@@ -11,10 +11,6 @@ _project_root = Path(__file__).resolve().parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-# Redirigir a la landing page si no hay parámetro de ruta
-if not st.query_params:
-    st.switch_page("src/ui/landing.py")
-
 from src.analyzer.batch_analyzer import BatchAnalyzer  # noqa: E402
 from src.config.settings import get_settings  # noqa: E402
 from src.knowledge_base.pdf_processor import PDFProcessor  # noqa: E402
