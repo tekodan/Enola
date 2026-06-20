@@ -1,0 +1,79 @@
+{
+    "violent_examples": [
+        {
+            "text": "Te voy a matar si seguís así",
+            "tipo": "verbal",
+            "severidad": "alta",
+            "indicadores": ["matar", "amenaza"]
+        },
+        {
+            "text": "Las mujeres solo sirven para cocinar y limpiar",
+            "tipo": "simbolica",
+            "severidad": "media",
+            "indicadores": ["estereotipo", "rol de genero"]
+        },
+        {
+            "text": "Si no accedés es tu culpa",
+            "tipo": "sexual",
+            "severidad": "alta",
+            "indicadores": ["culpa", "sexual"]
+        },
+        {
+            "text": "No te doy plata para que aprendas",
+            "tipo": "economica",
+            "severidad": "media",
+            "indicadores": ["plata", "control"]
+        },
+        {
+            "text": "Le pegó a su esposa",
+            "tipo": "fisica",
+            "severidad": "alta",
+            "indicadores": ["pegar", "golpe"]
+        },
+        {
+            "text": "No sos nada sin mí",
+            "tipo": "psicologica",
+            "severidad": "media",
+            "indicadores": ["control", "manipulacion"]
+        },
+        {
+            "text": "Si me dejás le hago daño a los hijos",
+            "tipo": "vicaria",
+            "severidad": "alta",
+            "indicadores": ["hijos", "amenaza"]
+        },
+        {
+            "text": "Sos una zorra",
+            "tipo": "verbal",
+            "severidad": "media",
+            "indicadores": ["insulto", "denigrante"]
+        }
+    ],
+    "neutral_examples": [
+        {
+            "text": "Qué lindo día hace hoy",
+            "tipo": "ninguna",
+            "severidad": "ninguna"
+        },
+        {
+            "text": "Feliz cumpleaños",
+            "tipo": "ninguna",
+            "severidad": "ninguna"
+        },
+        {
+            "text": "El clima está nice",
+            "tipo": "ninguna",
+            "severidad": "ninguna"
+        },
+        {
+            "text": "Compartí esta foto",
+            "tipo": "ninguna",
+            "severidad": "ninguna"
+        },
+        {
+            "text": "Hoy comí pizza",
+            "tipo": "ninguna",
+            "severidad": "ninguna"
+        }
+    ]
+}

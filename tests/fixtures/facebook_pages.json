@@ -1,0 +1,26 @@
+[
+    {
+        "id": "page-001",
+        "name": "Pagina de Prueba 1",
+        "url": "https://facebook.com/pagina-prueba-1",
+        "likes": 10000,
+        "description": "Una pagina de prueba para testing",
+        "category": "Entretenimiento"
+    },
+    {
+        "id": "page-002",
+        "name": "Pagina de Prueba 2",
+        "url": "https://facebook.com/pagina-prueba-2",
+        "likes": 5000,
+        "description": "Otra pagina de prueba",
+        "category": "Noticias"
+    },
+    {
+        "id": "page-003",
+        "name": "Pagina de Prueba 3",
+        "url": "https://facebook.com/pagina-prueba-3",
+        "likes": 7500,
+        "description": "Una tercera pagina de prueba",
+        "category": "Deportes"
+    }
+]

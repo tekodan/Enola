@@ -1,0 +1,56 @@
+app:
+  name: "TFM - Detección de Violencia de Género"
+  version: "1.0.0"
+  debug: false
+  log_level: "INFO"
+
+ollama:
+  base_url: "http://localhost:11434"
+  llm_model: "gemma4:e4b-it-qat-asst-think-64k"
+  embedding_model: "snowflake-arctic-embed:m"
+  timeout: 300
+
+scraper:
+  max_posts_per_page: 50
+  max_comments_per_post: 100
+  delay_between_requests: 2.0
+  timeout: 300
+  user_agent: "Mozilla/5.0 (compatible; ResearchBot/1.0)"
+  headless: true
+
+analyzer:
+  similarity_threshold: 0.7
+  context_chunks: 5
+  temperature: 0
+  max_tokens: 2048
+  few_shot_examples: 5
+
+knowledge_base:
+  chunk_size: 500
+  chunk_overlap: 50
+  collection_name: "violencia_genero"
+  persist_directory: "data/chroma_db"
+
+storage:
+  database_path: "data/tfm.db"
+  export_dir: "data/exports"
+  backup_enabled: true
+  backup_interval_hours: 24
+
+discovery:
+  max_iterations: 3
+  min_violence_score: 0.7
+  batch_size: 10
+  related_pages_limit: 20
+  groups_keywords:
+    - "política"
+    - "fútbol"
+    - "noticias"
+    - "debate"
+    - "opinión"
+
+pipeline:
+  enable_discovery: true
+  enable_backup: true
+  checkpoint_interval: 10
+  max_parallel_pages: 3

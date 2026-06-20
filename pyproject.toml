@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tfm-violencia-genero"
+version = "1.0.0"
+description = "Sistema de detección de violencia de género en Facebook usando RAG"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.12"
+authors = [
+    {name = "Investigador", email = "investigador@example.com"}
+]
+keywords = ["facebook", "violence-detection", "rag", "nlp", "research"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "scrapegraphai>=1.0.0",
+    "langchain>=0.3.0",
+    "langchain-chroma>=0.1.2",
+    "chromadb>=0.5.0",
+    "pydantic>=2.0.0",
+    "sqlalchemy>=2.0.0",
+    "streamlit>=1.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "mypy>=1.8.0",
+    "ruff>=0.2.0",
+    "black>=24.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/investigador/tfm-violencia-genero"
+Documentation = "https://github.com/investigador/tfm-violencia-genero/docs"
+Repository = "https://github.com/investigador/tfm-violencia-genero"
+
+[project.scripts]
+tfm = "cli.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "src"]
+pythonpath = ["src", "tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short --cov=src --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+strict_optional = true
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.isort]
+profile = "black"
+line_length = 100

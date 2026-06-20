@@ -1,0 +1,286 @@
+{
+  "mode": "llm",
+  "n_results": 30,
+  "chunks": [
+    {
+      "text": "y la gestión experta de diccionarios (lexicones).| Dimensión a Programar (Código) | Técnicas de Preprocesamiento Requeridas (PLN) | Algoritmo / Clasificador Sugerido | Observaciones de Programación (Feature Engineering) | | ----- | ----- | ----- | ----- | | Requisitos Globales del Sistema (Aplica a 5.0) | Actualización de Léxicos / Diccionarios Personalizados: El preprocesamiento NO debe eliminar los neologismos (ej. \"mangina\", \"viogen\", \"pagafantas\", \"feminazi\").",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 94,
+      "distance": 0.8888508677482605,
+      "id": "doc_94"
+    },
+    {
+      "text": "encia simbólica en textos cortos (redes sociales).| Dimensión a Programar (Código) | Técnicas de Preprocesamiento Requeridas (PLN) | Algoritmo / Clasificador Sugerido | Observaciones de Programación (Feature Engineering) | | ----- | ----- | ----- | ----- | | Requisitos Globales del Sistema (Aplica a 3.0) | Lematización: Convertir palabras a su forma canónica para unificar términos (ej.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 80,
+      "distance": 0.9100130796432495,
+      "id": "doc_80"
+    },
+    {
+      "text": "semánticos (Part-of-Speech tagging). | SVM Lineal.| Configurar reglas que detecten la \"victimización invertida\"; buscar estructuras sintácticas pasivas donde se diluya la responsabilidad del agresor o se culpe a la víctima | Libro de Códigos: Misoginia Organizada, Manosfera y Victimismo (Instrucciones para el Software) | Variable / Dimensión | Código | Definición Operacional Refinada | Reglas de Inclusión (Marcadores para el Software) | Ejemplos de Unidades de Análisis (Dataset) | | ----- | ----- | ----- | ----- | ----- | | Misoginia Organizada y Manosfera | 5.0 | Discursos coordinados por subculturas masculinistas que denigran a las mujeres basándose en el esencialismo biológico, la hipergamia, la cosificación y el victimismo frente al feminismo.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 85,
+      "distance": 0.9338873624801636,
+      "id": "doc_85"
+    },
+    {
+      "text": "arecer\" (Detección de odio explícito y exclusión).Categoría 3: Violencia Política contra la Mujer (VCMP) Código de programación: `VDGPOLITICAVCMP` Definición Teórica: Uso de las plataformas digitales para reproducir estereotipos sexistas con el fin de ridiculizar, deslegitimar y silenciar la capacidad de liderazgo o la voz pública de las mujeres en el ámbito político, activista o periodístico.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 69,
+      "distance": 0.9490265250205994,
+      "id": "doc_69"
+    },
+    {
+      "text": "s de gendertrolling* coordinadas contra lideresas.Libro de Códigos: Violencia Simbólica y Estructural (Instrucciones de Detección para el Software) | Variable / Dimensión | Código | Definición Operacional Refinada | Reglas de Inclusión (Marcadores para el Software) | Ejemplos de Unidades de Análisis (Dataset) | | ----- | ----- | ----- | ----- | ----- | | Violencia Simbólica y Estructural | 3.0 | Uso del lenguaje en el ecosistema digital para legitimar y naturalizar sistemas de opresión, imponiendo el orden social mediante la espectacularización de la violencia o la invalidación.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 71,
+      "distance": 0.9565125703811646,
+      "id": "doc_71"
+    },
+    {
+      "text": "--------------------------------------------- 1.1.Dimensión Léxica: Diccionario de Insultos por Intensidad El software debe clasificar los términos según su carga emocional y potencial de daño Insultos de Intensidad Alta (Baneables/Alertas Rojas): Sustantivos denigrantes: \"Puta\", \"zorra\", \"perra\", \"marimacho\", \"ramera\", \"malnacida\", \"bicha\", \"cabrona\", \"puerca\", \"basura infecta\", \"hija de la gran puta\", \"cerda\".",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 1,
+      "distance": 0.966477632522583,
+      "id": "doc_1"
+    },
+    {
+      "text": "ados de emoticonos de carácter sexual despectivo .Grooming: Activar protocolos de seguridad máxima si el algoritmo detecta a un adulto intentando ganar la confianza de una cuenta identificada como menor de edad mediante insinuaciones sexuales Clasificación Nivel 1.3: Misoginia Virtual Organizada (Manosfera) Esta categoría se define técnicamente como un conglomerado de comunidades digitales (foros, grupos de Facebook, canales de Telegram) donde se articula un discurso de oposición activa al feminismo y la igualdad de género, utilizando el anonimato y la cultura del troleo para disciplinar a las mujeres.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 20,
+      "distance": 0.9839550256729126,
+      "id": "doc_20"
+    },
+    {
+      "text": "pecto físico o la conducta sexual de la política .3\\. Dimensión de Desinformación y Manipulación Digital Uso de herramientas tecnológicas avanzadas para distorsionar la realidad (Clúster Politics y Deep-learning): Manipulación de Imágenes y Deepfakes: Creación de contenido visual falso, incluyendo pornografía generada por IA o fotos manipuladas para ridiculizar. Campañas de Difamación (Fake News): Publicación de noticias falsas o engañosas para dañar la reputación política de forma viral .",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 51,
+      "distance": 0.9936815500259399,
+      "id": "doc_51"
+    },
+    {
+      "text": "rna no es la dominante en la red social analizada.Marcadores para el software: Mofas sobre el acento, errores gramaticales o el estatus migratorio, utilizados como herramientas de disciplina y exclusión. \\-------------------------------------------------------------------------------- Lógica de Programación Sugerida (Interseccionalidad) Para que el software sea efectivo en esta categoría, el ingeniero debe programar una regla de \"co-ocurrencia\": 1.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 45,
+      "distance": 1.0175962448120117,
+      "id": "doc_45"
+    },
+    {
+      "text": "s distinto según la posición social de la víctima.Esta categoría permite que tu software pase de una detección genérica a una detección sofisticada y sensible al contexto social real, tal como propone la investigación feminista citada. Clasificación Detallada: Violencia Digital contra las Mujeres en Política (VCMP) 1\\.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 47,
+      "distance": 1.0265798568725586,
+      "id": "doc_47"
+    },
+    {
+      "text": "--------------------------------------------- 1.2.Dimensión Discursiva: Patrones de Dominación y EstereotiposEl software no solo debe buscar palabras sueltas, sino detectar estructuras gramaticales que refuercen la jerarquía de género . Mandatos de sumisión y espacio: \"Vuelve a la cocina\", \"ve a hacerme un sandwich\", \"mujer florero\", \"calladita te ves más bonita\", \"pónganse a fregar/barrer\" .",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 4,
+      "distance": 1.040280818939209,
+      "id": "doc_4"
+    },
+    {
+      "text": "------------------------------------------- 1.3.1.Taxonomía de Subculturas (Filtro por Perfiles) El software debe ser capaz de identificar marcadores asociados a subgrupos específicos que tienen sus propias jerergas: Incels (Celibato Involuntario): Hombres que culpan a las mujeres por su nula vida sexual; suelen usar un lenguaje de odio extremo y victimismo narcisista MGTOW (Men Going Their Own Way): Grupos que promueven la separación total de las mujeres, a las que ven como \"plagas\" o \"fuerzas malignas\" Pick Up Artists (PUA): Se enfocan en la manipulación y la persistencia sexual, ignorando el consentimiento y tratándolo como un \"obstáculo en el juego\" .",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 22,
+      "distance": 1.0425536632537842,
+      "id": "doc_22"
+    },
+    {
+      "text": "sin ser desafiadas por perspectivas alternativas .Identificación de \"Caballos de Troya\": Detectar perfiles que dicen ser feministas pero entran en grupos de opinión para desprestigiar a referentes del movimiento utilizando términos como \"TERF\" . Priorización de \"Bilis Digital\": Activar alertas máximas cuando se detecten ataques coordinados (como el sufrido por la Cátedra Feminismos 4.0 u otras investigadoras) orquestados desde foros como Forocoches o similares .",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 28,
+      "distance": 1.050224781036377,
+      "id": "doc_28"
+    },
+    {
+      "text": "ender para clasificar los comentarios de Facebook.A partir de la revisión de la literatura y la jurisprudencia colombiana, el Libro de Códigos se compone de las siguientes categorías analíticas: Categoría 1: Estereotipos, Dominación y Doble Estándar Código de programación: `VDG ESTEREOTIPO` Definición Teórica: Mensajes que expresan ideas falsas sobre las mujeres, sugiriendo que son más adecuadas para ciertos roles domésticos o de sumisión, o afirmando que son inapropiadas para ciertas tareas profesionales y públicas, así como expresiones que cosifican y juzgan su libertad sexual.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 65,
+      "distance": 1.0545902252197266,
+      "id": "doc_65"
+    },
+    {
+      "text": "normalizar términos con caracteres repetidos (ej.\"agresivooo\") a su forma base (\"agresivo\") antes de clasificarlos Uso de Mayúsculas Sostenidas: Identificar el uso de mayúsculas e intensificadores como marcador de alta carga emocional y agresividad, lo cual es común en insultos de intensidad alta como \"ASESINOS\" Desplazamiento Semántico y Multimodal: Ironía y Sarcasmo: El software debe emplear modelos de auto-atención (Transformers) para detectar cuando una frase aparentemente neutral es un ataque, como en \"calladita te ves más bonita\" Uso de Memes e Imágenes: Integrar detección multimodal, ya que los usuarios trasladan el odio a formatos visuales o memes para que los filtros de texto no los detecten Neologismos de Subcultura: Rastrear jerga específica de la manosfera como \"feminazi\", \"hembrismo\" o \"shur\", que a menudo no están en los diccionarios estándar Módulo 2: Identificación de Lógicas de Moderación de Plataformas El software debe mapear cómo operan las redes sociales (Meta, X) para anticipar qué contenido será bloqueado y bajo qué criterios Temporalidad de la Moderación: Moderación ex ante: Filtros automáticos que revisan el contenido antes de su publicación para evitar prohibiciones absolutas Moderación ex post: Revisión reactiva basada en denuncias de otros usuarios tras la publicación del mensaje Jerarquía de Discursos (Criterio de la Corte Constitucional): Nivel 1 (Discurso Prohibido): Identificar contenidos que las plataformas eliminan automáticamente, como incitación al genocidio, pornografía infantil o apología del odio que incite a la violencia .",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 116,
+      "distance": 1.066009759902954,
+      "id": "doc_116"
+    },
+    {
+      "text": "afortunado tu marido de tener una mujer como tú\".Categoría 2: Discurso de Odio y Misoginia Explícita Código de programación: `VDGODIOMISOGINO` Definición Teórica: Textos que expresan odio o prejuicios extremos hacia las mujeres basados en sus atributos inherentes de género, buscando infundir miedo o amenazar para que se sientan inseguras. Abarca desde los insultos directos que ofenden y humillan hasta la violencia no sexual explícita.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 67,
+      "distance": 1.0903899669647217,
+      "id": "doc_67"
+    },
+    {
+      "text": "Digital contra las Mujeres en Política (VCMP) 1\\.Dimensión de Deslegitimación de la Capacidad y el Liderazgo El software debe identificar ataques que no solo ofenden, sino que buscan anular la autoridad política de la mujer: Ridiculización de la Gestión: Conductas destinadas a burlarse de la capacidad de mando, liderazgo o conocimientos técnicos Tropos de Irracionalidad: Uso de estereotipos que presentan a la mujer como incapaz de tomar decisiones racionales o con \"ausencia de autocontrol\" Cuestionamiento del Mérito: Narrativas que sugieren que la posición de poder fue obtenida por favores sexuales o por ser una \"mujer instrumental\" de un hombre.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 48,
+      "distance": 1.0938217639923096,
+      "id": "doc_48"
+    },
+    {
+      "text": "Clasificación Nivel 1: Hostigamiento y Ciberacoso Sexista Esta categoría se define técnicamente como el ejercicio abusivo de la libertad de expresión mediante la publicación reiterada y sistemática de vejaciones e insultos con una intención dañina y ofensiva. Su objetivo es el asedio verbal, la humillación y la exclusión social de la mujer en el entorno digital \\-------------------------------------------------------------------------------- 1.1.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 0,
+      "distance": 1.0963374376296997,
+      "id": "doc_0"
+    },
+    {
+      "text": "icos cosificadores junto a vocabulario despectivo.| Textos que utilizan el símil de \"tomarse la pastilla roja\" para despertar a la realidad del poder sexual femenino, justificando su cosificación. | \\-------------------------------------------------------------------------------- Matriz de Implementación Algorítmica y Feature Engineering (Para el Ingeniero de Sistemas) Instrucciones para el equipo de desarrollo: La \"Manosfera\" utiliza un vocabulario que evoluciona rápidamente.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 92,
+      "distance": 1.099225401878357,
+      "id": "doc_92"
+    },
+    {
+      "text": "cto que cierre tu marco teórico con broche de oro?ESTA PARTE NO SE SI TE SIRVA PERO AHI VA Mapeo de estereotipos en tu software, he integrado la categorización técnica de la Corte Constitucional de Colombia (Sentencia T-140 de 2021\\) adaptada al entorno digital, junto con hallazgos de investigaciones lingüísticas sobre sexismo en redes sociales de 2025 .",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 103,
+      "distance": 1.1024234294891357,
+      "id": "doc_103"
+    },
+    {
+      "text": "cción de exigencia de rol tradicional y sumisión).Justificación Sociojurídica (Contexto Colombia): Las estructuras de género tradicionalistas en Colombia y Latinoamérica generan que los hombres evalúen con mayor severidad las conductas de las mujeres cuando se salen de los roles establecidos Diseño del Libro de Códigos para la Inteligencia Artificial Según la metodología cuantitativa y cualitativa propuesta por Hernández-Sampieri y Mendoza, el libro de códigos es el documento rector que describe las variables de investigación, sus categorías, y los códigos asignados para guiar el análisis de los datos.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 63,
+      "distance": 1.1117045879364014,
+      "id": "doc_63"
+    },
+    {
+      "text": "gramas (\"solo por dinero\", \"mujeres interesadas\").| SVM RBF o XGBoost | El sistema debe levantar una alerta cuando el campo semántico de la economía/genética coocurra en una misma oración con menciones al género femenino. | | 5.3 Ataque Institucional y Paranoia Legal | Reconocimiento de Entidades Nombradas (NER) para detectar instituciones o leyes reales. | Redes Neuronales Artificiales (RNA) o LSTM.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 98,
+      "distance": 1.1236284971237183,
+      "id": "doc_98"
+    },
+    {
+      "text": "les. | Redes Neuronales Artificiales (RNA) o LSTM.| Programar una alta penalización (riesgo de odio) cuando se detecte el prefijo \"falsa\" justo después de términos de naturaleza jurídica como \"denuncia\" o \"violación\". | | 5.4 Cosificación y Lenguaje Codificado | Bolsa de palabras (BoW) con peso por Frecuencia de Término (TF-IDF). | MNB (Multinomial Naive Bayes) complementado con SVM.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 99,
+      "distance": 1.1306663751602173,
+      "id": "doc_99"
+    },
+    {
+      "text": "ansgredir las estructuras tradicionales de género.El modelo debe buscar patrones lingüísticos donde se castigue social o moralmente la libertad femenina, incluyendo dinámicas de slut-shaming (castigo por un comportamiento sexual considerado inapropiado para lo femenino) . Marcadores Lingüísticos a detectar (PLN): Asociación de pronombres femeninos o nombres de activistas con léxico que evalúe severamente su moralidad (ej. cruces semánticos entre libertad y términos denigrantes).",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 60,
+      "distance": 1.1353460550308228,
+      "id": "doc_60"
+    },
+    {
+      "text": "odio>`, cruzado con imperativos de silenciamiento.| | 3.3 Espectacularización del Terror | Análisis de polaridad de sentimientos cruzado con léxicos híbridos de agresividad. | Clasificador supervisado XGBoost o SVM. | El sistema debe marcar altos niveles de riesgo cuando detecte coocurrencia de la entidad \"mujer\" con términos del campo semántico de \"asesinato\" o \"violación\". | | 3.4 Invalidación y Estigma | Etiquetado de roles semánticos (Part-of-Speech tagging). | SVM Lineal.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 84,
+      "distance": 1.1436030864715576,
+      "id": "doc_84"
+    },
+    {
+      "text": "n social bajo la apariencia de \"entretenimiento\" .Efecto de Disciplinamiento: Ataques masivos (efecto bola de nieve) que buscan que la mujer abandone la red social para evitar el asedio. \\------------------------------------------------------------------------------- Reglas de Lógica Algorítmica para esta Categoría Detección de \"Cámaras de Eco\": El software debe identificar si el mensaje proviene de hilos donde se refuerzan posturas radicales sin ser desafiadas por perspectivas alternativas .",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 27,
+      "distance": 1.1453557014465332,
+      "id": "doc_27"
+    },
+    {
+      "text": "utiliza un vocabulario que evoluciona rápidamente.Esta matriz detalla los requerimientos técnicos para que el clasificador detecte el odio ideológico e indirecto, recomendando el uso de modelos Transformer preentrenados y la gestión experta de diccionarios (lexicones).",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 93,
+      "distance": 1.1579105854034424,
+      "id": "doc_93"
+    },
+    {
+      "text": "xtos más allá de la simple repetición de palabras.| Manejo de Palabras Vacías (Stop words): No eliminar pronombres personales ni conjunciones adversativas indiscriminadamente, ya que son esenciales para detectar la inversión de roles y la justificación de la violencia. | | 3.1 Naturalización Patriarcal y Estereotipos | Bolsa de palabras (Bag of Words) y extracción de n-gramas (bigramas/trigramas). | SVM Lineal o Redes Neuronales Artificiales (RNA).",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 82,
+      "distance": 1.1619012355804443,
+      "id": "doc_82"
+    },
+    {
+      "text": "política, videojuegos o deportes como el fútbol .Mandato de sumisión: El software debe capturar frases que exijan el retorno al espacio privado, como \"vuelve a la cocina\" o \"calladita te ves más bonita\" . 4\\. Estereotipos sobre la \"Víctima Ideal\" El juicio social en Facebook y X suele evaluar a la víctima bajo un canon que el software debe identificar para evitar la revictimización La \"buena víctima\": Aquella que es inocente, débil y no tiene relación previa con el agresor.",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 111,
+      "distance": 1.1624974012374878,
+      "id": "doc_111"
+    },
+    {
+      "text": "nto y tratándolo como un \"obstáculo en el juego\" .Activistas de los Derechos de los Hombres (ADH): Ideólogos que sostienen que la violencia no tiene género y que las leyes actuales criminalizan injustamente al hombre . 1.3.2. Dimensión Léxica: Neologismos y Lexicalización Polarizante El sistema debe rastrear términos creados específicamente para deslegitimar el activismo feminista : Etiquetas peyorativas: \"Feminazi\", \"hembrismo\", \"misandria\", \"facha-pobre\", \"sanchicomunista\", \"Woke\", \"TERF\" .",
+      "source": "CATEGORIAS TFM CONSOLIDADO.md",
+      "chunk_index": 23,
+      "distance": 1.1649655103683472,
+      "id": "doc_23"
+    }
+  ],
+  "taxonomy": {
+    "fuente": "CATEGORIAS TFM CONSOLIDADO.md",
+    "niveles": [
+      {
+        "codigo": "3.",
+        "nombre": "Misoginia Organizada y Manosfera",
+        "subdimensiones": [],
+        "codigos_programaticos": []
+      },
+      {
+        "codigo": "1.1",
+        "nombre": "Dimensión Léxica: Diccionario de Insultos por Intensidad",
+        "subdimensiones": [
+          {
+            "codigo": "Insultos de Intensidad Alta (Baneables/Alertas Rojas)",
+            "definicion": "Sustantivos denigrantes: \"Puta\", \"zorra\", \"perra\", \"marimacho\", \"ramera\", \"malnacida\", \"bicha\", \"cabrona\", \"puerca\", \"basura infecta\", \"hija de la gran puta\", \"cerda\"."
+          }
+        ],
+        "codigos_programaticos": []
+      },
+      {
+        "codigo": "VDG ESTEREOTIPO",
+        "nombre": "Estereotipos, Dominación y Doble Estándar",
+        "subdimensiones": [],
+        "codigos_programaticos": [
+          "VDG ESTEREOTIPO"
+        ]
+      },
+      {
+        "codigo": "1.",
+        "nombre": "Hostigamiento y Ciberacoso Sexista",
+        "subdimensiones": [
+          {
+            "codigo": "1.1",
+            "nombre": "Dimensión Léxica: Diccionario de Insultos por Intensidad"
+          }
+        ],
+        "codigos_programaticos": []
+      },
+      {
+        "codigo": "VDGODIOMISOGINO",
+        "nombre": "Discurso de Odio y Misoginia Explícita",
+        "subdimensiones": [],
+        "codigos_programaticos": [
+          "VDGODIOMISOGINO"
+        ]
+      }
+    ],
+    "categorias_programaticas": [
+      {
+        "codigo": "VDGPOLITICAVCMP",
+        "nombre": "Violencia Política contra la Mujer (VCMP)",
+        "dimension": "Política"
+      },
+      {
+        "codigo": "3.0",
+        "nombre": "Violencia Simbólica y Estructural",
+        "dimension": "Estructural"
+      }
+    ],
+    "perfiles_constitucionales": [
+      {
+        "nombre": "T-140/2021 - Clasificación de la Corte Constitucional de Colombia adaptada al entorno digital",
+        "descripcion": "Mapeo de estereotipos en software."
+      }
+    ],
+    "total_categorias_nivel_1": 5,
+    "total_subdimensiones": 3
+  },
+  "diff": null
+}

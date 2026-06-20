@@ -1,0 +1,94 @@
+# ─────────────────────────────────────────────────────────────────────
+# Entornos virtuales y dependencias
+# ─────────────────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+build/
+dist/
+.eggs/
+*.egg
+
+# ─────────────────────────────────────────────────────────────────────
+# Bytecode y caches de Python / linters / type checkers
+# ─────────────────────────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.cache/
+
+# ─────────────────────────────────────────────────────────────────────
+# Artefactos de herramientas de IA (aider, cursor, etc.)
+# ─────────────────────────────────────────────────────────────────────
+.aider*
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4
+.cursor/
+.windsurf/
+.continue/
+.claude/
+
+# ─────────────────────────────────────────────────────────────────────
+# Secretos y configuración local
+# ─────────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─────────────────────────────────────────────────────────────────────
+# Datos de runtime (ChromaDB, SQLite, exports, sesiones)
+# Mantener estructura con .gitkeep en carpetas vacías
+# ─────────────────────────────────────────────────────────────────────
+#data/chroma_db/
+#data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/exports/
+data/*_auth.json
+data/cookies.json
+data/facebook_auth.json
+
+# ─────────────────────────────────────────────────────────────────────
+# Muestras grandes / binarios descargables
+# ─────────────────────────────────────────────────────────────────────
+mentalidad100.html
+*.zip
+*.tar.gz
+*.tar.bz2
+
+# ─────────────────────────────────────────────────────────────────────
+# Sistema operativo y editores
+# ─────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.bak
+
+# ─────────────────────────────────────────────────────────────────────
+# Logs y temporales
+# ─────────────────────────────────────────────────────────────────────
+*.log
+*.log.*
+*.tmp
+*.pid
+nohup.out

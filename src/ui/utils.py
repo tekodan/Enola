@@ -1,0 +1,238 @@
+"""Shared helpers for the Enola Investigadora Digital Streamlit UI.
+
+Centralizes:
+- DB data loading with caching
+- Human-readable category labels
+- Altair chart builders (pie + bar)
+- Knowledge base ZIP packaging for download
+- KPI computation from analysis results
+"""
+
+from __future__ import annotations
+
+import io
+import zipfile
+from collections import Counter
+from collections.abc import Sequence
+from datetime import datetime
+from pathlib import Path
+
+import altair as alt
+import pandas as pd
+
+from src.analyzer.category_mapping import CATEGORIAS_ORDENADAS
+from src.storage import get_database
+from src.storage.database import Database
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+LOGO_PATH = PROJECT_ROOT / "src" / "logo.png"
+KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge" / "categorias-violencia-genero-digital"
+README_PATH = PROJECT_ROOT / "README.md"
+SPEC_PATH = PROJECT_ROOT / "SPEC.md"
+
+GITHUB_REPO_URL = "https://github.com/investigador/tfm-violencia-genero"
+GITHUB_FORK_URL = "https://github.com/investigador/tfm-violencia-genero/fork"
+CONTACT_EMAIL = "investigador@example.com"
+
+CATEGORIA_LABELS: dict[str, str] = {
+    "VDG_VIOLENCIA_SIMBOLICA": "Violencia Simbólica",
+    "VDG_COSIFICACION_SLUTSHAMING": "Cosificación / Slut-shaming",
+    "VDG_HOSTILIDAD_FEMINICIDIO": "Hostilidad / Feminicidio",
+    "VDG_MANOSFERA_ANTIFEMINISMO": "Manosfera / Antifeminismo",
+    "VDG_SALVAGUARDA_FALSO_POSITIVO": "Salvaguarda (Falso Positivo)",
+    "VDG_DESACREDITACION_ACTIVISTAS": "Desacreditación de Activistas",
+}
+
+CATEGORIA_COLORS: dict[str, str] = {
+    "VDG_VIOLENCIA_SIMBOLICA": "#e67e22",
+    "VDG_COSIFICACION_SLUTSHAMING": "#8e44ad",
+    "VDG_HOSTILIDAD_FEMINICIDIO": "#c0392b",
+    "VDG_MANOSFERA_ANTIFEMINISMO": "#16a085",
+    "VDG_SALVAGUARDA_FALSO_POSITIVO": "#7f8c8d",
+    "VDG_DESACREDITACION_ACTIVISTAS": "#d35400",
+}
+
+VIOLENT_COLOR = "#c0392b"
+NON_VIOLENT_COLOR = "#27ae60"
+
+
+def label_for(code: str) -> str:
+    """Return the human-readable label for a VDG_* code, or the code itself."""
+    return CATEGORIA_LABELS.get(code, code)
+
+
+def color_for(code: str) -> str:
+    """Return the chart color for a VDG_* code, or a neutral gray."""
+    return CATEGORIA_COLORS.get(code, "#95a5a6")
+
+
+def load_data() -> tuple[dict, list[dict], list[dict], list[dict]]:
+    """Load DB stats, analysis results, posts, and pages in one shot."""
+    db: Database = get_database()
+    return (
+        db.get_stats(),
+        db.get_analysis_results(),
+        db.get_posts(limit=1000),
+        db.get_pages(limit=100),
+    )
+
+
+def filter_by_content_type(analysis: Sequence[dict], content_type: str) -> list[dict]:
+    """Filter analysis results by 'post', 'comment', or 'all'."""
+    if content_type == "all":
+        return list(analysis)
+    return [a for a in analysis if a.get("content_type") == content_type]
+
+
+def compute_pie_data(results: Sequence[dict]) -> pd.DataFrame:
+    """Build a DataFrame for the violent vs non-violent pie chart."""
+    counts = Counter(a.get("tiene_violencia") for a in results)
+    violent = counts.get("true", 0)
+    non_violent = counts.get("false", 0)
+    other = len(results) - violent - non_violent
+    rows: list[dict[str, object]] = [
+        {"Estado": "Con violencia", "Cantidad": violent},
+        {"Estado": "Sin violencia", "Cantidad": non_violent},
+    ]
+    if other:
+        rows.append({"Estado": "Sin clasificar", "Cantidad": other})
+    return pd.DataFrame(rows)
+
+
+def compute_bar_data(results: Sequence[dict]) -> pd.DataFrame:
+    """Build a DataFrame for the per-category bar chart.
+
+    Always includes the 6 canonical categories; missing ones get 0
+    so the chart stays stable across data changes.
+    """
+    violent = [a for a in results if a.get("tiene_violencia") == "true"]
+    counts = Counter(a.get("categoria", "ninguna") for a in violent)
+    total = sum(counts.get(c, 0) for c in CATEGORIAS_ORDENADAS)
+    rows: list[dict[str, object]] = []
+    for code in CATEGORIAS_ORDENADAS:
+        n = counts.get(code, 0)
+        pct = (n / total * 100.0) if total > 0 else 0.0
+        rows.append(
+            {
+                "Categoría": label_for(code),
+                "Código": code,
+                "Cantidad": n,
+                "Porcentaje": round(pct, 1),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_pie_chart(df: pd.DataFrame) -> alt.Chart:
+    """Build an interactive donut chart for violent vs non-violent."""
+    return (
+        alt.Chart(df)
+        .mark_arc(innerRadius=80, outerRadius=140, stroke="#fff", strokeWidth=2)
+        .encode(
+            theta=alt.Theta("Cantidad:Q", title=None),
+            color=alt.Color(
+                "Estado:N",
+                scale=alt.Scale(
+                    domain=["Con violencia", "Sin violencia", "Sin clasificar"],
+                    range=[VIOLENT_COLOR, NON_VIOLENT_COLOR, "#bdc3c7"],
+                ),
+                legend=alt.Legend(title="Estado", orient="bottom"),
+            ),
+            tooltip=[
+                alt.Tooltip("Estado:N", title="Estado"),
+                alt.Tooltip("Cantidad:Q", title="Cantidad"),
+            ],
+        )
+        .properties(height=320)
+    )
+
+
+def build_bar_chart(df: pd.DataFrame) -> alt.Chart:
+    """Build a horizontal bar chart with the 6 canonical categories."""
+    return (
+        alt.Chart(df)
+        .mark_bar(cornerRadiusEnd=4)
+        .encode(
+            x=alt.X("Porcentaje:Q", title="% sobre contenido violento"),
+            y=alt.Y(
+                "Categoría:N",
+                sort=alt.SortField(field="Porcentaje", order="descending"),
+                title=None,
+            ),
+            color=alt.Color(
+                "Código:N",
+                scale=alt.Scale(
+                    domain=CATEGORIAS_ORDENADAS,
+                    range=[CATEGORIA_COLORS[c] for c in CATEGORIAS_ORDENADAS],
+                ),
+                legend=None,
+            ),
+            tooltip=[
+                alt.Tooltip("Categoría:N", title="Categoría"),
+                alt.Tooltip("Cantidad:Q", title="Cantidad"),
+                alt.Tooltip("Porcentaje:Q", title="%", format=".1f"),
+            ],
+        )
+        .properties(height=320)
+    )
+
+
+def build_knowledge_zip() -> bytes:
+    """Zip the canonical knowledge base directory in memory.
+
+    Returns the raw bytes of a ZIP containing all .md files in
+    ``knowledge/categorias-violencia-genero-digital/`` with their
+    relative paths preserved (e.g. ``glosario/jerga-manosfera.md``).
+    """
+    if not KNOWLEDGE_DIR.is_dir():
+        return b""
+
+    buf = io.BytesIO()
+    base = KNOWLEDGE_DIR.parent
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(KNOWLEDGE_DIR.rglob("*.md")):
+            arcname = path.relative_to(base)
+            zf.write(path, arcname=str(arcname))
+    return buf.getvalue()
+
+
+def knowledge_zip_filename() -> str:
+    """Return a dated filename for the knowledge base zip download."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    return f"enola-taxonomia-violencia-{today}.zip"
+
+
+def knowledge_summary() -> dict[str, int]:
+    """Return summary stats about the knowledge directory contents."""
+    if not KNOWLEDGE_DIR.is_dir():
+        return {"files": 0, "size_bytes": 0}
+    files = list(KNOWLEDGE_DIR.rglob("*.md"))
+    size = sum(f.stat().st_size for f in files)
+    return {"files": len(files), "size_bytes": size}
+
+
+def compute_kpis(
+    stats: dict, analysis: Sequence[dict], knowledge: dict[str, int]
+) -> dict[str, object]:
+    """Compute the four headline KPIs for the hero section."""
+    total = stats.get("analysis_results_count", 0) or 0
+    violent = sum(1 for a in analysis if a.get("tiene_violencia") == "true")
+    violent_pct = (violent / total * 100.0) if total else 0.0
+    top_cat: str | None = None
+    if violent:
+        counter = Counter(
+            a.get("categoria")
+            for a in analysis
+            if a.get("tiene_violencia") == "true" and a.get("categoria")
+        )
+        if counter:
+            top_cat = label_for(counter.most_common(1)[0][0])
+    return {
+        "total": total,
+        "violent": violent,
+        "violent_pct": round(violent_pct, 1),
+        "categories": len(CATEGORIAS_ORDENADAS),
+        "pages": stats.get("pages_count", 0) or 0,
+        "top_category": top_cat or "—",
+        "knowledge_files": knowledge.get("files", 0),
+    }

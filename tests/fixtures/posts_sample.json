@@ -1,0 +1,35 @@
+[
+    {
+        "id": "post-001",
+        "text": "Este es un post de prueba con contenido normal.",
+        "author": "Autor 1",
+        "date": "2024-01-15T10:30:00",
+        "likes": 100,
+        "comments_count": 20,
+        "shares": 5,
+        "url": "https://facebook.com/post/001",
+        "page_id": "page-001"
+    },
+    {
+        "id": "post-002",
+        "text": "Otro post de prueba con contenido diferente.",
+        "author": "Autor 2",
+        "date": "2024-01-15T11:00:00",
+        "likes": 150,
+        "comments_count": 30,
+        "shares": 10,
+        "url": "https://facebook.com/post/002",
+        "page_id": "page-001"
+    },
+    {
+        "id": "post-003",
+        "text": "Tercer post de prueba.",
+        "author": "Autor 3",
+        "date": "2024-01-15T12:00:00",
+        "likes": 200,
+        "comments_count": 40,
+        "shares": 15,
+        "url": "https://facebook.com/post/003",
+        "page_id": "page-002"
+    }
+]
