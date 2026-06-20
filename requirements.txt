@@ -1,55 +1,39 @@
-# Core dependencies
+# ─────────────────────────────────────────────────────────────────────
+# Dependencias del proyecto (slim — auditado contra código real)
+# ─────────────────────────────────────────────────────────────────────
+# Solo lo que se importa en runtime en src/.
+# Excluidos por no usarse: sentence-transformers, gradio, langchain*,
+# ollama (package), pydantic-settings, aiosqlite, httpx, python-dotenv,
+# python-dateutil, tqdm, rich, pytest*, mypy, ruff, black, isort, types-*
+#
+# Para dev local con tooling (pytest, mypy, ruff, etc.):
+#   pip install -e ".[dev]"   ← extras en pyproject.toml
+# ─────────────────────────────────────────────────────────────────────
+
+# Core scraping (browser automation + HTML parsing)
 scrapegraphai>=1.0.0
-langchain>=0.3.0
-langchain-chroma>=0.1.2
-langchain-community>=0.3.0
+playwright>=1.40
+beautifulsoup4>=4.12
+
+# Vector store (acceso DIRECTO, sin LangChain)
 chromadb>=0.5.0
 
-# LLM and embeddings
-ollama>=0.2.0
-sentence-transformers>=2.5.0
-
-# Data processing
-pydantic>=2.0.0
-pydantic-settings>=2.0.0
-pyyaml>=6.0.0
-python-dotenv>=1.0.0
-
-# Database
-sqlalchemy>=2.0.0
-aiosqlite>=0.20.0
-
-# PDF processing
-pypdf2>=3.0.0
-pdfplumber>=0.10.0
-
-# Web and API
-httpx>=0.27.0
+# HTTP client (a Ollama en localhost:11434)
 aiohttp>=3.9.0
 
+# Embeddings / similarity
+numpy>=1.26
+
+# Data + models
+pydantic>=2.0
+sqlalchemy>=2.0
+
+# Config
+pyyaml>=6.0
+
+# PDF ingestion
+pdfplumber>=0.10
+pypdf2>=3.0
+
 # UI
-streamlit>=1.30.0
-gradio>=4.0.0
-
-# Testing
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-pytest-cov>=4.1.0
-pytest-mock>=3.12.0
-pytest-httpserver>=1.0.0
-httpx>=0.27.0
-
-# Utilities
-python-dateutil>=2.8.0
-tqdm>=4.66.0
-rich>=13.0.0
-
-# Type checking
-mypy>=1.8.0
-types-pyyaml>=6.0.0
-types-requests>=2.31.0
-
-# Linting and formatting
-ruff>=0.2.0
-black>=24.0.0
-isort>=5.13.0
+streamlit>=1.30
