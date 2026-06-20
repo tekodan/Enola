@@ -26,6 +26,7 @@ from src.storage.database import Database
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 LOGO_PATH = PROJECT_ROOT / "src" / "logo.png"
+UGR_LOGO_PATH = PROJECT_ROOT / "src" / "ugr.png"
 KNOWLEDGE_DIR = PROJECT_ROOT / "knowledge" / "categorias-violencia-genero-digital"
 README_PATH = PROJECT_ROOT / "README.md"
 SPEC_PATH = PROJECT_ROOT / "SPEC.md"

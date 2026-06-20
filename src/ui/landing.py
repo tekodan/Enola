@@ -21,6 +21,7 @@ from src.ui.utils import (  # noqa: E402
     GITHUB_FORK_URL,
     GITHUB_REPO_URL,
     LOGO_PATH,
+    UGR_LOGO_PATH,
     build_bar_chart,
     build_knowledge_zip,
     build_pie_chart,
@@ -338,6 +339,19 @@ def render_about_section() -> None:
 def render_contact_footer() -> None:
     """Render the contact / credits footer."""
     st.divider()
+
+    if UGR_LOGO_PATH.exists():
+        ugr_col, txt_col = st.columns([1, 9])
+        with ugr_col:
+            st.image(str(UGR_LOGO_PATH), width=80)
+        with txt_col:
+            st.markdown("### 🎓 TFM — Universidad de Granada")
+            st.caption(
+                "Trabajo Final de Máster en detección de violencia de género digital "
+                "con RAG. Facultad de Ciencias / Escuela Técnica Superior de Ingenierías "
+                "Informática y de Telecomunicación, Universidad de Granada."
+            )
+
     st.markdown("### ✉️ Contacto y créditos")
     st.markdown(
         f"""
