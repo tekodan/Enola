@@ -106,7 +106,7 @@ def render_sidebar() -> str:
         st.markdown("#### 👥 Créditos")
         st.markdown(
             """
-            - **🔬 Investigadora:** Mishel Luna
+            - **🔬 Investigadora:** Kimberly Michell Luna Eraso
             - **🎓 Tutora de proyecto:** María del Mar García Vita
             """
         )
