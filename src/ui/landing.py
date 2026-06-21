@@ -102,6 +102,20 @@ def render_sidebar() -> str:
         st.link_button("⭐ Ver repo en GitHub", GITHUB_REPO_URL, width="stretch")
         st.link_button("🔀 Fork en GitHub", GITHUB_FORK_URL, width="stretch", type="secondary")
 
+        st.divider()
+        st.markdown("#### 👥 Créditos")
+        st.markdown(
+            """
+            - **🔬 Investigadora:** Mishel Luna
+            - **🎓 Tutora de proyecto:** María del Mar García Vita
+            """
+        )
+
+        st.divider()
+        st.markdown("#### 🎓 Universidad de Granada")
+        if UGR_LOGO_PATH.exists():
+            st.image(str(UGR_LOGO_PATH), width=120)
+
     return content_type
 
 
@@ -364,6 +378,18 @@ def render_contact_footer() -> None:
     st.caption("Inspirado en Enola Holmes, la detective en pro de la justicia.")
 
 
+def render_powered_by_footer() -> None:
+    """Render a small 'powered by' credit at the very bottom of the page."""
+    st.markdown(
+        """
+        <div style="text-align: center; font-size: 0.75rem; color: #888; margin-top: 2rem;">
+            Powered by <a href="https://danialva.com" target="_blank" style="color: #888;">danialva.com</a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def main() -> None:
     content_type = render_sidebar()
     render_hero()
@@ -384,6 +410,7 @@ def main() -> None:
     render_knowledge_section()
     render_about_section()
     render_contact_footer()
+    render_powered_by_footer()
 
 
 main()
