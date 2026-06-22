@@ -362,8 +362,8 @@ def render_contact_footer() -> None:
             st.markdown("### 🎓 TFM — Universidad de Granada")
             st.caption(
                 "Trabajo Final de Máster en detección de violencia de género digital "
-                "con RAG. Facultad de Ciencias / Escuela Técnica Superior de Ingenierías "
-                "Informática y de Telecomunicación, Universidad de Granada."
+                "con RAG. Máster Interuniversitario en Cultura de Paz, Conflictos, "
+                "Educación y Derechos Humanos, Universidad de Granada."
             )
 
     st.markdown("### ✉️ Contacto y créditos")
