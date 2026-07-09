@@ -77,3 +77,116 @@ from src.analyzer import RAGClassifier, ClassificationResult
 - **Line length**: 100 chars (ruff, black, isort). Target Python: 3.12.
 - **pytest addopts**: `-v --tb=short --cov=src --cov-report=term-missing` — coverage runs automatically.
 - **ruff select**: `["E", "F", "I", "N", "W", "UP"]` — import sorting (`I`) included in lint step.
+
+## Human-in-the-loop feedback
+
+The validation tab in `app.py` (`✅ Validación`) lets a reviewer agree or
+disagree with each RAG analysis. The corrections flow through two stores:
+
+- **SQLite** (`analysis_feedback` table) — single source of truth for the
+  reviewer's verdict, free-text reason and override fields
+  (`categoria` / `dimension` / `justificacion`). Upsert by
+  `analysis_result_id`.
+- **ChromaDB** (`feedback_corrections` collection) — only the
+  *disagreements with corrections* are pushed here. `RAGClassifier`
+  retrieves the top-3 relevant corrections per call and injects them
+  into the prompt as `[VALIDADO POR HUMANO]` few-shots, so the LLM
+  re-trains implicitly on each batch run.
+
+The **landing** page (`src/ui/landing.py`) shows the *adjusted* report:
+KPIs and charts are computed from `build_adjusted_analysis(...)` which
+overlays the latest feedback on top of the raw `analysis_results`. The
+sub-section in the "Reportes" tab of `app.py` keeps the raw view for
+debugging and exports a CSV/JSON of all reviewed rows.
+
+## Multi-label classification (multi-categoría)
+
+A single analyzed post/comment can carry **up to 5 labels** (each a
+`LabelAssignment` with its own categoria, sub-dimension, severidad,
+justificación, evidencia, marcadores, etc.). The architecture is:
+
+- **LLM output** (`RAGClassifier`): the prompt asks the LLM to return a
+  `clasificaciones: [...]` array (1..5 entries, deduped by
+  `(categoria, dimension)`). The legacy single-label JSON
+  (`categoria`/`dimension`/`justificacion`) is still accepted and
+  auto-wrapped into a 1-element list.
+- **Persistence** (`src/storage/database.py`): each analysis row
+  continues to live in `analysis_results`, but the full label list is
+  stored in the side table `analysis_labels` (one row per label,
+  FK CASCADE). The flat `analysis_results` columns
+  (`categoria`/`dimension`/`severidad`/`justificacion`/`evidencia`/...)
+  are populated with the **primary** label (highest severity; ties
+  broken by `orden`) so single-column queries and KPIs keep working.
+- **Feedback**: same pattern — `analysis_feedback_labels` side table
+  carries the reviewer's overrides; flat `corrected_*` columns mirror
+  the primary override.
+- **UI**: validation tab (`app.py:786`) renders a dynamic list of
+  per-label rows (categoria, dimensión, severidad, justificación,
+  evidencia, FPP), with `+ Agregar etiqueta` / `➖ Quitar` buttons
+  capped at `MAX_LABELS = 5`. The Inspector (`landing.py`) and
+  Reports tab display the full label list with per-label
+  justifications.
+- **KPIs / charts** (`src/ui/utils.py`): `compute_bar_data` and
+  `compute_kpis` iterate `r["labels"]` instead of the single
+  `categoria`, so a multi-label content contributes one vote per
+  category. `compute_label_distribution` provides a drill-down
+  view of the (categoria, dimension) pairs.
+- **Backfill**: the migration creates the new side tables but does
+  **not** backfill existing analyses. Run
+  `python -m src.report analyze --reanalyze` to repopulate with the
+  multi-label schema.
+- **Cap**: ``MAX_LABELS = 5`` in `src/analyzer/category_mapping.py`.
+  The LLM is told to return at most this many labels; the rule-based
+  fallback sorts by severity and keeps the top-5.
+
+## Exclusion label & methodological rules (basura digital / violencia común / estadística)
+
+The system implements the methodology documented in the
+``INSTRUCCIÓN DE SISTEMA: FILTRO DE EXCLUSIÓN PREVIA`` and the six
+``REGLA N DEFINITIVA`` blocks (Reglas 1-6) plus the ``REGLA DE EXCLUSIÓN
+DE VIOLENCIA COMÚN``.
+
+- **Pre-filter (``src/analyzer/exclusion_filter.py``)** — runs FIRST in
+  `RAGClassifier.classify()`, before the LLM and ChromaDB lookups. Detects
+  basura digital (CÓDIGO 99) under three conditions: empty/NaN payload,
+  orphan hyperlink, typographic noise (punctuation/emojis/repeated
+  chars with no lexical structure). The violencia-común heuristic is
+  exposed for the rule-based fallback path but the primary
+  discrimination lives in the LLM prompt (instructions block at the
+  start of `classify()`).
+- **Schema** — `analysis_results` gained three columns via
+  `database.py:_migrate_schema()`: `exclusion_label` (`CODIGO_99` |
+  `VIOLENCIA_COMUN` | NULL), `exclusion_codigo` (e.g. `COND_2_ENLACE_HUERFANO`),
+  `exclusion_justificacion`. Rows with these labels are NOT deleted —
+  they participate in the missing-values report (Regla 1) and are
+  excluded from the violence-incidence denominators (Reglas 2-4).
+- **Regla 1 — Valores perdidos** (``src/report/reliability.py``):
+  `calcular_valores_perdidos()` returns a `ReliabilityReport` with
+  `n_basura_digital`, `pct_basura`, `nivel` (`ok` < 5% / `preventiva`
+  5-10% / `critica` > 10%) and the exact wording mandated by the spec.
+  Surfaced as a banner with color-coded alert in
+  `landing.py:render_reliability_banner()`.
+- **Regla 2 — Distribución de frecuencias** (``src/report/stats.py``):
+  `compute_frequency_distribution()` returns a `FrequencyTable` with
+  EXACTLY 4 columns — Categoría / Frecuencia Absoluta / Porcentaje
+  Válido / Porcentaje Acumulado. Porcentaje válido excludes CÓDIGO 99
+  and VIOLENCIA_COMUN. Porcentaje acumulado is a cumsum in descending
+  order that reaches 100% at the last row.
+- **Regla 3 — Moda** (``src/report/stats.py:compute_mode``): returns
+  the unique mode OR detects bimodal/multimodal distributions when two
+  or more categories share the maximum frequency. Emits the descriptive
+  text required by the spec (Paso 3.4).
+- **Regla 4 — Análisis bivariado** (``src/report/stats.py:compute_crosstabs``):
+  contingency tables crossing `categoria` against `subdimension` /
+  `pagina` / `fecha`. Computes observed frequencies and column-marginal
+  percentages (Paso 4.3) and emits the descriptive alert (Paso 4.4).
+- **Regla 5 — Dashboard** (``src/ui/landing.py``): pie chart
+  (Regla 5.2) + bar chart sorted descending (Regla 5.3) +
+  frequency-table rendered BELOW the charts per Regla 5.4.
+- **Regla 6 — Métricas de IA** (``src/report/metrics.py``):
+  `compute_confusion_matrix()` produces VP/VN/FP/FN;
+  `compute_reliability_metrics()` uses sklearn to compute Precisión,
+  Sensibilidad (Recall) and F1-Score; `render_metrics_report()` emits
+  the full report. Ground truth comes from `analysis_feedback` rows —
+  `agrees="true"` rows are TP/TN; `agrees="false"` rows use the
+  reviewer's `corrected_categoria` override.

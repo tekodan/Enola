@@ -103,11 +103,40 @@ def compute_pie_data(results: Sequence[dict]) -> pd.DataFrame:
 def compute_bar_data(results: Sequence[dict]) -> pd.DataFrame:
     """Build a DataFrame for the per-category bar chart.
 
-    Always includes the 6 canonical categories; missing ones get 0
-    so the chart stays stable across data changes.
+    **Multi-label aware**: each analysis row contributes as many votes
+    as labels it carries (via the ``labels`` side key, falling back to
+    the flat ``categoria`` when no labels are present). A single
+    analyzed content that triggers two categories is therefore counted
+    twice — once per label.
+
+    **Excludes** rows carrying any exclusion sentinel (CÓDIGO 99 or
+    VIOLENCIA_COMUN) from both the numerator and the denominator, so
+    the percentages reflect "what fraction of valid violence is each
+    category" (Regla 2 — Porcentaje Válido).
+
+    Always includes the 6 canonical categories; missing ones get 0 so
+    the chart stays stable across data changes.
     """
-    violent = [a for a in results if a.get("tiene_violencia") == "true"]
-    counts = Counter(a.get("categoria", "ninguna") for a in violent)
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+    valid = [
+        a
+        for a in results
+        if a.get("tiene_violencia") == "true" and a.get("exclusion_label") not in _exclusion
+    ]
+    counts: Counter[str] = Counter()
+    for a in valid:
+        labels = a.get("labels") or []
+        if labels:
+            for lbl in labels:
+                cat = lbl.get("categoria") or "ninguna"
+                if cat == "ninguna":
+                    continue
+                counts[cat] += 1
+        else:
+            cat = a.get("categoria", "ninguna")
+            if cat == "ninguna":
+                continue
+            counts[cat] += 1
     total = sum(counts.get(c, 0) for c in CATEGORIAS_ORDENADAS)
     rows: list[dict[str, object]] = []
     for code in CATEGORIAS_ORDENADAS:
@@ -122,6 +151,45 @@ def compute_bar_data(results: Sequence[dict]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+def compute_label_distribution(
+    results: Sequence[dict],
+) -> tuple[pd.DataFrame, int]:
+    """Multi-label aware: count distinct categories, total label votes,
+    and the most common (categoria, dimension) pair.
+
+    Returns:
+        Tuple ``(per_label_df, total_label_votes)`` where
+        ``per_label_df`` has columns ``Categoría``/``Código``/
+        ``Subdimensión``/``Cantidad``/``Porcentaje``. Useful for
+        drill-down views that want to see which sub-dimensions are
+        firing, not just the umbrella categories.
+    """
+    violent = [a for a in results if a.get("tiene_violencia") == "true"]
+    counts: Counter[tuple[str, str | None]] = Counter()
+    for a in violent:
+        labels = a.get("labels") or []
+        if labels:
+            for lbl in labels:
+                counts[(lbl.get("categoria") or "ninguna", lbl.get("dimension"))] += 1
+        else:
+            counts[(a.get("categoria", "ninguna"), a.get("dimension"))] += 1
+    total = sum(counts.values())
+    rows: list[dict[str, object]] = []
+    for (cat, dim), n in counts.most_common():
+        cat_str: str = str(cat) if cat is not None else "ninguna"
+        pct = (n / total * 100.0) if total > 0 else 0.0
+        rows.append(
+            {
+                "Categoría": label_for(cat_str),
+                "Código": cat_str,
+                "Subdimensión": str(dim) if dim else "—",
+                "Cantidad": n,
+                "Porcentaje": round(pct, 1),
+            }
+        )
+    return pd.DataFrame(rows), total
 
 
 def build_pie_chart(df: pd.DataFrame) -> alt.Chart:
@@ -215,19 +283,32 @@ def knowledge_summary() -> dict[str, int]:
 def compute_kpis(
     stats: dict, analysis: Sequence[dict], knowledge: dict[str, int]
 ) -> dict[str, object]:
-    """Compute the four headline KPIs for the hero section."""
+    """Compute the four headline KPIs for the hero section.
+
+    Multi-label aware: the "violent" count is the number of contents
+    with at least one violent label; the "top label" is the most
+    frequent individual ``categoria`` across all labels (so a single
+    multi-label content can boost several tops).
+    """
     total = stats.get("analysis_results_count", 0) or 0
     violent = sum(1 for a in analysis if a.get("tiene_violencia") == "true")
     violent_pct = (violent / total * 100.0) if total else 0.0
     top_cat: str | None = None
     if violent:
-        counter = Counter(
-            a.get("categoria")
-            for a in analysis
-            if a.get("tiene_violencia") == "true" and a.get("categoria")
-        )
+        counter: Counter[str] = Counter()
+        for a in analysis:
+            if a.get("tiene_violencia") != "true":
+                continue
+            labels = a.get("labels") or []
+            if labels:
+                for lbl in labels:
+                    code = lbl.get("categoria")
+                    if code:
+                        counter[str(code)] += 1
+            elif a.get("categoria"):
+                counter[str(a["categoria"])] += 1
         if counter:
-            top_cat = label_for(counter.most_common(1)[0][0])
+            top_cat = label_for(str(counter.most_common(1)[0][0]))
     return {
         "total": total,
         "violent": violent,

@@ -18,12 +18,14 @@ def main() -> None:
     seeds = load_seed_pages(path)
 
     if not seeds:
-        print("No se encontraron páginas seed.")
+        print("No se encontraron seeds.")
         sys.exit(1)
 
-    print(f"Ejecutando pipeline con {len(seeds)} páginas seed:")
+    print(f"Ejecutando pipeline con {len(seeds)} seeds:")
     for s in seeds:
-        print(f"  • {s}")
+        url = s["url"] if isinstance(s, dict) else s
+        source = s.get("source", "unknown") if isinstance(s, dict) else "unknown"
+        print(f"  • [{source}] {url}")
 
     scraper = FacebookScraper(max_posts=10, max_comments=20)
     orchestrator = PipelineOrchestrator(scraper=scraper)

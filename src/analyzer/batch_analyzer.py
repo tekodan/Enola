@@ -3,6 +3,10 @@
 Reads posts/comments from the database, sends each to the RAG classifier
 (which uses ChromaDB for context), and writes the result back to the
 ``analysis_results`` table.
+
+By default, a :class:`~src.knowledge_base.feedback_store.FeedbackStore`
+is wired up so the classifier injects human-validated corrections as
+dynamic few-shot examples.
 """
 
 import json
@@ -13,6 +17,7 @@ from datetime import datetime
 from src.analyzer.llm_client import OllamaClient
 from src.analyzer.rag_classifier import RAGClassifier
 from src.config.settings import get_settings
+from src.knowledge_base.feedback_store import get_feedback_store
 from src.knowledge_base.vector_store import get_vector_store
 from src.storage.database import Database
 
@@ -47,6 +52,7 @@ class BatchAnalyzer:
         classifier: RAGClassifier | None = None,
         llm_client: OllamaClient | None = None,
         vector_store=None,
+        feedback_store=None,
         analyze_posts: bool = True,
         analyze_comments: bool = True,
         reanalyze_existing: bool = False,
@@ -64,6 +70,10 @@ class BatchAnalyzer:
                 persist_directory=settings.knowledge_base.persist_directory,
                 collection_name=settings.knowledge_base.collection_name,
             )
+            fb_store = feedback_store or get_feedback_store(
+                persist_directory=settings.knowledge_base.persist_directory,
+                collection_name=settings.knowledge_base.feedback_collection_name,
+            )
             llm = llm_client or OllamaClient(
                 base_url=settings.ollama.base_url,
                 model=settings.ollama.llm_model,
@@ -72,11 +82,13 @@ class BatchAnalyzer:
             self.classifier = RAGClassifier(
                 llm_client=llm,
                 vector_store=vs,
+                feedback_store=fb_store,
                 context_chunks=settings.analyzer.context_chunks,
             )
             logger.info(
-                "RAGClassifier initialized: vector_store=%s, llm=%s",
+                "RAGClassifier initialized: vector_store=%s, feedback_store=%s, llm=%s",
                 type(vs).__name__,
+                type(fb_store).__name__,
                 type(llm).__name__,
             )
 
@@ -140,8 +152,6 @@ class BatchAnalyzer:
         for item in items:
             try:
                 text = item.get("text", "")
-                if not text.strip():
-                    continue
 
                 result = self.classifier.classify_sync(text)
 
@@ -170,6 +180,10 @@ class BatchAnalyzer:
                         "score_ajuste": str(result.score_ajuste)
                         if result.score_ajuste is not None
                         else None,
+                        "clasificaciones": [c.to_dict() for c in result.clasificaciones],
+                        "exclusion_label": result.exclusion_label,
+                        "exclusion_codigo": result.exclusion_codigo,
+                        "exclusion_justificacion": result.exclusion_justificacion,
                     }
                 )
 
@@ -194,8 +208,6 @@ class BatchAnalyzer:
         for item in items:
             try:
                 text = item.get("text", "")
-                if not text.strip():
-                    continue
 
                 result = self.classifier.classify_sync(text)
 
@@ -225,6 +237,10 @@ class BatchAnalyzer:
                         "score_ajuste": str(result.score_ajuste)
                         if result.score_ajuste is not None
                         else None,
+                        "clasificaciones": [c.to_dict() for c in result.clasificaciones],
+                        "exclusion_label": result.exclusion_label,
+                        "exclusion_codigo": result.exclusion_codigo,
+                        "exclusion_justificacion": result.exclusion_justificacion,
                     }
                 )
 

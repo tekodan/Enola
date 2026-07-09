@@ -12,11 +12,12 @@ ollama:
 
 scraper:
   max_posts_per_page: 50
-  max_comments_per_post: 100
+  max_comments_per_post: 10
   delay_between_requests: 2.0
   timeout: 300
   user_agent: "Mozilla/5.0 (compatible; ResearchBot/1.0)"
   headless: true
+  use_interactive: true
 
 analyzer:
   similarity_threshold: 0.7
@@ -30,6 +31,7 @@ knowledge_base:
   chunk_overlap: 50
   collection_name: "violencia_genero"
   persist_directory: "data/chroma_db"
+  feedback_collection_name: "feedback_corrections"
 
 storage:
   database_path: "data/tfm.db"

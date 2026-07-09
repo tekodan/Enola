@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from src.analyzer.category_mapping import Categoria
 from src.analyzer.embeddings import PostEmbeddings
-from src.analyzer.rag_classifier import ClassificationResult, RAGClassifier
+from src.analyzer.rag_classifier import ClassificationResult, LabelAssignment, RAGClassifier
 from src.analyzer.violence_types import Severity
 
 
@@ -38,16 +38,20 @@ class TestClassificationResult:
         """Test creating with all fields."""
         result = ClassificationResult(
             tiene_violencia=True,
-            categoria="VDG_HOSTILIDAD_FEMINICIDIO",
-            dimension="3.1",
-            severidad=Severity.ALTA,
             confianza=0.9,
-            justificacion="Amenaza de muerte directa",
-            evidencia="te voy a matar",
-            regla_disparada="Cat 3 / Regla 1",
-            marcadores_detectados=["matar", "te voy a"],
-            es_falso_positivo_probable=False,
-            score_ajuste=0.95,
+            clasificaciones=[
+                LabelAssignment(
+                    categoria="VDG_HOSTILIDAD_FEMINICIDIO",
+                    dimension="3.1",
+                    severidad=Severity.ALTA,
+                    justificacion="Amenaza de muerte directa",
+                    evidencia="te voy a matar",
+                    regla_disparada="Cat 3 / Regla 1",
+                    marcadores_detectados=["matar", "te voy a"],
+                    es_falso_positivo_probable=False,
+                    score_ajuste=0.95,
+                )
+            ],
         )
         assert result.tiene_violencia is True
         assert result.categoria == "VDG_HOSTILIDAD_FEMINICIDIO"
@@ -62,11 +66,15 @@ class TestClassificationResult:
         """Test conversion to dictionary."""
         result = ClassificationResult(
             tiene_violencia=True,
-            categoria="VDG_COSIFICACION_SLUTSHAMING",
-            dimension="2.2",
-            severidad=Severity.MEDIA,
-            justificacion="Slut-shaming",
-            evidencia="zorra",
+            clasificaciones=[
+                LabelAssignment(
+                    categoria="VDG_COSIFICACION_SLUTSHAMING",
+                    dimension="2.2",
+                    severidad=Severity.MEDIA,
+                    justificacion="Slut-shaming",
+                    evidencia="zorra",
+                )
+            ],
         )
         data = result.to_dict()
         assert data["tiene_violencia"] is True
@@ -172,6 +180,92 @@ class TestClassificationResult:
         assert result.categoria == "ninguna"
         assert "Error parsing" in result.justificacion
 
+    def test_from_llm_response_multi_label(self):
+        """New schema: ``clasificaciones`` array of labels."""
+        import json
+
+        payload = {
+            "tiene_violencia": True,
+            "severidad_global": "alta",
+            "clasificaciones": [
+                {
+                    "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                    "dimension": "1.1",
+                    "severidad": "baja",
+                    "justificacion": "estereotipo",
+                    "evidencia": "a la cocina",
+                    "marcadores_detectados": ["cocina", "mujeres"],
+                },
+                {
+                    "categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                    "dimension": "3.1",
+                    "severidad": "alta",
+                    "justificacion": "amenaza",
+                    "evidencia": "te voy a matar",
+                    "marcadores_detectados": ["matar"],
+                },
+            ],
+        }
+        r = ClassificationResult.from_llm_response(json.dumps(payload))
+        assert r.tiene_violencia is True
+        assert r.severidad_global == Severity.ALTA
+        assert len(r.clasificaciones) == 2
+        # Backwards-compat properties delegate to the primary label.
+        assert r.categoria == "VDG_VIOLENCIA_SIMBOLICA"
+        assert r.dimension == "1.1"
+        assert r.severidad == Severity.BAJA
+        # The "primary" property points to the first entry.
+        assert r.primary is not None
+        assert r.primary.categoria == "VDG_VIOLENCIA_SIMBOLICA"
+
+    def test_from_llm_response_legacy_single_label(self):
+        """Legacy single-label schema is wrapped into a 1-element list."""
+        legacy = (
+            '{"tiene_violencia": true, "categoria": "VDG_COSIFICACION_SLUTSHAMING",'
+            ' "dimension": "2.2", "severidad": "media",'
+            ' "justificacion": "insulto sexual", "evidencia": "zorra"}'
+        )
+        r = ClassificationResult.from_llm_response(legacy)
+        assert r.tiene_violencia is True
+        assert r.categoria == "VDG_COSIFICACION_SLUTSHAMING"
+        assert r.dimension == "2.2"
+        assert r.severidad == Severity.MEDIA
+        assert len(r.clasificaciones) == 1
+
+    def test_from_llm_response_empty_clasificaciones(self):
+        """Empty array + ``tiene_violencia: false`` ⇒ no labels."""
+        import json
+
+        r = ClassificationResult.from_llm_response(
+            json.dumps({"tiene_violencia": False, "clasificaciones": []})
+        )
+        assert r.tiene_violencia is False
+        assert r.clasificaciones == []
+        assert r.categoria == "ninguna"
+
+    def test_to_dict_exposes_labels(self):
+        """``to_dict`` includes the full multi-label payload."""
+        import json
+
+        r = ClassificationResult.from_llm_response(
+            json.dumps(
+                {
+                    "clasificaciones": [
+                        {
+                            "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                            "dimension": "1.1",
+                            "severidad": "baja",
+                            "justificacion": "j",
+                        }
+                    ]
+                }
+            )
+        )
+        d = r.to_dict()
+        assert d["tiene_violencia"] is True
+        assert d["categoria"] == "VDG_VIOLENCIA_SIMBOLICA"
+        assert len(d["clasificaciones"]) == 1
+
 
 class TestRAGClassifier:
     """Tests for RAGClassifier."""
@@ -186,7 +280,7 @@ class TestRAGClassifier:
         assert classifier.few_shot_examples == []
 
     def test_init_custom(self):
-        """Test initialization with custom values."""
+        """Test initialization with custom params."""
         mock_llm = MagicMock()
         mock_vector = MagicMock()
         classifier = RAGClassifier(
@@ -198,6 +292,72 @@ class TestRAGClassifier:
         assert classifier.llm_client == mock_llm
         assert classifier.vector_store == mock_vector
         assert classifier.context_chunks == 10
+
+    def test_init_with_feedback_store(self):
+        """Classifier accepts and stores a feedback_store."""
+        mock_fb = MagicMock()
+        classifier = RAGClassifier(
+            llm_client=MagicMock(),
+            vector_store=MagicMock(),
+            feedback_store=mock_fb,
+            feedback_n_results=5,
+        )
+        assert classifier.feedback_store is mock_fb
+        assert classifier.feedback_n_results == 5
+
+    def test_classify_calls_feedback_store(self):
+        """When a feedback_store is provided, retrieval is invoked at classify time."""
+        import asyncio
+
+        mock_fb = MagicMock()
+        mock_fb.search_relevant_corrections.return_value = []
+        classifier = RAGClassifier(
+            llm_client=None,  # triggers rule-based fallback (no Ollama needed)
+            vector_store=None,
+            feedback_store=mock_fb,
+        )
+        asyncio.run(classifier.classify("sample text"))
+        mock_fb.search_relevant_corrections.assert_called_once()
+
+    def test_classify_without_feedback_store_skips_lookup(self):
+        """Without a feedback_store, no search call is made."""
+        import asyncio
+
+        classifier = RAGClassifier(
+            llm_client=None,
+            vector_store=None,
+            feedback_store=None,
+        )
+        # Should not raise; path is silently skipped.
+        result = asyncio.run(classifier.classify("sample"))
+        # Either rule-based or no-op result is acceptable — we just
+        # care that the no-feedback path doesn't blow up.
+        assert result is not None
+
+    def test_build_prompt_with_feedback_chunks(self):
+        """Human-validated blocks appear in the prompt body."""
+        classifier = RAGClassifier(context_chunks=2)
+        chunks = [{"text": "ctx", "source": "s", "chunk_index": 0, "distance": 0.1}]
+        feedback_chunks = [
+            {
+                "text": 'TEXTO: "x" RESULTADO: {"y":1}',
+                "metadata": {
+                    "corrected_categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                    "corrected_dimension": "3.1",
+                },
+                "distance": 0.05,
+            }
+        ]
+        prompt = classifier._build_prompt("some text", chunks, feedback_chunks)
+        assert "[VALIDADO POR HUMANO · VDG_HOSTILIDAD_FEMINICIDIO/3.1]" in prompt
+        assert 'TEXTO: "x" RESULTADO: {"y":1}' in prompt
+
+    def test_build_prompt_without_feedback_falls_back(self):
+        """When no feedback chunks are given, prompt still renders."""
+        classifier = RAGClassifier(context_chunks=2)
+        chunks: list[dict[str, object]] = []
+        prompt = classifier._build_prompt("text", chunks, None)
+        assert "(Sin ejemplos few-shot)" in prompt
 
     def test_build_prompt_includes_canonical_table(self):
         """The prompt must include the 18-row canonical table."""

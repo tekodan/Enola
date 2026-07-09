@@ -24,6 +24,20 @@ Gestor del vector store en ChromaDB.
 - search: Busca documentos similares
 - get_collection_stats: Estadísticas de la colección
 
+### FeedbackStore
+Colección ChromaDB separada (`feedback_corrections`) que persiste las
+correcciones validadas por humanos. El ``RAGClassifier`` la consulta
+para inyectar few-shots dinámicos al prompt.
+- create_collection / delete_collection
+- add_correction(feedback_id, text, corrected_categoria, …)
+- search_relevant_corrections(query, n_results)
+- remove_correction(chromadb_id)
+- get_count
+
+Las correcciones se renderizan con ``render_few_shot_doc`` que produce
+el mismo formato JSON que ``RAGClassifier._build_prompt`` espera, así
+el LLM las trata como ejemplos equivalentes a los estáticos.
+
 ## API Pública
 
 ### PDFProcessor

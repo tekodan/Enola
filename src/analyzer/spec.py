@@ -31,23 +31,48 @@ Enum con niveles de severidad del clasificador:
 - ALTA
 - NINGUNA
 
+### Clasificación multi-etiqueta
+
+Una sola pieza de contenido analizado puede disparar **varias
+etiquetas** simultáneamente (p.ej. un comentario con un estereotipo
+de género **y** una amenaza letal). El modelo retorna una lista
+ordenada de hasta ``MAX_LABELS = 5`` etiquetas; la severidad global
+se calcula como el ``max()`` de las severidades por etiqueta.
+
+### LabelAssignment
+Una etiqueta individual (lo que el LLM devuelve por cada fila de la
+lista ``clasificaciones``):
+- categoria: str (canónico VDG_*)
+- dimension: str | None (X.Y)
+- severidad: Severity
+- justificacion: str (por qué ESTA etiqueta aplica)
+- evidencia: str (cita que sustenta ESTA etiqueta)
+- regla_disparada: str | None
+- marcadores_detectados: list[str]
+- confianza: float | None
+- score_ajuste: float | None
+- es_falso_positivo_probable: bool
+
 ### ClassificationResult
 Resultado de clasificación (lo que devuelve el LLM en JSON):
 - tiene_violencia: bool
-- categoria: str (de ChromaDB)
-- dimension: str | None (de ChromaDB)
-- codigo: str | None (de ChromaDB)
-- severidad: Severity
-- confianza: float (opcional)
-- justificacion: str
-- evidencia: str
+- severidad_global: Severity (max de las etiquetas)
+- clasificaciones: list[LabelAssignment] (1..N)
+
+Para mantener compatibilidad con código legacy, expone además
+propiedades delegadas a la etiqueta primaria (la primera):
+``categoria``, ``dimension``, ``severidad``, ``justificacion``,
+``evidencia``, ``regla_disparada``, ``marcadores_detectados``,
+``es_falso_positivo_probable``, ``score_ajuste``.
 
 ### RAGClassifier
 Clasificador RAG:
-- classify: Clasifica un texto
+- classify: Clasifica un texto (multi-etiqueta)
 - classify_batch: Clasifica múltiples textos
-- _build_prompt: Construye prompt con contexto de ChromaDB
-- _rule_based_classify: Fallback sin LLM
+- _build_prompt: Construye prompt con contexto de ChromaDB e
+  instrucciones multi-etiqueta
+- _rule_based_classify: Fallback sin LLM (también multi-etiqueta:
+  devuelve una etiqueta por cada bucket que matcheó)
 
 ### PostEmbeddings
 Gestor de embeddings para similitud:

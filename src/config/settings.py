@@ -34,6 +34,7 @@ class ScraperConfig(BaseModel):
     timeout: int = Field(default=60, ge=1)
     user_agent: str = "Mozilla/5.0 (compatible; ResearchBot/1.0)"
     headless: bool = True
+    use_interactive: bool = True
 
 
 class AnalyzerConfig(BaseModel):
@@ -53,6 +54,7 @@ class KnowledgeBaseConfig(BaseModel):
     chunk_overlap: int = Field(default=50, ge=0, le=500)
     collection_name: str = "violencia_genero"
     persist_directory: str = "data/chroma_db"
+    feedback_collection_name: str = "feedback_corrections"
 
 
 class StorageConfig(BaseModel):

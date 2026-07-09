@@ -109,6 +109,8 @@ class Comment(BaseModel):
     post_id: str | None = None
     parent_id: str | None = None
     url: str | None = None
+    time_ago: str | None = None
+    responses: int = 0
     created_at: datetime = Field(default_factory=datetime.now)
 
     @field_validator("likes", mode="before")
@@ -132,6 +134,8 @@ class Comment(BaseModel):
             "post_id": self.post_id,
             "parent_id": self.parent_id,
             "url": self.url,
+            "time_ago": self.time_ago,
+            "responses": self.responses,
             "created_at": self.created_at.isoformat(),
         }
 
@@ -257,6 +261,8 @@ class ScrapeResult(BaseModel):
     pages_scraped: int = 0
     posts_found: int = 0
     comments_found: int = 0
+    requires_auth: bool = False
+    has_captcha: bool = False
 
     def add_error(self, error: str) -> None:
         """Add an error message."""

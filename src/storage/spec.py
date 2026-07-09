@@ -46,12 +46,47 @@ Tabla para resultados de análisis.
 - post_id: Foreign key a posts (nullable)
 - comment_id: Foreign key a comments (nullable)
 - tiene_violencia: 'true', 'false', o 'unknown'
-- tipo: Tipo de violencia detectada
-- severidad: 'baja', 'media', 'alta'
-- justificacion: Explicación del análisis
-- evidencia: Cita del texto
-- confidence: Score de confianza
+- categoria: Código VDG_* **primario** (mayor severidad, espejo de la
+  tabla lateral)
+- dimension: subdimensión primaria
+- severidad: severidad primaria
+- justificacion, evidencia, regla_disparada, marcadores_detectados,
+  confianza, score_ajuste, es_falso_positivo_probable: campos planos
+  espejados desde la etiqueta primaria
 - created_at: Timestamp de creación
+
+### AnalysisLabelModel
+**Tabla lateral multi-etiqueta** — una fila por etiqueta asignada a
+un análisis. Permite que un mismo contenido analizable cargue
+múltiples categorías con su propia justificación, evidencia,
+severidad y marcadores.
+- id: PK
+- analysis_result_id: FK → analysis_results.id (CASCADE delete)
+- orden: 0..N preserva el orden de salida del LLM
+- categoria, dimension, severidad, justificacion, evidencia,
+  regla_disparada, marcadores_detectados, confianza, score_ajuste,
+  es_falso_positivo_probable
+- created_at
+
+### AnalysisFeedbackModel
+Tabla para validación humana de los análisis.
+- id: Primary key, autoincrement
+- analysis_result_id: FK → analysis_results.id (única por análisis — upsert)
+- content_type, content_id: denormalizados para queries simples
+- text_snapshot: copia del texto al momento de la revisión
+- agrees: 'true' | 'false'
+- reason: motivo de la corrección (opcional)
+- corrected_categoria, corrected_dimension, corrected_justificacion:
+  overrides válidos sólo cuando agrees='false' (espejo de la etiqueta
+  primaria en el feedback)
+- indexed_in_chromadb: 'true' | 'false'
+- chromadb_id, chromadb_indexed_at: trazabilidad con ChromaDB
+- reviewer, created_at, updated_at
+
+### AnalysisFeedbackLabelModel
+**Tabla lateral multi-etiqueta del feedback humano.** Espejo de
+``AnalysisLabelModel`` ligado a ``analysis_feedback`` en vez de a
+``analysis_results``.
 
 ### SeedPageModel
 Tabla para páginas semilla.
@@ -104,6 +139,22 @@ seed_pages = db.get_seed_pages(is_seed=True)
 # Estadísticas
 stats = db.get_stats()
 # {'posts_count': 100, 'comments_count': 500, ...}
+
+# Feedback humano
+db.save_feedback({
+    'analysis_result_id': 1,
+    'content_type': 'post',
+    'content_id': 'p1',
+    'text_snapshot': 'texto del post',
+    'agrees': 'false',
+    'reason': 'mal categorizado',
+    'corrected_categoria': 'VDG_HOSTILIDAD_FEMINICIDIO',
+    'corrected_dimension': '3.1',
+    'corrected_justificacion': 'corrected',
+})
+corrections = db.list_feedback(only_disagreements=True)
+pending = db.list_feedback(only_pending_index=True)
+db.mark_feedback_indexed(fb_id, chromadb_id)
 ```
 
 ### ExportManager

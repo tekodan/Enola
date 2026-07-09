@@ -1,20 +1,21 @@
 """SPEC: Scraper Module.
 
 Este módulo se encarga de la extracción de posts y comentarios de Facebook
-usando ScrapeGraphAI como motor principal de scraping.
+usando una estrategia híbrida: DOM-based extraction + LLM fallback.
 
 ## Responsabilidades
 - Extraer posts de páginas de Facebook
 - Extraer comentarios de posts
 - Descubrir páginas relacionadas
-- Manejar errores y rate limiting
+- Manejar errores, rate limiting, login walls y captchas
 - Persistir datos extraídos
+- Cachear HTML para evitar rescrapeos repetidos
 
 ## Modelo de Datos
 
 ### Post
 Modelo que representa un post de Facebook.
-- id: Identificador único (hash del URL + timestamp)
+- id: Identificador único (hash del URL + contenido)
 - text: Contenido textual del post
 - author: Nombre del autor/página
 - date: Fecha de publicación
@@ -66,6 +67,23 @@ Resultado de una operación de scraping.
 - pages_scraped: Cantidad de páginas raspadas
 - posts_found: Cantidad de posts encontrados
 - comments_found: Cantidad de comentarios encontrados
+- requires_auth: True si Facebook pidió login
+- has_captcha: True si apareció captcha/security check
+
+## Arquitectura de Estrategias
+
+El scraper usa el patrón Strategy para extracción:
+
+```python
+from src.scraper import FacebookScraper
+from src.scraper.strategies import DOMExtractionStrategy
+
+scraper = FacebookScraper(strategy=DOMExtractionStrategy())
+```
+
+Estrategias disponibles:
+- `DOMExtractionStrategy`: Extracción DOM-based con BeautifulSoup (rápida, sin LLM)
+- `LLMExtractionStrategy`: Extracción vía LLM (placeholder, delega a DOM por ahora)
 
 ## API Pública
 
@@ -85,6 +103,9 @@ comments = await scraper.scrape_comments(post.url, max_comments=100)
 
 # Extraer todo (posts + comentarios)
 result = await scraper.scrape_full("https://facebook.com/page-name")
+
+# Modo interactivo (abre modales de comentarios en vivo)
+posts = await scraper.scrape_page_interactive("https://facebook.com/page-name")
 ```
 
 ## Configuración
@@ -94,17 +115,36 @@ El scraper usa la configuración de config.yaml:
 - scraper.max_comments_per_post: Máximo de comentarios por post
 - scraper.delay_between_requests: Delay entre requests
 - scraper.timeout: Timeout general
+- scraper.headless: Modo headless del browser
+- scraper.use_interactive: Usar extracción interactiva de comentarios
 
 ## Dependencias
-- ScrapeGraphAI: Motor de scraping con LLM
+- ScrapeGraphAI: Motor de scraping con LLM (fallback)
+- Playwright: Navegación y extracción interactiva
+- BeautifulSoup4: Preprocesamiento DOM
 - Pydantic: Validación de modelos
 
 ## Consideraciones
 - Solo contenido público (páginas/grupos públicos)
-- Rate limiting para evitar bloqueos
+- Rate limiting con user-agent rotation
+- Cache de HTML con TTL (default 24h)
+- Detección de login wall y captcha
+- Retry con backoff en interacciones de modales
 - Logging de errores
 - Manejo de páginas con contenido dinámico
 
 ## Tests
-Ver test_unit.py y test_integration.py para casos de prueba.
+- test_unit.py — Tests de modelos Pydantic
+- test_integration.py — Tests de serialización y fixtures
+- test_preprocessor.py — Tests del FacebookPreprocessor
+- test_scraper_preprocessing.py — Tests del flujo scraper + preprocessor
+- test_interactor.py — Tests del CommentInteractor
+
+## Estructura de archivos
+- `facebook.py` — Scraper principal
+- `facebook_preprocessor.py` — Preprocesador DOM
+- `comment_interactor.py` — Interacción con modales de comentarios
+- `models.py` — Modelos Pydantic
+- `strategies.py` — Estrategias de extracción (Strategy pattern)
+- `mock_facebook.py` — Mock para testing sin Facebook
 """

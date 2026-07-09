@@ -2,13 +2,14 @@
 
 The taxonomy of digital gender violence is **homogeneous and alphabetic for
 categories** and **numeric for sub-dimensions**. The LLM is instructed via
-the system prompt to pick one of the 18 valid combinations — never invent.
+the system prompt to pick up to ``MAX_LABELS`` valid combinations — never
+invent.
 
 Single source of truth for:
 
 - The 6 valid category codes (alphabetic, ``VDG_*``)
 - The 18 valid sub-dimension codes (numeric, ``1.1``..``6.3``)
-- Validation/normalization of LLM output
+- Validation/normalization of LLM output (single + multi-label)
 - The compact canonical table that gets injected into the prompt
 - A severity scale normalizer (``"baja-media"`` → ``Severity.BAJA``, etc.)
 
@@ -19,11 +20,22 @@ has no dependency on ChromaDB.
 from __future__ import annotations
 
 import logging
+import unicodedata
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from src.analyzer.violence_types import Severity
 
+if TYPE_CHECKING:
+    from src.analyzer.rag_classifier import LabelAssignment
+
 logger = logging.getLogger(__name__)
+
+
+#: Hard cap on the number of labels the LLM may emit per content. The
+#: order in which labels are returned determines which are kept when
+#: the LLM overshoots.
+MAX_LABELS: int = 5
 
 
 class Categoria(StrEnum):
@@ -115,8 +127,6 @@ def normalize_categoria(value: object) -> str:
     underscores, then try to match the suffix against each canonical
     value's normalized form.
     """
-    import unicodedata
-
     if value is None:
         return Categoria.NINGUNA.value
     raw = str(value).strip()
@@ -225,6 +235,147 @@ def map_gravedad(value: object) -> Severity:
     return Severity.NINGUNA
 
 
+def _severity_rank(sev: Severity) -> int:
+    """Numeric rank for max()-aggregating severities across labels."""
+    order = {
+        Severity.NINGUNA: 0,
+        Severity.BAJA: 1,
+        Severity.MEDIA: 2,
+        Severity.ALTA: 3,
+    }
+    return order.get(sev, 0)
+
+
+def max_severity(values: list[Severity]) -> Severity:
+    """Return the highest ``Severity`` in ``values`` (empty ⇒ ``NINGUNA``)."""
+    if not values:
+        return Severity.NINGUNA
+    return max(values, key=_severity_rank)
+
+
+def _coerce_float(value: object) -> float | None:
+    """Best-effort float coercion for confidence/score fields."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip())
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+def _coerce_bool(value: object) -> bool:
+    """Best-effort bool coercion for the false-positive flag."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes", "si", "sí"}
+    if isinstance(value, (int, float)):
+        return value != 0
+    return False
+
+
+def _coerce_marcadores(value: object) -> list[str]:
+    """Normalize ``marcadores_detectados`` from list / csv string / other."""
+    if isinstance(value, list):
+        return [str(m) for m in value if m]
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        # Try JSON first
+        try:
+            import json
+
+            parsed = json.loads(stripped)
+            if isinstance(parsed, list):
+                return [str(m) for m in parsed if m]
+        except (ValueError, TypeError):
+            pass
+        return [m.strip() for m in stripped.split(",") if m.strip()]
+    return []
+
+
+def validate_clasificaciones(
+    data: object,
+    max_labels: int = MAX_LABELS,
+) -> list[LabelAssignment]:
+    """Validate and normalize the ``clasificaciones`` array from the LLM.
+
+    The input is expected to be a list of objects with at least
+    ``categoria`` and ``dimension`` keys. Behavior:
+
+    - Non-list input → empty list (with a warning).
+    - Drops entries with category outside the canonical set or with
+      ``dimension`` not allowed for that category.
+    - Deduplicates by ``(categoria, dimension)`` (first occurrence wins).
+    - Caps the result at ``max_labels`` entries (the first ones in the
+      input order are kept).
+    - Returns labels in input order (so the highest-priority label is at
+      index 0).
+    """
+    from src.analyzer.rag_classifier import LabelAssignment
+
+    if not isinstance(data, list):
+        if data not in (None, [], {}):
+            logger.warning(
+                "LLM devolvió 'clasificaciones' no-lista (%s) — descartando",
+                type(data).__name__,
+            )
+        return []
+
+    seen: set[tuple[str, str | None]] = set()
+    out: list[LabelAssignment] = []
+    for raw in data:
+        if not isinstance(raw, dict):
+            logger.warning(
+                "Elemento de 'clasificaciones' no es objeto (%s) — descartando",
+                type(raw).__name__,
+            )
+            continue
+
+        cat, dim = validate_codigo(raw.get("categoria"), raw.get("dimension"))
+        if cat == Categoria.NINGUNA.value:
+            continue
+        key = (cat, dim)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        out.append(
+            LabelAssignment(
+                categoria=cat,
+                dimension=dim,
+                justificacion=str(raw.get("justificacion") or "").strip(),
+                evidencia=str(raw.get("evidencia") or "").strip(),
+                regla_disparada=(
+                    str(raw["regla_disparada"]).strip()
+                    if raw.get("regla_disparada") is not None
+                    else None
+                ),
+                marcadores_detectados=_coerce_marcadores(raw.get("marcadores_detectados")),
+                confianza=_coerce_float(raw.get("confianza")),
+                score_ajuste=_coerce_float(raw.get("score_ajuste")),
+                es_falso_positivo_probable=_coerce_bool(
+                    raw.get("es_falso_positivo_probable", False)
+                ),
+                severidad=map_gravedad(raw.get("severidad")),
+            )
+        )
+        if len(out) >= max_labels:
+            logger.debug(
+                "LLM devolvió más de %d etiquetas — recortando a las primeras %d",
+                max_labels,
+                max_labels,
+            )
+            break
+
+    return out
+
+
 def render_tabla_canonica_prompt() -> str:
     """Render the compact 18-row canonical table to inject into the prompt.
 
@@ -233,7 +384,9 @@ def render_tabla_canonica_prompt() -> str:
     the prompt small (~600 tokens).
     """
     lines = [
-        "CATEGORÍAS VÁLIDAS (elegí EXACTAMENTE una fila, o 'ninguna' si no encaja):",
+        "CATEGORÍAS VÁLIDAS (elegí HASTA "
+        + str(MAX_LABELS)
+        + " filas — una por cada categoría que aplique; usá 'ninguna' SOLO en la lista vacía):",
         "",
         "| categoria                          | dimension | descripcion                                |",
         "|------------------------------------|-----------|--------------------------------------------|",
@@ -246,7 +399,8 @@ def render_tabla_canonica_prompt() -> str:
             lines.append(f"| {cat_cell:<34} | {d:<9} | {desc:<42} |")
     lines.append("")
     lines.append(
-        "Si el texto no encaja en ninguna categoría: 'categoria': 'ninguna', 'dimension': null."
+        "Si el texto no encaja en ninguna categoría: devolve `clasificaciones: []` "
+        "y `tiene_violencia: false`."
     )
     return "\n".join(lines)
 
@@ -254,7 +408,7 @@ def render_tabla_canonica_prompt() -> str:
 def render_severidad_prompt() -> str:
     """Render the severity scale legend for the prompt."""
     return (
-        "ESCALA DE SEVERIDAD (fija):\n"
+        "ESCALA DE SEVERIDAD (fija, por etiqueta):\n"
         '- "baja"     → violencia implícita, estereotipos, micromachismos\n'
         '- "media"    → insultos, cosificación, deslegitimación\n'
         '- "alta"     → amenazas, hostilidad letal, acoso coordinado\n'
@@ -264,6 +418,7 @@ def render_severidad_prompt() -> str:
 
 __all__ = [
     "Categoria",
+    "MAX_LABELS",
     "SUBDIMENSIONES_POR_CATEGORIA",
     "DESCRIPCION_SUBDIMENSION",
     "GRAVEDAD_POR_CATEGORIA",
@@ -272,6 +427,8 @@ __all__ = [
     "normalize_dimension",
     "validate_codigo",
     "map_gravedad",
+    "max_severity",
+    "validate_clasificaciones",
     "render_tabla_canonica_prompt",
     "render_severidad_prompt",
 ]

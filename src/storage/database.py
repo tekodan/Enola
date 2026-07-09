@@ -14,6 +14,9 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from src.storage.base import Base
 from src.storage.models import (
+    AnalysisFeedbackLabelModel,
+    AnalysisFeedbackModel,
+    AnalysisLabelModel,
     AnalysisResultModel,
     CommentModel,
     PageModel,
@@ -57,12 +60,92 @@ class Database:
         ``categoria``, ``confidence`` → ``confianza``) and drops them
         when the SQLite version supports it.
 
+        Multi-label side tables (``analysis_labels`` and
+        ``analysis_feedback_labels``) are created when missing. They
+        are intentionally **not** backfilled — the user is expected
+        to run ``python -m src.report analyze --reanalyze`` to repopulate
+        with the new multi-label schema.
+
         Safe to run multiple times.
         """
         from sqlalchemy import inspect, text
 
         inspector = inspect(self.engine)
-        if "analysis_results" not in inspector.get_table_names():
+        existing_tables = set(inspector.get_table_names())
+
+        # Ensure multi-label side tables exist. They are created with
+        # plain DDL (not via Base.metadata.create_all on the parent)
+        # so the migration is a single pass.
+        if "analysis_labels" not in existing_tables:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE analysis_labels (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            analysis_result_id INTEGER NOT NULL
+                                REFERENCES analysis_results(id) ON DELETE CASCADE,
+                            orden INTEGER NOT NULL DEFAULT 0,
+                            categoria VARCHAR NOT NULL,
+                            dimension VARCHAR,
+                            severidad VARCHAR NOT NULL DEFAULT 'ninguna',
+                            justificacion TEXT NOT NULL DEFAULT '',
+                            evidencia TEXT NOT NULL DEFAULT '',
+                            regla_disparada VARCHAR,
+                            marcadores_detectados TEXT,
+                            confianza VARCHAR,
+                            score_ajuste VARCHAR,
+                            es_falso_positivo_probable VARCHAR NOT NULL DEFAULT 'false',
+                            created_at DATETIME NOT NULL
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX ix_analysis_labels_result "
+                        "ON analysis_labels(analysis_result_id)"
+                    )
+                )
+
+        if "analysis_feedback_labels" not in existing_tables:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE analysis_feedback_labels (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            analysis_feedback_id INTEGER NOT NULL
+                                REFERENCES analysis_feedback(id) ON DELETE CASCADE,
+                            orden INTEGER NOT NULL DEFAULT 0,
+                            categoria VARCHAR NOT NULL,
+                            dimension VARCHAR,
+                            severidad VARCHAR NOT NULL DEFAULT 'ninguna',
+                            justificacion TEXT NOT NULL DEFAULT '',
+                            evidencia TEXT NOT NULL DEFAULT '',
+                            regla_disparada VARCHAR,
+                            marcadores_detectados TEXT,
+                            confianza VARCHAR,
+                            score_ajuste VARCHAR,
+                            es_falso_positivo_probable VARCHAR NOT NULL DEFAULT 'false',
+                            created_at DATETIME NOT NULL,
+                            updated_at DATETIME NOT NULL
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        "CREATE INDEX ix_analysis_feedback_labels_fb "
+                        "ON analysis_feedback_labels(analysis_feedback_id)"
+                    )
+                )
+
+        # Refresh inspector after potential table creation.
+        inspector = inspect(self.engine)
+        existing_tables = set(inspector.get_table_names())
+
+        if "analysis_results" not in existing_tables:
             return
 
         existing_cols = {c["name"] for c in inspector.get_columns("analysis_results")}
@@ -84,8 +167,37 @@ class Database:
             additions.append(("es_falso_positivo_probable", "VARCHAR DEFAULT 'false'"))
         if "score_ajuste" not in existing_cols:
             additions.append(("score_ajuste", "VARCHAR"))
+        if "exclusion_label" not in existing_cols:
+            additions.append(("exclusion_label", "VARCHAR"))
+        if "exclusion_codigo" not in existing_cols:
+            additions.append(("exclusion_codigo", "VARCHAR"))
+        if "exclusion_justificacion" not in existing_cols:
+            additions.append(("exclusion_justificacion", "TEXT"))
 
-        if not additions and "tipo" not in existing_cols and "confidence" not in existing_cols:
+        # Migrate seed_pages: add ``source`` column if missing.
+        seed_additions: list[tuple[str, str]] = []
+        if "seed_pages" in existing_tables:
+            seed_cols = {c["name"] for c in inspector.get_columns("seed_pages")}
+            if "source" not in seed_cols:
+                seed_additions.append(("source", "VARCHAR DEFAULT 'facebook_page'"))
+
+        # Build list of comments additions independently so we can
+        # decide whether to skip the analysis_results block entirely.
+        comment_additions: list[tuple[str, str]] = []
+        if "comments" in existing_tables:
+            comment_cols = {c["name"] for c in inspector.get_columns("comments")}
+            if "time_ago" not in comment_cols:
+                comment_additions.append(("time_ago", "VARCHAR"))
+            if "responses" not in comment_cols:
+                comment_additions.append(("responses", "INTEGER DEFAULT 0"))
+
+        if (
+            not additions
+            and "tipo" not in existing_cols
+            and "confidence" not in existing_cols
+            and not seed_additions
+            and not comment_additions
+        ):
             return
 
         with self.engine.begin() as conn:
@@ -118,6 +230,12 @@ class Database:
                 if "confidence" in existing_cols:
                     conn.execute(text("ALTER TABLE analysis_results DROP COLUMN confidence"))
 
+            for col_name, col_type in seed_additions:
+                conn.execute(text(f"ALTER TABLE seed_pages ADD COLUMN {col_name} {col_type}"))
+
+            for col_name, col_type in comment_additions:
+                conn.execute(text(f"ALTER TABLE comments ADD COLUMN {col_name} {col_type}"))
+
     @contextmanager
     def get_session(self) -> Generator[Session, None, None]:
         """Get database session context manager."""
@@ -132,6 +250,25 @@ class Database:
             session.close()
 
     # ----- Single-record save helpers -----
+
+    @staticmethod
+    def _coerce_datetime_fields(data: dict, fields: tuple[str, ...]) -> dict:
+        """Convert ISO-format strings in ``fields`` to ``datetime``.
+
+        SQLAlchemy ``DateTime`` columns reject naive string inputs; this
+        helper keeps the call sites clean by normalizing the dict before
+        it reaches the ORM.
+        """
+        from datetime import datetime
+
+        for f in fields:
+            value = data.get(f)
+            if isinstance(value, str) and value:
+                try:
+                    data[f] = datetime.fromisoformat(value)
+                except ValueError:
+                    data[f] = None
+        return data
 
     def save_post(self, post_data: dict) -> bool:
         """Save a post to the database.
@@ -221,10 +358,18 @@ class Database:
         Returns:
             Number of posts saved
         """
+        from sqlalchemy import inspect
+
+        valid_keys = {c.key for c in inspect(PostModel).mapper.columns}
         saved = 0
         with self.get_session() as session:
             for post_data in posts_data:
                 try:
+                    post_data = self._coerce_datetime_fields(
+                        post_data,
+                        ("date", "created_at"),
+                    )
+                    post_data = {k: v for k, v in post_data.items() if k in valid_keys}
                     existing = session.query(PostModel).filter_by(id=post_data["id"]).first()
                     if existing:
                         for key, value in post_data.items():
@@ -247,10 +392,18 @@ class Database:
         Returns:
             Number of comments saved
         """
+        from sqlalchemy import inspect
+
+        valid_keys = {c.key for c in inspect(CommentModel).mapper.columns}
         saved = 0
         with self.get_session() as session:
             for comment_data in comments_data:
                 try:
+                    comment_data = self._coerce_datetime_fields(
+                        comment_data,
+                        ("date", "created_at"),
+                    )
+                    comment_data = {k: v for k, v in comment_data.items() if k in valid_keys}
                     existing = session.query(CommentModel).filter_by(id=comment_data["id"]).first()
                     if existing:
                         for key, value in comment_data.items():
@@ -521,6 +674,11 @@ class Database:
     def get_analysis_results(self, content_type: str | None = None) -> list[dict]:
         """Get analysis results from database.
 
+        Each returned dict is enriched with a ``labels`` key holding the
+        ordered list of :class:`AnalysisLabelModel` rows (or an empty
+        list when the analysis was created before the multi-label
+        schema and never re-analyzed).
+
         Args:
             content_type: Optional filter ('post' or 'comment')
 
@@ -531,7 +689,59 @@ class Database:
             query = session.query(AnalysisResultModel)
             if content_type:
                 query = query.filter_by(content_type=content_type)
-            return [r.to_dict() for r in query.all()]
+            rows = [r.to_dict() for r in query.all()]
+
+            ids = [r["id"] for r in rows if r.get("id") is not None]
+            labels_by_id: dict[int, list[dict]] = {ar_id: [] for ar_id in ids}
+            if ids:
+                label_rows = (
+                    session.query(AnalysisLabelModel)
+                    .filter(AnalysisLabelModel.analysis_result_id.in_(ids))
+                    .order_by(
+                        AnalysisLabelModel.analysis_result_id.asc(),
+                        AnalysisLabelModel.orden.asc(),
+                    )
+                    .all()
+                )
+                for lr in label_rows:
+                    labels_by_id.setdefault(lr.analysis_result_id, []).append(lr.to_dict())
+
+        for r in rows:
+            labels = labels_by_id.get(r.get("id"), [])
+            r["labels"] = labels
+        return rows
+
+    def get_feedback_with_labels(self, content_type: str | None = None) -> list[dict]:
+        """Return feedback rows enriched with their corrected ``labels`` list.
+
+        The flat ``corrected_*`` columns stay (backwards-compat) and
+        mirror the primary corrected label; the new ``labels`` key
+        carries the full list.
+        """
+        with self.get_session() as session:
+            query = session.query(AnalysisFeedbackModel)
+            if content_type:
+                query = query.filter_by(content_type=content_type)
+            fb_rows = [r.to_dict() for r in query.all()]
+
+            ids = [r["id"] for r in fb_rows if r.get("id") is not None]
+            labels_by_id: dict[int, list[dict]] = {fb_id: [] for fb_id in ids}
+            if ids:
+                label_rows = (
+                    session.query(AnalysisFeedbackLabelModel)
+                    .filter(AnalysisFeedbackLabelModel.analysis_feedback_id.in_(ids))
+                    .order_by(
+                        AnalysisFeedbackLabelModel.analysis_feedback_id.asc(),
+                        AnalysisFeedbackLabelModel.orden.asc(),
+                    )
+                    .all()
+                )
+                for lr in label_rows:
+                    labels_by_id.setdefault(lr.analysis_feedback_id, []).append(lr.to_dict())
+
+        for r in fb_rows:
+            r["labels"] = labels_by_id.get(r.get("id"), [])
+        return fb_rows
 
     def get_seed_pages(self, is_seed: bool | None = None) -> list[dict]:
         """Get seed pages from database.
@@ -555,12 +765,29 @@ class Database:
             Dictionary with counts of pages, posts, comments, etc.
         """
         with self.get_session() as session:
+            feedback_total = session.query(AnalysisFeedbackModel).count()
+            feedback_disagreements = (
+                session.query(AnalysisFeedbackModel).filter_by(agrees="false").count()
+            )
+            feedback_agreements = (
+                session.query(AnalysisFeedbackModel).filter_by(agrees="true").count()
+            )
+            feedback_pending_index = (
+                session.query(AnalysisFeedbackModel)
+                .filter_by(indexed_in_chromadb="false")
+                .filter(AnalysisFeedbackModel.agrees == "false")
+                .count()
+            )
             return {
                 "pages_count": session.query(PageModel).count(),
                 "posts_count": session.query(PostModel).count(),
                 "comments_count": session.query(CommentModel).count(),
                 "analysis_results_count": session.query(AnalysisResultModel).count(),
                 "seed_pages_count": session.query(SeedPageModel).count(),
+                "feedback_count": feedback_total,
+                "feedback_disagreement_count": feedback_disagreements,
+                "feedback_agreement_count": feedback_agreements,
+                "feedback_pending_index_count": feedback_pending_index,
             }
 
     # ----- Batch analysis methods -----
@@ -571,14 +798,29 @@ class Database:
         If a result with the same ``(content_type, content_id)`` already
         exists, its fields are updated.  Otherwise a new row is created.
 
+        When ``result_data`` carries a ``clasificaciones`` list (list of
+        dicts with the same shape as
+        :class:`~src.analyzer.rag_classifier.LabelAssignment`), the
+        side table ``analysis_labels`` is replaced with the new list
+        and the flat ``analysis_results`` columns (``categoria`` /
+        ``dimension`` / ``severidad`` / ``justificacion`` / ``evidencia``
+        / ``regla_disparada`` / ``marcadores_detectados`` / etc.) are
+        populated with the **primary** label (highest severity, ties
+        broken by list order) so legacy single-column queries keep
+        working.
+
         Args:
-            result_data: Dictionary with AnalysisResultModel fields
+            result_data: Dictionary with AnalysisResultModel fields.
+                May also include ``clasificaciones`` (list of label
+                dicts).
 
         Returns:
             ID of the saved/updated result
         """
         content_type = result_data.get("content_type", "")
         content_id = result_data.get("content_id", "")
+
+        clasificaciones_raw = result_data.pop("clasificaciones", None)
 
         with self.get_session() as session:
             existing = (
@@ -594,12 +836,158 @@ class Database:
                 for key, value in result_data.items():
                     if hasattr(existing, key):
                         setattr(existing, key, value)
-                return existing.id
+                result_id = existing.id
+            else:
+                result = AnalysisResultModel(**result_data)
+                session.add(result)
+                session.flush()
+                result_id = result.id
 
-            result = AnalysisResultModel(**result_data)
-            session.add(result)
-            session.flush()
-            return result.id
+            if isinstance(clasificaciones_raw, list):
+                self._replace_labels_for_result(session, result_id, clasificaciones_raw)
+
+            return result_id
+
+    @staticmethod
+    def _primary_label_dict(labels: list[dict]) -> dict:
+        """Pick the primary label for filling the flat columns.
+
+        Sort by severity desc; ties keep the original order. Always
+        returns a dict with the full set of flat-column keys (filled
+        with neutral defaults when the chosen label does not carry
+        them).
+        """
+        sev_order = {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}
+
+        def _rank(label: dict) -> int:
+            sev = str(label.get("severidad") or "ninguna")
+            return sev_order.get(sev, 0)
+
+        def _envelope(d: dict) -> dict:
+            return {
+                "categoria": d.get("categoria") or "ninguna",
+                "dimension": d.get("dimension"),
+                "severidad": d.get("severidad") or "ninguna",
+                "justificacion": d.get("justificacion") or "",
+                "evidencia": d.get("evidencia") or "",
+                "regla_disparada": d.get("regla_disparada"),
+                "marcadores_detectados": d.get("marcadores_detectados"),
+                "confianza": d.get("confianza"),
+                "score_ajuste": d.get("score_ajuste"),
+                "es_falso_positivo_probable": (
+                    "true" if d.get("es_falso_positivo_probable") else "false"
+                ),
+            }
+
+        if not labels:
+            return _envelope({})
+        # Sort by severity desc; ties keep the original input order.
+        return _envelope(max(labels, key=lambda lbl: (_rank(lbl), 1)))
+
+    @staticmethod
+    def _replace_labels_for_result(
+        session: Session, analysis_result_id: int, labels: list[dict]
+    ) -> None:
+        """Replace the ``analysis_labels`` rows for one result.
+
+        Also mirrors the primary label back into the flat
+        ``analysis_results`` columns for backwards compatibility.
+        """
+        # Wipe existing labels for this result.
+        session.query(AnalysisLabelModel).filter_by(analysis_result_id=analysis_result_id).delete(
+            synchronize_session=False
+        )
+
+        import json as _json
+
+        for orden, lbl in enumerate(labels):
+            marcadores = lbl.get("marcadores_detectados") or []
+            if isinstance(marcadores, list):
+                marcadores_json = _json.dumps(marcadores, ensure_ascii=False)
+            else:
+                marcadores_json = _json.dumps(
+                    [m.strip() for m in str(marcadores).split(",") if m.strip()],
+                    ensure_ascii=False,
+                )
+            row = AnalysisLabelModel(
+                analysis_result_id=analysis_result_id,
+                orden=orden,
+                categoria=str(lbl.get("categoria") or "ninguna"),
+                dimension=lbl.get("dimension"),
+                severidad=str(lbl.get("severidad") or "ninguna"),
+                justificacion=str(lbl.get("justificacion") or ""),
+                evidencia=str(lbl.get("evidencia") or ""),
+                regla_disparada=lbl.get("regla_disparada"),
+                marcadores_detectados=marcadores_json,
+                confianza=_to_str_or_none(lbl.get("confianza")),
+                score_ajuste=_to_str_or_none(lbl.get("score_ajuste")),
+                es_falso_positivo_probable=(
+                    "true" if lbl.get("es_falso_positivo_probable") else "false"
+                ),
+            )
+            session.add(row)
+
+        # Mirror the primary label into the flat columns.
+        import json as _json
+
+        primary = Database._primary_label_dict(labels)
+        marcadores_flat = primary["marcadores_detectados"]
+        if isinstance(marcadores_flat, list):
+            marcadores_str = _json.dumps(marcadores_flat, ensure_ascii=False)
+        elif marcadores_flat is None:
+            marcadores_str = None
+        else:
+            marcadores_str = str(marcadores_flat)
+
+        result = session.query(AnalysisResultModel).filter_by(id=analysis_result_id).one()
+        result.categoria = primary["categoria"]
+        result.dimension = primary["dimension"]
+        result.severidad = primary["severidad"]
+        result.justificacion = primary["justificacion"]
+        result.evidencia = primary["evidencia"]
+        result.regla_disparada = primary["regla_disparada"]
+        result.marcadores_detectados = marcadores_str
+        result.confianza = primary["confianza"]
+        result.score_ajuste = primary["score_ajuste"]
+        result.es_falso_positivo_probable = primary["es_falso_positivo_probable"]
+
+    def get_labels_for_analysis(self, analysis_result_id: int) -> list[dict[str, object]]:
+        """Return the ordered list of labels for one analysis result."""
+        with self.get_session() as session:
+            rows = (
+                session.query(AnalysisLabelModel)
+                .filter_by(analysis_result_id=analysis_result_id)
+                .order_by(AnalysisLabelModel.orden.asc())
+                .all()
+            )
+            return [r.to_dict() for r in rows]
+
+    def get_all_analysis_labels(self) -> dict[int, list[dict[str, object]]]:
+        """Return ``{analysis_result_id: [labels...]}`` for every analysis."""
+        with self.get_session() as session:
+            rows = (
+                session.query(AnalysisLabelModel)
+                .order_by(
+                    AnalysisLabelModel.analysis_result_id.asc(),
+                    AnalysisLabelModel.orden.asc(),
+                )
+                .all()
+            )
+            out: dict[int, list[dict[str, object]]] = {}
+            for r in rows:
+                out.setdefault(r.analysis_result_id, []).append(r.to_dict())
+            return out
+
+    def get_feedback_labels(self, feedback_id: int) -> list[dict[str, object]]:
+        """Return the ordered list of corrected labels for one feedback row."""
+        with self.get_session() as session:
+            rows = (
+                session.query(AnalysisFeedbackLabelModel)
+                .filter_by(analysis_feedback_id=feedback_id)
+                .order_by(AnalysisFeedbackLabelModel.orden.asc())
+                .all()
+            )
+            return [r.to_dict() for r in rows]
 
     def get_unanalyzed_posts(self) -> list[dict]:
         """Get posts that have no analysis result yet.
@@ -698,6 +1086,291 @@ class Database:
 
         content = "_".join(str(p) for p in parts)
         return hashlib.md5(content.encode()).hexdigest()[:16]
+
+    # ----- Feedback (human validation) -----
+
+    def save_feedback(self, feedback_data: dict) -> int:
+        """Upsert a feedback row.
+
+        The logical key is ``analysis_result_id`` — at most one feedback per
+        analysis. If a row already exists for that ``analysis_result_id``,
+        its fields are updated and ``indexed_in_chromadb`` is reset to
+        ``"false"`` so the corrected version can be re-pushed.
+
+        When ``feedback_data`` carries a ``corrected_labels`` list
+        (list of label dicts with the same shape as
+        :class:`~src.analyzer.rag_classifier.LabelAssignment`), the
+        side table ``analysis_feedback_labels`` is replaced with the
+        new list and the flat ``corrected_*`` columns mirror the
+        **primary** corrected label.
+
+        Args:
+            feedback_data: Dictionary with ``AnalysisFeedbackModel``
+                fields. May also include ``corrected_labels``.
+
+        Returns:
+            ID of the saved (or updated) feedback row.
+        """
+        analysis_result_id = feedback_data.get("analysis_result_id")
+
+        corrected_labels_raw = feedback_data.pop("corrected_labels", None)
+
+        with self.get_session() as session:
+            existing = (
+                session.query(AnalysisFeedbackModel)
+                .filter_by(analysis_result_id=analysis_result_id)
+                .first()
+            )
+
+            if existing:
+                for key, value in feedback_data.items():
+                    if hasattr(existing, key):
+                        setattr(existing, key, value)
+                # If the human changed their mind, the old ChromaDB entry
+                # is stale — force a re-index on next sync.
+                if feedback_data.get("indexed_in_chromadb") is None:
+                    existing.indexed_in_chromadb = "false"
+                    existing.chromadb_id = None
+                    existing.chromadb_indexed_at = None
+                feedback_id = existing.id
+            else:
+                row = AnalysisFeedbackModel(**feedback_data)
+                session.add(row)
+                session.flush()
+                feedback_id = row.id
+
+            if (
+                isinstance(corrected_labels_raw, list)
+                and str(feedback_data.get("agrees", "false")).lower() == "false"
+            ):
+                self._replace_feedback_labels(session, feedback_id, corrected_labels_raw)
+
+            return feedback_id
+
+    @staticmethod
+    def _replace_feedback_labels(session: Session, feedback_id: int, labels: list[dict]) -> None:
+        """Replace the ``analysis_feedback_labels`` rows for one feedback row.
+
+        Also mirrors the primary label back into the flat
+        ``analysis_feedback`` columns for backwards compatibility.
+        """
+        session.query(AnalysisFeedbackLabelModel).filter_by(
+            analysis_feedback_id=feedback_id
+        ).delete(synchronize_session=False)
+
+        import json as _json
+
+        for orden, lbl in enumerate(labels):
+            marcadores = lbl.get("marcadores_detectados") or []
+            if isinstance(marcadores, list):
+                marcadores_json = _json.dumps(marcadores, ensure_ascii=False)
+            else:
+                marcadores_json = _json.dumps(
+                    [m.strip() for m in str(marcadores).split(",") if m.strip()],
+                    ensure_ascii=False,
+                )
+            row = AnalysisFeedbackLabelModel(
+                analysis_feedback_id=feedback_id,
+                orden=orden,
+                categoria=str(lbl.get("categoria") or "ninguna"),
+                dimension=lbl.get("dimension"),
+                severidad=str(lbl.get("severidad") or "ninguna"),
+                justificacion=str(lbl.get("justificacion") or ""),
+                evidencia=str(lbl.get("evidencia") or ""),
+                regla_disparada=lbl.get("regla_disparada"),
+                marcadores_detectados=marcadores_json,
+                confianza=_to_str_or_none(lbl.get("confianza")),
+                score_ajuste=_to_str_or_none(lbl.get("score_ajuste")),
+                es_falso_positivo_probable=(
+                    "true" if lbl.get("es_falso_positivo_probable") else "false"
+                ),
+            )
+            session.add(row)
+
+        # Mirror the primary label into the flat columns.
+        primary = Database._primary_label_dict(labels)
+        fb = session.query(AnalysisFeedbackModel).filter_by(id=feedback_id).one()
+        fb.corrected_categoria = primary["categoria"]
+        fb.corrected_dimension = primary["dimension"]
+        fb.corrected_justificacion = primary["justificacion"]
+
+    def get_feedback_for_analysis(self, analysis_result_id: int) -> dict | None:
+        """Return the feedback for a single analysis result, or ``None``."""
+        with self.get_session() as session:
+            row = (
+                session.query(AnalysisFeedbackModel)
+                .filter_by(analysis_result_id=analysis_result_id)
+                .first()
+            )
+            return row.to_dict() if row else None
+
+    def list_feedback(
+        self,
+        content_type: str | None = None,
+        only_disagreements: bool = False,
+        only_pending_index: bool = False,
+    ) -> list[dict]:
+        """List feedback rows with optional filters.
+
+        Each returned dict is enriched with a ``labels`` key holding the
+        ordered list of corrected labels (empty if no overrides were
+        stored via the multi-label API).
+
+        Args:
+            content_type: Filter by ``"post"`` or ``"comment"``.
+            only_disagreements: If True, return only ``agrees="false"``.
+            only_pending_index: If True, return only rows whose
+                ``indexed_in_chromadb`` is ``"false"`` AND that are
+                disagreements (corrections worth pushing).
+
+        Returns:
+            List of feedback dicts.
+        """
+        with self.get_session() as session:
+            query = session.query(AnalysisFeedbackModel)
+            if content_type:
+                query = query.filter_by(content_type=content_type)
+            if only_disagreements:
+                query = query.filter_by(agrees="false")
+            if only_pending_index:
+                query = query.filter_by(indexed_in_chromadb="false", agrees="false")
+            rows = [r.to_dict() for r in query.all()]
+
+            ids = [r["id"] for r in rows if r.get("id") is not None]
+            labels_by_id: dict[int, list[dict]] = {i: [] for i in ids}
+            if ids:
+                label_rows = (
+                    session.query(AnalysisFeedbackLabelModel)
+                    .filter(AnalysisFeedbackLabelModel.analysis_feedback_id.in_(ids))
+                    .order_by(
+                        AnalysisFeedbackLabelModel.analysis_feedback_id.asc(),
+                        AnalysisFeedbackLabelModel.orden.asc(),
+                    )
+                    .all()
+                )
+                for lr in label_rows:
+                    labels_by_id.setdefault(lr.analysis_feedback_id, []).append(lr.to_dict())
+
+        for r in rows:
+            r["labels"] = labels_by_id.get(r.get("id"), [])
+        return rows
+
+    def get_feedback_joined_with_analysis(
+        self,
+        content_type: str | None = None,
+        only_disagreements: bool = False,
+    ) -> list[dict]:
+        """Return feedback joined with the original analysis row.
+
+        Each output dict contains the analysis_result fields plus the
+        feedback fields, prefixed with ``original_`` for clarity. Used
+        by the "Análisis corregidos" report.
+
+        Args:
+            content_type: Filter by ``"post"`` or ``"comment"``.
+            only_disagreements: If True, keep only rows where the
+                reviewer disagreed.
+
+        Returns:
+            List of joined dicts, ordered by ``updated_at`` desc.
+        """
+        with self.get_session() as session:
+            query = session.query(AnalysisFeedbackModel, AnalysisResultModel).join(
+                AnalysisResultModel,
+                AnalysisResultModel.id == AnalysisFeedbackModel.analysis_result_id,
+            )
+            if content_type:
+                query = query.filter(AnalysisFeedbackModel.content_type == content_type)
+            if only_disagreements:
+                query = query.filter(AnalysisFeedbackModel.agrees == "false")
+
+            query = query.order_by(AnalysisFeedbackModel.updated_at.desc())
+
+            results: list[dict] = []
+            for fb, ar in query.all():
+                joined = ar.to_dict()
+                fb_dict = fb.to_dict()
+                joined["feedback"] = fb_dict
+                joined["original_categoria"] = ar.categoria
+                joined["original_dimension"] = ar.dimension
+                joined["original_justificacion"] = ar.justificacion
+                joined["original_severidad"] = ar.severidad
+                joined["corrected_categoria"] = fb.corrected_categoria
+                joined["corrected_dimension"] = fb.corrected_dimension
+                joined["corrected_justificacion"] = fb.corrected_justificacion
+                joined["reason"] = fb.reason
+                joined["agrees"] = fb.agrees
+                results.append(joined)
+            return results
+
+    def get_original_text(self, content_type: str, content_id: str) -> str:
+        """Return the original text for a post/comment (used by feedback form)."""
+        with self.get_session() as session:
+            if content_type == "post":
+                row = session.query(PostModel).filter_by(id=content_id).first()
+            elif content_type == "comment":
+                row = session.query(CommentModel).filter_by(id=content_id).first()
+            else:
+                return ""
+            return (row.text or "") if row else ""
+
+    def mark_feedback_indexed(self, feedback_id: int, chromadb_id: str) -> bool:
+        """Mark a feedback row as indexed in ChromaDB.
+
+        Args:
+            feedback_id: PK of the feedback row.
+            chromadb_id: ID returned by ChromaDB ``add``.
+
+        Returns:
+            True on success, False if the row doesn't exist.
+        """
+        from datetime import datetime
+
+        with self.get_session() as session:
+            row = session.query(AnalysisFeedbackModel).filter_by(id=feedback_id).first()
+            if not row:
+                return False
+            row.indexed_in_chromadb = "true"
+            row.chromadb_id = chromadb_id
+            row.chromadb_indexed_at = datetime.now()
+            return True
+
+    def unmark_feedback_indexed(self, feedback_id: int) -> bool:
+        """Mark a feedback row as no-longer-indexed (ChromaDB entry removed).
+
+        Args:
+            feedback_id: PK of the feedback row.
+
+        Returns:
+            True on success.
+        """
+        with self.get_session() as session:
+            row = session.query(AnalysisFeedbackModel).filter_by(id=feedback_id).first()
+            if not row:
+                return False
+            row.indexed_in_chromadb = "false"
+            row.chromadb_id = None
+            row.chromadb_indexed_at = None
+            return True
+
+
+def _to_str_or_none(value: object) -> str | None:
+    """Coerce a numeric/string to a string for storage, or None.
+
+    Used to write the ``confianza`` / ``score_ajuste`` columns of
+    ``analysis_labels`` / ``analysis_feedback_labels`` from arbitrary
+    Python inputs (float, int, stringified number, ``None``).
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, str):
+        s = value.strip()
+        return s if s else None
+    return None
 
 
 # Global database instance

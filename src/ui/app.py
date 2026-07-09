@@ -1,9 +1,11 @@
 """Streamlit app — Upload markdown/PDF documents to ChromaDB."""
 
+import json
 import sys
 import tempfile
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 # Ensure project root is on sys.path so "from src" works
@@ -12,11 +14,27 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from src.analyzer.batch_analyzer import BatchAnalyzer  # noqa: E402
+from src.analyzer.category_mapping import MAX_LABELS  # noqa: E402
 from src.config.settings import get_settings  # noqa: E402
+from src.knowledge_base.feedback_store import (  # noqa: E402
+    FeedbackStore,
+    get_feedback_store,
+)
 from src.knowledge_base.pdf_processor import PDFProcessor  # noqa: E402
 from src.knowledge_base.text_processor import process_text  # noqa: E402
 from src.knowledge_base.vector_store import get_vector_store  # noqa: E402
 from src.storage import get_database as get_sqlite_db  # noqa: E402
+from src.ui.adjusted_report import (  # noqa: E402
+    join_feedback_with_analysis,
+)
+from src.ui.validacion import (  # noqa: E402
+    build_feedback_payload,
+    categoria_choices,
+    dimension_options_for,
+    feedback_status_label,
+    filter_analysis_for_validation,
+    is_valid_categoria_for_dimension,
+)
 
 st.set_page_config(
     page_title="Cargar conocimiento — TFM Violencia de Género",
@@ -109,8 +127,8 @@ with st.sidebar:
         pass
 
 # ------ Main tabs ------
-tab_upload, tab_explore, tab_reports = st.tabs(
-    ["📤 Cargar documentos", "🔍 Explorar base", "📊 Reportes"]
+tab_upload, tab_explore, tab_reports, tab_validacion = st.tabs(
+    ["📤 Cargar documentos", "🔍 Explorar base", "📊 Reportes", "✅ Validación"]
 )
 
 # ===== TAB 1: Upload =====
@@ -436,6 +454,123 @@ with tab_reports:
         else:
             st.info("Sin resultados con los filtros seleccionados.")
 
+    # === Sub-section: Análisis corregidos (raw view + export) ===
+    st.divider()
+    st.subheader("📋 Análisis corregidos (vista cruda)")
+    st.caption(
+        "Comparativa lado a lado entre la salida cruda de la IA y la corrección "
+        "(si existe) validada por un humano. Esta es la **vista cruda** — la "
+        "versión ajustada se muestra en el landing (Enola)."
+    )
+
+    fb_raw_rows = db.list_feedback()
+    fb_joined = db.get_feedback_joined_with_analysis()
+    rows_for_report = join_feedback_with_analysis(fb_joined)
+
+    if not rows_for_report:
+        st.info("Todavía no hay revisiones. Cargá correcciones desde el tab ✅ Validación.")
+    else:
+        # Filters
+        col_f1, col_f2, col_f3 = st.columns([2, 2, 2])
+        with col_f1:
+            fb_filter_type = st.selectbox(
+                "Tipo",
+                options=["Todos", "post", "comment"],
+                key="rpt_fb_type",
+            )
+        with col_f2:
+            fb_filter_agrees = st.selectbox(
+                "Decisión",
+                options=["Todos", "De acuerdo", "Corregido"],
+                key="rpt_fb_agrees",
+            )
+        with col_f3:
+            fb_filter_indexed = st.selectbox(
+                "Estado ChromaDB",
+                options=["Todos", "Indexado", "Pendiente"],
+                key="rpt_fb_indexed",
+            )
+
+        filtered_rows = rows_for_report
+        if fb_filter_type != "Todos":
+            filtered_rows = [r for r in filtered_rows if r.get("content_type") == fb_filter_type]
+        if fb_filter_agrees == "De acuerdo":
+            filtered_rows = [r for r in filtered_rows if r.get("agrees") == "true"]
+        elif fb_filter_agrees == "Corregido":
+            filtered_rows = [r for r in filtered_rows if r.get("agrees") == "false"]
+        if fb_filter_indexed == "Indexado":
+            filtered_rows = [r for r in filtered_rows if r.get("indexed_in_chromadb") == "true"]
+        elif fb_filter_indexed == "Pendiente":
+            filtered_rows = [r for r in filtered_rows if r.get("indexed_in_chromadb") == "false"]
+
+        if filtered_rows:
+            df_compare = pd.DataFrame(
+                [
+                    {
+                        "Tipo": r.get("content_type"),
+                        "ID": str(r.get("content_id") or "")[:18],
+                        "Decisión": "✅ De acuerdo"
+                        if r.get("agrees") == "true"
+                        else "❌ Corregido",
+                        "Cat. IA": str(r.get("original_categoria") or "—"),
+                        "Cat. Humano": str(r.get("corrected_categoria") or "—"),
+                        "Dim. IA": str(r.get("original_dimension") or "—"),
+                        "Dim. Humano": str(r.get("corrected_dimension") or "—"),
+                        "ChromaDB": "🟢" if r.get("indexed_in_chromadb") == "true" else "🟡",
+                    }
+                    for r in filtered_rows
+                ]
+            )
+            st.dataframe(df_compare, width="stretch", hide_index=True)
+
+            # Per-row expandable detail
+            with st.expander(f"🔍 Detalle completo ({len(filtered_rows)} filas)", expanded=False):
+                for r in filtered_rows[:50]:
+                    st.markdown(
+                        f"**[{r.get('content_type')}/{r.get('content_id')}]** — "
+                        f"`{r.get('analysis_id')}`"
+                    )
+                    st.markdown(f"&nbsp;&nbsp;📝 Texto: *{r.get('text_snapshot') or ''}*")
+                    st.markdown(
+                        f"&nbsp;&nbsp;🤖 IA: `{r.get('original_categoria') or '—'}` / "
+                        f"`{r.get('original_dimension') or '—'}` — *"
+                        f"{r.get('original_justificacion') or '—'}*"
+                    )
+                    st.markdown(
+                        f"&nbsp;&nbsp;🧑 Humano: `{r.get('corrected_categoria') or '—'}` / "
+                        f"`{r.get('corrected_dimension') or '—'}` — *"
+                        f"{r.get('corrected_justificacion') or '—'}*"
+                    )
+                    if r.get("reason"):
+                        st.markdown(f"&nbsp;&nbsp;💬 Motivo: {r.get('reason')}")
+                    st.divider()
+
+            # Export buttons
+            st.divider()
+            col_dl1, col_dl2, _ = st.columns([2, 2, 4])
+            with col_dl1:
+                csv_bytes = df_compare.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "⬇️ Descargar CSV",
+                    data=csv_bytes,
+                    file_name="analisis_corregidos.csv",
+                    mime="text/csv",
+                    key="rpt_fb_csv",
+                )
+            with col_dl2:
+                json_bytes = json.dumps(
+                    filtered_rows, ensure_ascii=False, indent=2, default=str
+                ).encode("utf-8")
+                st.download_button(
+                    "⬇️ Descargar JSON",
+                    data=json_bytes,
+                    file_name="analisis_corregidos.json",
+                    mime="application/json",
+                    key="rpt_fb_json",
+                )
+        else:
+            st.info("Sin filas para los filtros seleccionados.")
+
     st.divider()
 
     # Batch analysis button
@@ -475,3 +610,444 @@ with tab_reports:
                 st.rerun()
             except Exception as e:
                 st.error(f"Error en análisis batch: {e}")
+
+
+# ===== TAB 4: Validación =====
+with tab_validacion:
+    st.subheader("✅ Validación humana de análisis")
+    st.caption(
+        "Revisá las salidas de la IA. Las correcciones confirmadas se guardan "
+        "en SQLite y se inyectan como ejemplos few-shot en ChromaDB para que "
+        "la IA aprenda de los errores confirmados por humanos."
+    )
+
+    # ------- Stats header -------
+    feedback_count = db_stats.get("feedback_count", 0)
+    feedback_agreement = db_stats.get("feedback_agreement_count", 0)
+    feedback_disagreement = db_stats.get("feedback_disagreement_count", 0)
+    feedback_pending = db_stats.get("feedback_pending_index_count", 0)
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("📝 Total revisiones", feedback_count)
+    k2.metric("✅ De acuerdo", feedback_agreement)
+    k3.metric("❌ Corregido", feedback_disagreement)
+    k4.metric("⏳ Pendientes de indexar", feedback_pending)
+
+    # ------- ChromaDB feedback panel -------
+    st.divider()
+    with st.expander("🔧 Colección `feedback_corrections` (ChromaDB)"):
+        try:
+            fb_store: FeedbackStore = get_feedback_store(
+                persist_directory=settings.knowledge_base.persist_directory,
+                collection_name=settings.knowledge_base.feedback_collection_name,
+            )
+            fb_count = fb_store.get_count()
+            st.metric("Correcciones indexadas", fb_count)
+            if st.button("🚀 Indexar todas las correcciones pendientes", key="btn_index_all"):
+                pending = db.list_feedback(only_pending_index=True)
+                if not pending:
+                    st.info("No hay correcciones pendientes de indexar.")
+                else:
+                    progress = st.progress(0.0, text="Indexando…")
+                    ok = 0
+                    for idx, p in enumerate(pending, start=1):
+                        try:
+                            original_text = p.get("text_snapshot") or db.get_original_text(
+                                p.get("content_type") or "post",
+                                p.get("content_id") or "",
+                            )
+                            if not original_text:
+                                continue
+                            ar_id = p["analysis_result_id"]
+                            analysis_row = db.get_analysis_result_by_content(
+                                p.get("content_type") or "post",
+                                p.get("content_id") or "",
+                            )
+                            original_cat = (analysis_row or {}).get("categoria")
+                            cid = fb_store.add_correction(
+                                feedback_id=p["id"],
+                                text=original_text,
+                                corrected_categoria=p.get("corrected_categoria")
+                                or original_cat
+                                or "ninguna",
+                                corrected_dimension=p.get("corrected_dimension"),
+                                corrected_justificacion=p.get("corrected_justificacion")
+                                or "Revisado por humano",
+                                original_categoria=original_cat,
+                                content_type=p.get("content_type") or "post",
+                                content_id=p.get("content_id") or "",
+                                reason=p.get("reason"),
+                                id=p.get("chromadb_id"),
+                            )
+                            db.mark_feedback_indexed(p["id"], cid)
+                            ok += 1
+                        except Exception as ex:
+                            st.warning(f"Error indexando feedback {p.get('id')}: {ex}")
+                        progress.progress(idx / len(pending))
+                    progress.empty()
+                    st.success(f"✅ {ok} correcciones indexadas en ChromaDB")
+                    st.rerun()
+        except Exception as e:
+            st.error(f"Error accediendo a feedback store: {e}")
+
+    # ------- Filters + table -------
+    st.divider()
+    st.subheader("Análisis pendientes de revisar")
+
+    col_f1, col_f2, col_f3 = st.columns([2, 2, 2])
+    with col_f1:
+        v_content_type = st.selectbox(
+            "Tipo",
+            options=["all", "post", "comment"],
+            format_func={
+                "all": "Todos",
+                "post": "Posts",
+                "comment": "Comments",
+            }.get,
+            key="v_type",
+        )
+    with col_f2:
+        v_state = st.selectbox(
+            "Estado de revisión",
+            options=[
+                "all",
+                "pending",
+                "agreed",
+                "disagreed",
+            ],
+            format_func={
+                "all": "Todos",
+                "pending": "⏳ Pendientes",
+                "agreed": "✅ De acuerdo",
+                "disagreed": "❌ Corregidos",
+            }.get,
+            key="v_state",
+        )
+    with col_f3:
+        v_only_violent = st.checkbox(
+            "Solo con violencia",
+            value=False,
+            key="v_only_violent",
+        )
+
+    # Refresh button
+    if st.button("🔄 Refrescar", width="stretch"):
+        st.rerun()
+
+    all_analysis: list[dict[str, object]] = db.get_analysis_results()
+    all_fb: list[dict[str, object]] = db.list_feedback()
+    filtered = filter_analysis_for_validation(
+        all_analysis,
+        all_fb,
+        content_type=None if v_content_type == "all" else v_content_type,
+        review_state=v_state,
+        only_violent=v_only_violent,
+    )
+
+    if not filtered:
+        st.info("No hay análisis con los filtros seleccionados.")
+    else:
+        st.caption(f"{len(filtered)} filas mostradas")
+        for row in filtered:
+            with st.expander(
+                f"[{row.get('content_type')}] "
+                f"{str(row.get('content_id') or '')[:20]} — "
+                f"IA: *{row.get('categoria') or '—'}* / "
+                f"`{row.get('dimension') or '—'}` — "
+                f"{feedback_status_label(row.get('feedback_row') or {})}",
+                expanded=False,
+            ):
+                # ------- Show original text -------
+                original_text = row.get("text_snapshot") or db.get_original_text(
+                    row.get("content_type") or "post",
+                    row.get("content_id") or "",
+                )
+                if not original_text:
+                    original_text = f"(Texto original no disponible — ID {row.get('content_id')})"
+                st.markdown("**Texto original:**")
+                st.info(original_text[:800] + ("…" if len(original_text) > 800 else ""))
+
+                # ------- Show AI classification -------
+                st.markdown("**🤖 Clasificación de la IA:**")
+                ai_labels = list(row.get("labels") or [])
+                ai_cols = st.columns(4)
+                ai_cols[0].markdown(f"**Violencia:** `{row.get('tiene_violencia') or '—'}`")
+                ai_cols[1].markdown(f"**Categoría (primaria):** `{row.get('categoria') or '—'}`")
+                ai_cols[2].markdown(f"**Dimensión (primaria):** `{row.get('dimension') or '—'}`")
+                ai_cols[3].markdown(f"**Severidad global:** `{row.get('severidad') or '—'}`")
+                if ai_labels:
+                    with st.expander(
+                        f"Etiquetas detectadas ({len(ai_labels)})",
+                        expanded=len(ai_labels) > 1,
+                    ):
+                        for i, lbl in enumerate(ai_labels, start=1):
+                            st.markdown(
+                                f"**#{i} — {lbl.get('categoria')} / "
+                                f"{lbl.get('dimension') or '—'} "
+                                f"(sev: {lbl.get('severidad') or '—'})**"
+                            )
+                            st.write(f"  - Justificación: {lbl.get('justificacion') or '—'}")
+                            st.write(f"  - Evidencia: {lbl.get('evidencia') or '—'}")
+                            st.write(f"  - Marcadores: {lbl.get('marcadores_detectados') or '—'}")
+                else:
+                    with st.expander("Justificación / evidencia / marcadores", expanded=False):
+                        st.write("**Justificación:**", row.get("justificacion") or "—")
+                        st.write("**Evidencia:**", row.get("evidencia") or "—")
+                        st.write(
+                            "**Marcadores detectados:**",
+                            row.get("marcadores_detectados") or "—",
+                        )
+
+                st.divider()
+
+                # ------- Feedback form (multi-label) -------
+                ar_id = row.get("id")
+                existing_fb = row.get("feedback_row") or {}
+                existing_fb_labels: list[dict] = list(existing_fb.get("labels") or [])
+
+                # Backwards-compat: if no multi-label rows but flat
+                # corrected_* fields are present, synthesize a 1-row list.
+                if not existing_fb_labels and existing_fb.get("corrected_categoria"):
+                    existing_fb_labels = [
+                        {
+                            "categoria": existing_fb.get("corrected_categoria"),
+                            "dimension": existing_fb.get("corrected_dimension"),
+                            "severidad": "media",
+                            "justificacion": existing_fb.get("corrected_justificacion") or "",
+                        }
+                    ]
+
+                st.markdown("**✅ Tu revisión:**")
+                with st.form(key=f"fb_form_{ar_id}"):
+                    default_agrees = (
+                        "yes"
+                        if str(existing_fb.get("agrees", "")).lower() == "true"
+                        else ("no" if str(existing_fb.get("agrees", "")).lower() == "false" else "")
+                    )
+                    agrees_choice = st.radio(
+                        "¿Coincidís con la IA?",
+                        options=["yes", "no"],
+                        format_func={"yes": "✅ Sí, coincido", "no": "❌ No, corregir"}.get,
+                        index=(
+                            0 if default_agrees == "yes" else (1 if default_agrees == "no" else 0)
+                        ),
+                        key=f"agrees_{ar_id}",
+                    )
+
+                    show_corrections = agrees_choice == "no"
+                    reason = ""
+                    label_rows_widget: list[dict] = []
+
+                    # State initializer: keep the row count in sync with
+                    # the existing feedback so edits feel stable across
+                    # rerenders. Streamlit forbids changing widget keys
+                    # mid-form, so we use a session-state copy that the
+                    # add/remove buttons mutate.
+                    n_key = f"n_labels_{ar_id}"
+                    if n_key not in st.session_state:
+                        st.session_state[n_key] = max(1, len(existing_fb_labels))
+                    n_labels = st.session_state[n_key]
+
+                    if show_corrections:
+                        reason = st.text_input(
+                            "¿Por qué no coincidís? (opcional)",
+                            value=str(existing_fb.get("reason") or ""),
+                            key=f"reason_{ar_id}",
+                        )
+
+                        st.caption(
+                            f"Edición multi-etiqueta — agregá hasta {MAX_LABELS} "
+                            f"categorías que apliquen al texto."
+                        )
+                        cat_pairs = categoria_choices()
+
+                        for idx in range(n_labels):
+                            existing_row = (
+                                existing_fb_labels[idx] if idx < len(existing_fb_labels) else {}
+                            )
+                            with st.expander(
+                                f"🏷 Etiqueta {idx + 1}"
+                                + (
+                                    f" — {existing_row.get('categoria')}"
+                                    if existing_row.get("categoria")
+                                    else ""
+                                ),
+                                expanded=True,
+                            ):
+                                cols_top = st.columns([2, 2])
+                                with cols_top[0]:
+                                    default_cat_idx = 0
+                                    for i, (_, val) in enumerate(cat_pairs):
+                                        if val and val == existing_row.get("categoria"):
+                                            default_cat_idx = i
+                                            break
+                                    cat_choice = st.selectbox(
+                                        "Categoría",
+                                        options=cat_pairs,
+                                        format_func=lambda p: p[0],
+                                        index=default_cat_idx,
+                                        key=f"cat_{ar_id}_{idx}",
+                                    )[1]
+                                with cols_top[1]:
+                                    dim_pairs = dimension_options_for(cat_choice)
+                                    default_dim_idx = 0
+                                    for i, (_, val) in enumerate(dim_pairs):
+                                        if val and val == existing_row.get("dimension"):
+                                            default_dim_idx = i
+                                            break
+                                    dim_choice = st.selectbox(
+                                        "Dimensión",
+                                        options=dim_pairs,
+                                        format_func=lambda p: p[0],
+                                        index=default_dim_idx,
+                                        key=f"dim_{ar_id}_{idx}",
+                                    )[1]
+
+                                cols_mid = st.columns([1, 3])
+                                with cols_mid[0]:
+                                    sev_choices = ["baja", "media", "alta", "ninguna"]
+                                    default_sev = str(existing_row.get("severidad") or "media")
+                                    sev_idx = (
+                                        sev_choices.index(default_sev)
+                                        if default_sev in sev_choices
+                                        else 1
+                                    )
+                                    sev_choice = st.selectbox(
+                                        "Severidad",
+                                        options=sev_choices,
+                                        index=sev_idx,
+                                        key=f"sev_{ar_id}_{idx}",
+                                    )
+                                with cols_mid[1]:
+                                    fpp_choice = st.checkbox(
+                                        "Falso positivo probable",
+                                        value=bool(existing_row.get("es_falso_positivo_probable")),
+                                        key=f"fpp_{ar_id}_{idx}",
+                                    )
+
+                                justif = st.text_area(
+                                    "Justificación (por qué esta categoría aplica)",
+                                    value=str(existing_row.get("justificacion") or ""),
+                                    key=f"justif_{ar_id}_{idx}",
+                                )
+                                evidencia = st.text_area(
+                                    "Evidencia (cita del texto)",
+                                    value=str(existing_row.get("evidencia") or ""),
+                                    key=f"evid_{ar_id}_{idx}",
+                                )
+
+                                label_rows_widget.append(
+                                    {
+                                        "categoria": cat_choice,
+                                        "dimension": dim_choice,
+                                        "severidad": sev_choice,
+                                        "es_falso_positivo_probable": fpp_choice,
+                                        "justificacion": justif,
+                                        "evidencia": evidencia,
+                                    }
+                                )
+
+                        add_col, rm_col, _sp = st.columns([1, 1, 4])
+                        with add_col:
+                            if (
+                                st.form_submit_button(
+                                    "➕ Agregar etiqueta",
+                                    disabled=n_labels >= MAX_LABELS,
+                                )
+                                and n_labels < MAX_LABELS
+                            ):
+                                st.session_state[n_key] = n_labels + 1
+                                st.rerun()
+                        with rm_col:
+                            if (
+                                st.form_submit_button(
+                                    "➖ Quitar última",
+                                    disabled=n_labels <= 1,
+                                )
+                                and n_labels > 1
+                            ):
+                                st.session_state[n_key] = n_labels - 1
+                                st.rerun()
+
+                    reviewer = st.text_input(
+                        "Revisor (opcional)",
+                        value="",
+                        key=f"rev_{ar_id}",
+                    )
+
+                    saved_col, indexed_col = st.columns(2)
+                    with saved_col:
+                        submit_save = st.form_submit_button(
+                            "💾 Guardar feedback",
+                            type="primary",
+                            width="stretch",
+                        )
+                    with indexed_col:
+                        submit_save_index = st.form_submit_button(
+                            "💾+🔎 Guardar y enviar a ChromaDB",
+                            width="stretch",
+                        )
+
+                # ------- Persist -------
+                if submit_save or submit_save_index:
+                    payload = build_feedback_payload(
+                        analysis_result_id=ar_id,
+                        content_type=row.get("content_type") or "post",
+                        content_id=row.get("content_id") or "",
+                        text_snapshot=original_text,
+                        agrees=(agrees_choice == "yes"),
+                        reason=reason,
+                        reviewer=reviewer,
+                        corrected_labels=label_rows_widget,
+                    )
+                    # Cross-row validation: every (categoria, dimension)
+                    # must be a valid pair.
+                    invalid = False
+                    for lbl in payload.get("corrected_labels") or []:
+                        if not is_valid_categoria_for_dimension(
+                            str(lbl.get("categoria") or ""),
+                            str(lbl.get("dimension") or ""),
+                        ):
+                            invalid = True
+                            break
+                    if payload["agrees"] == "false" and invalid:
+                        st.error(
+                            "❌ Alguna etiqueta tiene una dimensión que no "
+                            "corresponde a su categoría — revisá antes de "
+                            "guardar."
+                        )
+                    else:
+                        try:
+                            new_fb_id = db.save_feedback(payload)
+                            st.success("✅ Feedback guardado")
+                            if submit_save_index and payload["agrees"] == "false":
+                                # Push to ChromaDB right away (multi-label aware).
+                                try:
+                                    cid = fb_store.add_correction(
+                                        feedback_id=new_fb_id,
+                                        text=original_text,
+                                        corrected_categoria=str(
+                                            payload.get("corrected_categoria")
+                                            or row.get("categoria")
+                                            or "ninguna"
+                                        ),
+                                        corrected_dimension=payload.get("corrected_dimension"),
+                                        corrected_justificacion=str(
+                                            payload.get("corrected_justificacion")
+                                            or "Revisado por humano"
+                                        ),
+                                        original_categoria=row.get("categoria"),
+                                        content_type=row.get("content_type") or "post",
+                                        content_id=row.get("content_id") or "",
+                                        reason=str(payload.get("reason") or ""),
+                                        corrected_labels=list(
+                                            payload.get("corrected_labels") or []
+                                        ),
+                                    )
+                                    db.mark_feedback_indexed(new_fb_id, cid)
+                                    st.success("🔎 Indexado en ChromaDB")
+                                except Exception as ex:
+                                    st.warning(f"No se pudo indexar en ChromaDB: {ex}")
+                            st.rerun()
+                        except Exception as ex:
+                            st.error(f"❌ Error guardando feedback: {ex}")

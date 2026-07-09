@@ -1,14 +1,69 @@
 """Unit tests for pipeline module."""
 
+import os
 from dataclasses import asdict
+from tempfile import NamedTemporaryFile
 from unittest.mock import MagicMock
 
 from src.pipeline.orchestrator import (
     PipelineOrchestrator,
     PipelineResult,
     PipelineStats,
+    load_seed_pages,
     run_full_pipeline,
 )
+from src.scraper.models import ContentSource
+
+
+class TestLoadSeedPages:
+    """Tests for load_seed_pages URL classification."""
+
+    def test_load_seed_pages_classifies_automatically(self):
+        """Test seed URLs are classified based purely on URL pattern."""
+        lines = [
+            "# pages",
+            "https://www.facebook.com/Mentalidad100",
+            "# post",
+            "https://www.facebook.com/100080046996960/posts/999061662772058/",
+            "# reel",
+            "https://www.facebook.com/reel/993030670163319",
+            "# group",
+            "https://www.facebook.com/groups/groupname",
+            "# unknown",
+            "not-a-url",
+        ]
+
+        with NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
+            f.write("\n".join(lines))
+            tmp_path = f.name
+
+        try:
+            results = load_seed_pages(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+        assert len(results) == 5
+        assert results[0] == {
+            "url": "https://www.facebook.com/Mentalidad100",
+            "source": ContentSource.FACEBOOK_PAGE.value,
+        }
+        assert results[1] == {
+            "url": "https://www.facebook.com/100080046996960/posts/999061662772058/",
+            "source": ContentSource.FACEBOOK_POST.value,
+        }
+        assert results[2] == {
+            "url": "https://www.facebook.com/reel/993030670163319",
+            "source": ContentSource.FACEBOOK_POST.value,
+        }
+        assert results[3] == {
+            "url": "https://www.facebook.com/groups/groupname",
+            "source": ContentSource.FACEBOOK_GROUP.value,
+        }
+        assert results[4] == {"url": "not-a-url", "source": ContentSource.UNKNOWN.value}
+
+    def test_load_seed_pages_missing_file(self):
+        """Test loading from a non-existent file returns empty list."""
+        assert load_seed_pages("/tmp/nonexistent_seed_file_12345.txt") == []
 
 
 class TestPipelineStats:
@@ -145,6 +200,49 @@ class TestPipelineOrchestrator:
 
         assert result.success is True
         assert mock_scraper.scrape_page_sync.called
+
+    def test_run_seed_pipeline_routes_post(self):
+        """Test post URLs are routed to scrape_post_sync."""
+        mock_scraper = MagicMock()
+        mock_scraper.scrape_post_sync.return_value = []
+
+        orchestrator = PipelineOrchestrator(scraper=mock_scraper)
+
+        result = orchestrator.run_seed_pipeline(
+            [{"url": "https://www.facebook.com/page/posts/123", "source": "facebook_post"}]
+        )
+
+        assert result.success is True
+        assert mock_scraper.scrape_post_sync.called
+        assert not mock_scraper.scrape_page_sync.called
+
+    def test_run_seed_pipeline_routes_reel(self):
+        """Test reel URLs are routed to scrape_reel_sync."""
+        mock_scraper = MagicMock()
+        mock_scraper.scrape_reel_sync.return_value = []
+
+        orchestrator = PipelineOrchestrator(scraper=mock_scraper)
+
+        result = orchestrator.run_seed_pipeline(
+            [{"url": "https://www.facebook.com/reel/123456", "source": "facebook_post"}]
+        )
+
+        assert result.success is True
+        assert mock_scraper.scrape_reel_sync.called
+        assert not mock_scraper.scrape_page_sync.called
+        assert not mock_scraper.scrape_post_sync.called
+
+    def test_run_seed_pipeline_legacy_string(self):
+        """Test legacy string seeds are auto-classified and routed."""
+        mock_scraper = MagicMock()
+        mock_scraper.scrape_reel_sync.return_value = []
+
+        orchestrator = PipelineOrchestrator(scraper=mock_scraper)
+
+        result = orchestrator.run_seed_pipeline(["https://www.facebook.com/reel/legacy"])
+
+        assert result.success is True
+        assert mock_scraper.scrape_reel_sync.called
 
     def test_run_discovery_pipeline_no_db(self):
         """Test running discovery without database."""

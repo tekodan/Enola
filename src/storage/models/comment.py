@@ -25,6 +25,8 @@ class CommentModel(Base):
     post_id = Column(String, ForeignKey("posts.id"), nullable=True)
     parent_id = Column(String, nullable=True)
     url = Column(String, nullable=True)
+    time_ago = Column(String, nullable=True)
+    responses = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.now)
 
     # Relationships
@@ -44,5 +46,7 @@ class CommentModel(Base):
             "post_id": self.post_id,
             "parent_id": self.parent_id,
             "url": self.url,
+            "time_ago": self.time_ago,
+            "responses": self.responses,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

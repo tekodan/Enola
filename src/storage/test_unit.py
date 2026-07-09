@@ -411,3 +411,435 @@ class TestExportManager:
 
         files = exporter.get_export_files()
         assert len(files) == 2
+
+
+class TestFeedbackOperations:
+    """Tests for human-feedback CRUD on analysis results."""
+
+    def _seed_result(self, db, *, content_id: str = "p1") -> int:
+        """Insert an analysis result and return its id."""
+        return db.save_analysis_result(
+            {
+                "content_type": "post",
+                "content_id": content_id,
+                "tiene_violencia": "true",
+                "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                "dimension": "1.1",
+                "severidad": "baja",
+                "justificacion": "AI orig",
+                "evidencia": "ev orig",
+            }
+        )
+
+    def test_save_feedback_insert(self, db):
+        """First insert creates a new row."""
+        rid = self._seed_result(db)
+        fid = db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "the text",
+                "agrees": "true",
+            }
+        )
+        assert fid == 1
+        row = db.get_feedback_for_analysis(rid)
+        assert row is not None
+        assert row["agrees"] == "true"
+        assert row["corrected_categoria"] is None
+
+    def test_save_feedback_upsert_by_analysis_id(self, db):
+        """A second feedback for the same analysis replaces the first."""
+        rid = self._seed_result(db)
+        fid1 = db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+                "corrected_categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+            }
+        )
+        fid2 = db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "true",
+            }
+        )
+        assert fid2 == fid1
+        rows = db.list_feedback()
+        assert len(rows) == 1
+        assert rows[0]["agrees"] == "true"
+
+    def test_list_feedback_filters(self, db):
+        """Filter by content_type / only_disagreements / only_pending_index."""
+        r1 = self._seed_result(db, content_id="p1")
+        r2 = self._seed_result(db, content_id="c1")
+
+        # r1: comment-like feedback (upsert)
+        db.save_feedback(
+            {
+                "analysis_result_id": r1,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+                "corrected_categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+            }
+        )
+        db.save_feedback(
+            {
+                "analysis_result_id": r2,
+                "content_type": "comment",
+                "content_id": "c1",
+                "text_snapshot": "t",
+                "agrees": "true",
+            }
+        )
+
+        assert len(db.list_feedback()) == 2
+        assert len(db.list_feedback(content_type="post")) == 1
+        assert len(db.list_feedback(only_disagreements=True)) == 1
+        assert len(db.list_feedback(only_pending_index=True)) == 1
+
+        # Mark r1 as indexed — pending list should now be empty
+        db.mark_feedback_indexed(1, "chroma-1")
+        assert len(db.list_feedback(only_pending_index=True)) == 0
+
+    def test_mark_unmark_feedback_indexed(self, db):
+        """Indexed flag toggles correctly."""
+        rid = self._seed_result(db)
+        fid = db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+            }
+        )
+        assert db.get_feedback_for_analysis(rid)["indexed_in_chromadb"] == "false"
+        db.mark_feedback_indexed(fid, "doc_42")
+        row = db.get_feedback_for_analysis(rid)
+        assert row["indexed_in_chromadb"] == "true"
+        assert row["chromadb_id"] == "doc_42"
+        assert row["chromadb_indexed_at"] is not None
+        db.unmark_feedback_indexed(fid)
+        row = db.get_feedback_for_analysis(rid)
+        assert row["indexed_in_chromadb"] == "false"
+        assert row["chromadb_id"] is None
+
+    def test_feedback_joined_with_analysis(self, db):
+        """Join returns both original + corrected fields side by side."""
+        rid = self._seed_result(db)
+        db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+                "corrected_categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                "corrected_dimension": "3.1",
+                "corrected_justificacion": "corr",
+            }
+        )
+        joined = db.get_feedback_joined_with_analysis()
+        assert len(joined) == 1
+        assert joined[0]["original_categoria"] == "VDG_VIOLENCIA_SIMBOLICA"
+        assert joined[0]["corrected_categoria"] == "VDG_HOSTILIDAD_FEMINICIDIO"
+        assert joined[0]["corrected_dimension"] == "3.1"
+        assert joined[0]["agrees"] == "false"
+
+    def test_feedback_table_exists_for_legacy_db(self, tmp_path):
+        """Database() must create analysis_feedback even on empty DB."""
+        from sqlalchemy import inspect
+
+        path = tmp_path / "legacy.db"
+        db = Database(f"sqlite:///{path}")
+        tables = inspect(db.engine).get_table_names()
+        assert "analysis_feedback" in tables
+
+    def test_feedback_updates_reindex_pending_flag(self, db):
+        """Updating a feedback that's already indexed resets the flag."""
+        rid = self._seed_result(db)
+        fid = db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+            }
+        )
+        db.mark_feedback_indexed(fid, "chroma-1")
+        # Upsert without specifying indexed_in_chromadb
+        db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+                "corrected_categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+            }
+        )
+        row = db.get_feedback_for_analysis(rid)
+        assert row["indexed_in_chromadb"] == "false"
+        assert row["chromadb_id"] is None
+
+    def test_get_stats_includes_feedback(self, db):
+        """get_stats() reports feedback counts."""
+        rid = self._seed_result(db)
+        db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+                "corrected_categoria": "VDG_VIOLENCIA_SIMBOLICA",
+            }
+        )
+        stats = db.get_stats()
+        assert stats["feedback_count"] == 1
+        assert stats["feedback_disagreement_count"] == 1
+        assert stats["feedback_agreement_count"] == 0
+        assert stats["feedback_pending_index_count"] == 1
+
+
+class TestMultiLabel:
+    """Tests for the multi-label side tables and helpers."""
+
+    def _seed_post(self, db):
+        db.save_post(
+            {
+                "id": "p1",
+                "text": "te voy a matar zorra",
+                "author": "x",
+                "date": datetime(2024, 1, 1),
+                "likes": 0,
+                "comments_count": 0,
+                "shares": 0,
+                "url": "u",
+                "page_id": "pg",
+                "source": "facebook_page",
+            }
+        )
+
+    def test_save_analysis_with_clasificaciones_creates_label_rows(self, db):
+        """Passing ``clasificaciones`` writes one row per label."""
+        self._seed_post(db)
+        rid = db.save_or_update_analysis_result(
+            {
+                "content_type": "post",
+                "content_id": "p1",
+                "post_id": "p1",
+                "tiene_violencia": "true",
+                "clasificaciones": [
+                    {
+                        "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                        "dimension": "1.1",
+                        "severidad": "baja",
+                        "justificacion": "estereotipo",
+                        "evidencia": "a la cocina",
+                        "marcadores_detectados": ["cocina"],
+                    },
+                    {
+                        "categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                        "dimension": "3.1",
+                        "severidad": "alta",
+                        "justificacion": "amenaza",
+                        "evidencia": "matar",
+                        "marcadores_detectados": ["matar"],
+                    },
+                ],
+            }
+        )
+        labels = db.get_labels_for_analysis(rid)
+        assert len(labels) == 2
+        assert labels[0]["orden"] == 0
+        assert labels[1]["orden"] == 1
+        # Primary label mirrored into the flat row.
+        all_rows = db.get_analysis_results()
+        row = next(r for r in all_rows if r["id"] == rid)
+        # Highest severity is HOSTILIDAD/alta → that's the primary.
+        assert row["categoria"] == "VDG_HOSTILIDAD_FEMINICIDIO"
+        assert row["severidad"] == "alta"
+        assert row["justificacion"] == "amenaza"
+        assert len(row["labels"]) == 2
+
+    def test_save_analysis_without_clasificaciones_keeps_flat_row(self, db):
+        """Backwards-compat: missing ``clasificaciones`` is allowed."""
+        self._seed_post(db)
+        rid = db.save_or_update_analysis_result(
+            {
+                "content_type": "post",
+                "content_id": "p1",
+                "post_id": "p1",
+                "tiene_violencia": "true",
+                "categoria": "VDG_COSIFICACION_SLUTSHAMING",
+                "dimension": "2.2",
+                "severidad": "media",
+                "justificacion": "zorra",
+            }
+        )
+        labels = db.get_labels_for_analysis(rid)
+        assert labels == []
+        rows = db.get_analysis_results()
+        row = next(r for r in rows if r["id"] == rid)
+        assert row["labels"] == []
+        assert row["categoria"] == "VDG_COSIFICACION_SLUTSHAMING"
+
+    def test_save_analysis_replaces_labels_on_update(self, db):
+        """A second save with different labels replaces the side rows."""
+        self._seed_post(db)
+        rid = db.save_or_update_analysis_result(
+            {
+                "content_type": "post",
+                "content_id": "p1",
+                "tiene_violencia": "true",
+                "clasificaciones": [
+                    {
+                        "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                        "dimension": "1.1",
+                        "severidad": "baja",
+                        "justificacion": "old",
+                    },
+                    {
+                        "categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                        "dimension": "3.1",
+                        "severidad": "alta",
+                        "justificacion": "old2",
+                    },
+                ],
+            }
+        )
+        assert len(db.get_labels_for_analysis(rid)) == 2
+
+        db.save_or_update_analysis_result(
+            {
+                "content_type": "post",
+                "content_id": "p1",
+                "tiene_violencia": "true",
+                "clasificaciones": [
+                    {
+                        "categoria": "VDG_COSIFICACION_SLUTSHAMING",
+                        "dimension": "2.1",
+                        "severidad": "alta",
+                        "justificacion": "new",
+                    },
+                ],
+            }
+        )
+        labels = db.get_labels_for_analysis(rid)
+        assert len(labels) == 1
+        assert labels[0]["categoria"] == "VDG_COSIFICACION_SLUTSHAMING"
+
+    def test_save_feedback_with_corrected_labels(self, db):
+        """Feedback multi-label: list_feedback returns the corrected labels."""
+        self._seed_post(db)
+        rid = db.save_or_update_analysis_result(
+            {
+                "content_type": "post",
+                "content_id": "p1",
+                "tiene_violencia": "true",
+                "clasificaciones": [
+                    {
+                        "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                        "dimension": "1.1",
+                        "severidad": "baja",
+                    },
+                ],
+            }
+        )
+        fb_id = db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+                "corrected_labels": [
+                    {
+                        "categoria": "VDG_COSIFICACION_SLUTSHAMING",
+                        "dimension": "2.1",
+                        "severidad": "media",
+                        "justificacion": "reclasificado",
+                    },
+                    {
+                        "categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                        "dimension": "3.1",
+                        "severidad": "alta",
+                        "justificacion": "agregado",
+                    },
+                ],
+            }
+        )
+        fb_rows = db.list_feedback()
+        fb = next(r for r in fb_rows if r["id"] == fb_id)
+        assert len(fb["labels"]) == 2
+        # Flat columns mirror the primary (HOSTILIDAD alta).
+        assert fb["corrected_categoria"] == "VDG_HOSTILIDAD_FEMINICIDIO"
+        assert fb["corrected_dimension"] == "3.1"
+        assert fb["corrected_justificacion"] == "agregado"
+
+    def test_save_feedback_agreement_drops_labels(self, db):
+        """``agrees='true'`` ⇒ corrected labels are NOT written."""
+        self._seed_post(db)
+        rid = db.save_or_update_analysis_result(
+            {
+                "content_type": "post",
+                "content_id": "p1",
+                "tiene_violencia": "true",
+                "clasificaciones": [
+                    {
+                        "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                        "dimension": "1.1",
+                        "severidad": "baja",
+                        "justificacion": "x",
+                    },
+                ],
+            }
+        )
+        db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "true",
+                "corrected_labels": [
+                    {
+                        "categoria": "VDG_COSIFICACION_SLUTSHAMING",
+                        "dimension": "2.1",
+                        "severidad": "media",
+                    },
+                ],
+            }
+        )
+        fb_rows = db.list_feedback()
+        assert len(fb_rows[0]["labels"]) == 0
+
+    def test_cascade_delete_labels_declared_in_schema(self, db):
+        """The schema declares ON DELETE CASCADE on the FK to analysis_results.
+
+        SQLite needs ``PRAGMA foreign_keys = ON`` per connection for the
+        cascade to actually fire (off by default). This test verifies
+        the schema *declares* the cascade; the runtime enforcement is a
+        deployment-time concern handled at the connection level.
+        """
+        from sqlalchemy import inspect
+
+        inspector = inspect(db.engine)
+        fks = inspector.get_foreign_keys("analysis_labels")
+        assert any(
+            "analysis_results" in (fk.get("referred_table") or "")
+            and "CASCADE" in (fk.get("options", {}).get("ondelete") or "").upper()
+            for fk in fks
+        )

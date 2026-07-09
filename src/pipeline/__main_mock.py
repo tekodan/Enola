@@ -6,6 +6,7 @@ import sys
 
 try:
     from src.scraper.mock_facebook import MockFacebookScraper
+
     MOCK_AVAILABLE = True
 except ImportError:
     MOCK_AVAILABLE = False
@@ -22,7 +23,9 @@ logging.basicConfig(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Pipeline de detección de violencia en Facebook")
     parser.add_argument("seed_file", nargs="?", help="Archivo con URLs seed (opcional)")
-    parser.add_argument("--mock", action="store_true", help="Usar datos mock en lugar de Facebook real")
+    parser.add_argument(
+        "--mock", action="store_true", help="Usar datos mock en lugar de Facebook real"
+    )
 
     args = parser.parse_args()
 

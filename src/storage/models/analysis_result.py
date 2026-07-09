@@ -34,6 +34,9 @@ class AnalysisResultModel(Base):
     marcadores_detectados = Column(Text, nullable=True)
     es_falso_positivo_probable = Column(String, default="false")
     score_ajuste = Column(String, nullable=True)
+    exclusion_label = Column(String, nullable=True)
+    exclusion_codigo = Column(String, nullable=True)
+    exclusion_justificacion = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
 
     # Relationships
@@ -60,5 +63,8 @@ class AnalysisResultModel(Base):
             "marcadores_detectados": self.marcadores_detectados,
             "es_falso_positivo_probable": self.es_falso_positivo_probable,
             "score_ajuste": self.score_ajuste,
+            "exclusion_label": self.exclusion_label,
+            "exclusion_codigo": self.exclusion_codigo,
+            "exclusion_justificacion": self.exclusion_justificacion,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

@@ -15,6 +15,11 @@ from src.knowledge_base.discovery import (
     render_discovery_report,
     retrieve_discovery_chunks,
 )
+from src.knowledge_base.feedback_store import (
+    DEFAULT_COLLECTION_NAME,
+    FeedbackStore,
+    render_few_shot_doc,
+)
 from src.knowledge_base.pdf_processor import (
     PDFProcessor,
     chunk_text,
@@ -615,3 +620,169 @@ class TestRenderDiscoveryReport:
         result = {"mode": "retrieval-only", "n_results": 5, "chunks": []}
         report = render_discovery_report(result)
         assert "no se recuperaron chunks" in report.lower()
+
+
+class TestRenderFewShotDoc:
+    """Tests for the few-shot document renderer shared with RAGClassifier."""
+
+    def test_includes_corrected_categoria(self):
+        doc = render_few_shot_doc(
+            "user said zorra",
+            categoria="VDG_COSIFICACION_SLUTSHAMING",
+            dimension="2.2",
+            justificacion="corrected",
+        )
+        assert "VDG_COSIFICACION_SLUTSHAMING" in doc
+        assert '"dimension": "2.2"' in doc
+        assert '"justificacion": "corrected"' in doc
+
+    def test_dimension_null_serialized(self):
+        """``dimension=None`` ⇒ no ``clasificaciones`` array (no violencia)."""
+        doc = render_few_shot_doc("t", categoria="ninguna", dimension=None, justificacion="x")
+        assert '"tiene_violencia": false' in doc
+        assert '"clasificaciones": []' in doc
+
+    def test_quotes_in_justificacion_are_emitted_verbatim(self):
+        """Renderer encodes via ``json.dumps``; quotes are escaped."""
+        import json as _json
+
+        doc = render_few_shot_doc(
+            "t", categoria="X", dimension="1.1", justificacion='has "quotes" inside'
+        )
+        expected = _json.dumps('has "quotes" inside')
+        assert expected in doc
+
+    def test_multi_label_render_uses_clasificaciones(self):
+        """Passing ``clasificaciones`` produces the new multi-label shape."""
+        doc = render_few_shot_doc(
+            "t",
+            clasificaciones=[
+                {
+                    "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                    "dimension": "1.1",
+                    "severidad": "baja",
+                    "justificacion": "j1",
+                },
+                {
+                    "categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                    "dimension": "3.1",
+                    "severidad": "alta",
+                    "justificacion": "j2",
+                },
+            ],
+        )
+        assert '"tiene_violencia": true' in doc
+        assert '"severidad_global": "alta"' in doc
+        assert '"VDG_VIOLENCIA_SIMBOLICA"' in doc
+        assert '"VDG_HOSTILIDAD_FEMINICIDIO"' in doc
+        assert '"clasificaciones"' in doc
+
+
+class TestFeedbackStore:
+    """Tests for the ChromaDB-backed feedback store."""
+
+    def _make_store(self, tmp_path, *, name: str = "test_feedback") -> FeedbackStore:
+        fs = FeedbackStore(persist_directory=str(tmp_path / "chroma"), collection_name=name)
+        fs.create_collection()
+        return fs
+
+    def test_default_collection_name(self):
+        assert DEFAULT_COLLECTION_NAME == "feedback_corrections"
+        assert FeedbackStore.DEFAULT_COLLECTION_NAME == "feedback_corrections"
+
+    def test_init_creates_directory(self, tmp_path):
+        target = tmp_path / "new_chroma"
+        FeedbackStore(persist_directory=str(target))
+        assert target.exists()
+
+    def test_create_collection_idempotent(self, tmp_path):
+        fs = self._make_store(tmp_path)
+        fs.create_collection()
+        fs.create_collection()  # second call must not raise
+        assert fs.collection is not None
+
+    def test_add_correction_returns_id(self, tmp_path):
+        fs = self._make_store(tmp_path)
+        cid = fs.add_correction(
+            feedback_id=1,
+            text="sample text",
+            corrected_categoria="VDG_HOSTILIDAD_FEMINICIDIO",
+            corrected_dimension="3.1",
+            corrected_justificacion="corr",
+            content_type="post",
+            content_id="p1",
+            original_categoria="VDG_VIOLENCIA_SIMBOLICA",
+        )
+        assert cid.startswith("feedback_")
+        assert fs.get_count() == 1
+
+    def test_add_correction_rejects_empty_text(self, tmp_path):
+        import pytest
+
+        fs = self._make_store(tmp_path)
+        with pytest.raises(ValueError):
+            fs.add_correction(
+                feedback_id=1,
+                text="   ",
+                corrected_categoria="X",
+                corrected_dimension="1.1",
+                corrected_justificacion="",
+                content_type="post",
+                content_id="p1",
+            )
+
+    def test_search_relevant_returns_indexed(self, tmp_path):
+        fs = self._make_store(tmp_path)
+        fs.add_correction(
+            feedback_id=1,
+            text="user said zorra",
+            corrected_categoria="VDG_COSIFICACION_SLUTSHAMING",
+            corrected_dimension="2.2",
+            corrected_justificacion="x",
+            content_type="post",
+            content_id="p1",
+        )
+        results = fs.search_relevant_corrections("zorra", n_results=1)
+        assert len(results) == 1
+        meta = results[0]["metadata"]
+        assert meta["source"] == "human_feedback"
+        assert meta["corrected_categoria"] == "VDG_COSIFICACION_SLUTSHAMING"
+
+    def test_search_empty_collection_returns_empty(self, tmp_path):
+        fs = self._make_store(tmp_path)
+        assert fs.search_relevant_corrections("anything") == []
+
+    def test_remove_correction_decrements_count(self, tmp_path):
+        fs = self._make_store(tmp_path)
+        cid = fs.add_correction(
+            feedback_id=1,
+            text="a",
+            corrected_categoria="VDG_X",
+            corrected_dimension="1.1",
+            corrected_justificacion="",
+            content_type="post",
+            content_id="p",
+        )
+        assert fs.remove_correction(cid) is True
+        assert fs.get_count() == 0
+
+    def test_remove_correction_unknown_id_silent_noop(self, tmp_path):
+        """ChromaDB returns success silently for missing ids — return True."""
+        fs = self._make_store(tmp_path)
+        # ChromaDB .delete() on a missing id is a no-op rather than raising,
+        # so treat unknown ids as a successful no-op (the UI sees no error).
+        assert fs.remove_correction("feedback_doesnotexist") is True
+
+    def test_count_includes_one_doc(self, tmp_path):
+        fs = self._make_store(tmp_path)
+        assert fs.get_count() == 0
+        fs.add_correction(
+            feedback_id=1,
+            text="text",
+            corrected_categoria="VDG_X",
+            corrected_dimension="1.1",
+            corrected_justificacion="",
+            content_type="post",
+            content_id="p",
+        )
+        assert fs.get_count() == 1

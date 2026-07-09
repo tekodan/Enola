@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -11,21 +12,37 @@ from pydantic import BaseModel
 from src.analyzer.embeddings import PostEmbeddings
 from src.analyzer.rag_classifier import RAGClassifier
 from src.discovery.page_discovery import PageDiscovery
+from src.scraper.models import ContentSource
+from src.scraper.url_utils import classify_facebook_url, is_facebook_reel_url
 from src.storage.database import Database
 
 SEED_PAGES_PATH = Path(__file__).parent.parent.parent / "data" / "seed_pages.txt"
 
 
-def load_seed_pages(path: str | Path | None = None) -> list[str]:
-    """Load seed page URLs from a file (one per line, # comments ignored).
+def load_seed_pages(path: str | Path | None = None) -> list[dict[str, str]]:
+    """Load seed URLs from a file and classify them automatically.
+
+    Lines starting with ``#`` are ignored. Each non-empty line is treated as a
+    Facebook URL and classified as ``page``, ``post``, ``group`` or ``unknown``
+    based purely on the URL pattern.
 
     Defaults to ``data/seed_pages.txt`` if no path given.
+
+    Returns:
+        List of dicts with ``url`` and ``source`` keys.
     """
     p = Path(path) if path else SEED_PAGES_PATH
     if not p.exists():
         return []
-    lines = p.read_text(encoding="utf-8").splitlines()
-    return [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
+
+    results: list[dict[str, str]] = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        url = line.strip()
+        if not url or url.startswith("#"):
+            continue
+        source = classify_facebook_url(url)
+        results.append({"url": url, "source": source.value})
+    return results
 
 
 @dataclass
@@ -92,11 +109,13 @@ class PipelineOrchestrator:
         self.max_iterations = max_iterations
         self.min_violence_score = min_violence_score
 
-    def run_seed_pipeline(self, seed_pages: list[str]) -> PipelineResult:
-        """Run pipeline on seed pages.
+    def run_seed_pipeline(self, seed_pages: Sequence[dict[str, str] | str]) -> PipelineResult:
+        """Run pipeline on seed pages/posts/reels.
 
         Args:
-            seed_pages: List of seed page URLs
+            seed_pages: List of seed dicts (``{"url": ..., "source": ...}``) or
+                legacy list of URLs. Each seed is routed to the appropriate
+                scraper method based on its ``source`` (page/post/reel).
 
         Returns:
             PipelineResult with execution stats
@@ -106,11 +125,31 @@ class PipelineOrchestrator:
         errors = []
 
         try:
-            for page_url in seed_pages:
-                posts = []
+            for seed in seed_pages:
+                if isinstance(seed, dict):
+                    page_url = seed["url"]
+                    source = seed.get("source", ContentSource.FACEBOOK_PAGE.value)
+                else:
+                    page_url = seed
+                    source = classify_facebook_url(page_url).value
+
+                posts: list = []
                 if self.scraper:
-                    # Check if scraper has sync or async interface
-                    if hasattr(self.scraper, "scrape_page_sync"):
+                    if source == ContentSource.FACEBOOK_POST.value:
+                        if is_facebook_reel_url(page_url) and hasattr(
+                            self.scraper, "scrape_reel_sync"
+                        ):
+                            posts = self.scraper.scrape_reel_sync(page_url)
+                        elif hasattr(self.scraper, "scrape_post_sync"):
+                            posts = self.scraper.scrape_post_sync(page_url)
+                        elif hasattr(self.scraper, "scrape_post"):
+                            try:
+                                loop = asyncio.get_event_loop()
+                            except RuntimeError:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                            posts = loop.run_until_complete(self.scraper.scrape_post(page_url))
+                    elif hasattr(self.scraper, "scrape_page_sync"):
                         posts = self.scraper.scrape_page_sync(page_url)
                     elif hasattr(self.scraper, "scrape_page"):
                         try:
@@ -123,6 +162,17 @@ class PipelineOrchestrator:
                 # Save posts
                 if self.database and posts:
                     self.database.save_posts_batch([p.to_dict() for p in posts])
+
+                # Persist seed metadata with detected source
+                if self.database:
+                    self.database.save_seed_page(
+                        {
+                            "url": page_url,
+                            "source": source,
+                            "is_seed": "true",
+                            "posts_count": len(posts),
+                        }
+                    )
 
                 stats.pages_scraped += 1
                 stats.posts_found += len(posts)
@@ -231,6 +281,7 @@ class PipelineOrchestrator:
                         {
                             "url": page.url,
                             "name": page.name,
+                            "source": ContentSource.FACEBOOK_PAGE.value,
                             "is_seed": "true",
                             "discovered_from": page.discovered_from,
                             "violence_score": str(page.similarity_score),
@@ -257,12 +308,14 @@ class PipelineOrchestrator:
             )
 
     def run_full_pipeline(
-        self, seed_pages: list[str], iterations: int | None = None
+        self,
+        seed_pages: Sequence[dict[str, str] | str],
+        iterations: int | None = None,
     ) -> PipelineResult:
         """Run full pipeline with iterations.
 
         Args:
-            seed_pages: Initial seed page URLs
+            seed_pages: Initial seed dicts or legacy URLs
             iterations: Number of iterations (uses default if None)
 
         Returns:
@@ -276,7 +329,7 @@ class PipelineOrchestrator:
         all_errors = []
         all_new_seeds = []
 
-        current_seeds = seed_pages.copy()
+        current_seeds = list(seed_pages).copy()
 
         for iteration in range(iterations):
             # Run seed pipeline
@@ -311,7 +364,7 @@ class PipelineOrchestrator:
 
 
 def run_full_pipeline(
-    seed_pages: list[str],
+    seed_pages: Sequence[dict[str, str] | str],
     database: Database | None = None,
     scraper=None,
     classifier: RAGClassifier | None = None,

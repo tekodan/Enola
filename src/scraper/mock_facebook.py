@@ -16,7 +16,7 @@ class MockFacebookScraper(FacebookScraper):
 
     def __init__(self, use_mock_data: bool = True, *args, **kwargs):
         """Initialize mock scraper.
-        
+
         Args:
             use_mock_data: If True, use fixture data; if False, fall back to parent
         """
@@ -70,10 +70,11 @@ class MockFacebookScraper(FacebookScraper):
         logger.info("Using mock data for %s", page_url)
 
         # Return all mock posts or filter by URL pattern
-        posts_to_return = self.mock_posts[:self.max_posts]
+        posts_to_return = self.mock_posts[: self.max_posts]
 
         # Simulate processing delay
         import asyncio
+
         await asyncio.sleep(0.1)
 
         logger.info("Mock scraped %d posts from %s", len(posts_to_return), page_url)
@@ -102,6 +103,7 @@ class MockFacebookScraper(FacebookScraper):
 
         # Simulate processing delay
         import asyncio
+
         await asyncio.sleep(0.05)
 
         logger.info("Mock scraped %d comments from %s", len(comments), post_url)
@@ -122,9 +124,10 @@ class MockFacebookScraper(FacebookScraper):
             for i, post in enumerate(posts):
                 if i > 0:
                     import asyncio
+
                     await asyncio.sleep(self.delay * 0.5)
 
-                comments = await self.scrape_comments(post.url, post.id)
+                comments = await self.scrape_comments(post.url or "", post.id)
                 result.comments.extend(comments)
 
             result.comments_found = len(result.comments)
@@ -136,12 +139,37 @@ class MockFacebookScraper(FacebookScraper):
 
         return result
 
+    async def scrape_post(self, post_url: str) -> list[Post]:
+        """Mock implementation that returns fixture posts for a single post URL."""
+        if not self.use_mock_data:
+            return await super().scrape_post(post_url)
+        return await self.scrape_page(post_url)
+
+    def scrape_post_sync(self, post_url: str) -> list[Post]:
+        """Synchronous mock version for a single post."""
+        if not self.use_mock_data:
+            return super().scrape_post_sync(post_url)
+        return self.scrape_page_sync(post_url)
+
+    async def scrape_reel(self, reel_url: str) -> list[Post]:
+        """Mock implementation that returns fixture posts for a reel URL."""
+        if not self.use_mock_data:
+            return await super().scrape_reel(reel_url)
+        return await self.scrape_page(reel_url)
+
+    def scrape_reel_sync(self, reel_url: str) -> list[Post]:
+        """Synchronous mock version for a reel."""
+        if not self.use_mock_data:
+            return super().scrape_reel_sync(reel_url)
+        return self.scrape_page_sync(reel_url)
+
     def scrape_page_sync(self, page_url: str) -> list[Post]:
         """Synchronous mock version."""
         if not self.use_mock_data:
             return super().scrape_page_sync(page_url)
 
         import asyncio
+
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -156,6 +184,7 @@ class MockFacebookScraper(FacebookScraper):
             return super().scrape_comments_sync(post_url, post_id)
 
         import asyncio
+
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -170,6 +199,7 @@ class MockFacebookScraper(FacebookScraper):
             return super().scrape_full_sync(page_url)
 
         import asyncio
+
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:

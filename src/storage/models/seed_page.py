@@ -20,6 +20,7 @@ class SeedPageModel(Base):
     url = Column(String, unique=True, nullable=False)
     name = Column(String, default="")
     page_id = Column(String, nullable=True)
+    source = Column(String, default="facebook_page")  # page/post/group/unknown
     is_seed = Column(String, default="true")  # 'true' or 'false'
     discovered_from = Column(String, nullable=True)
     violence_score = Column(String, nullable=True)
@@ -33,6 +34,7 @@ class SeedPageModel(Base):
             "url": self.url,
             "name": self.name,
             "page_id": self.page_id,
+            "source": self.source,
             "is_seed": self.is_seed,
             "discovered_from": self.discovered_from,
             "violence_score": self.violence_score,

@@ -10,13 +10,19 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
 _project_root = Path(__file__).resolve().parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+from src.ui.adjusted_report import (  # noqa: E402
+    build_adjusted_analysis,
+    compute_adjustment_breakdown,
+)
 from src.ui.utils import (  # noqa: E402
+    CATEGORIA_LABELS,
     CONTACT_EMAIL,
     GITHUB_FORK_URL,
     GITHUB_REPO_URL,
@@ -139,21 +145,308 @@ def render_hero() -> None:
     )
 
 
-def render_kpis(kpis: dict[str, object]) -> None:
-    """Render the four headline KPI cards."""
+def render_kpis(
+    kpis: dict[str, object],
+    adjustment: dict[str, object] | None = None,
+) -> None:
+    """Render the six headline KPI cards.
+
+    Row 1: Análisis totales, % con violencia, % ajustado por humanos,
+    % autónomo.
+    Row 2: Categorías canónicas, Páginas scrapeadas (kept for compat).
+    """
+    if adjustment is None:
+        adjustment = {
+            "adjusted_pct": 0.0,
+            "autonomous_pct": 0.0,
+            "adjusted_count": 0,
+            "total": 0,
+        }
+
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📄 Análisis totales", kpis["total"])
     col2.metric("🚨 % con violencia", f"{kpis['violent_pct']}%", help="Del total analizado")
     col3.metric(
+        "🧑 % Ajustado por humanos",
+        f"{adjustment['adjusted_pct']}%",
+        help=(
+            f"{adjustment.get('adjusted_count', 0)} de {adjustment.get('total', 0)} "
+            "análisis revisados y corregidos por humanos"
+        ),
+    )
+    col4.metric(
+        "🤖 % Autónomo",
+        f"{adjustment['autonomous_pct']}%",
+        help="Sin revisión humana — clasificación sólo de la IA",
+    )
+
+    col5, col6, _, _ = st.columns(4)
+    col5.metric(
         "📚 Categorías canónicas",
         kpis["categories"],
         help="Taxonomía cerrada VDG_*",
     )
-    col4.metric("🗄️ Páginas scrapeadas", kpis["pages"])
+    col6.metric("🗄️ Páginas scrapeadas", kpis["pages"])
+
+
+def render_reliability_banner(analysis: list[dict]) -> dict[str, object]:
+    """Render the Regla 1 reliability banner with the missing-values report.
+
+    Shows the percentage of CODIGO_99 / basura digital rows and the
+    alert level (ok / preventiva / crítica). Returns the dict so it
+    can also be referenced by other panels.
+    """
+    from src.report.reliability import calcular_valores_perdidos
+
+    st.divider()
+    st.subheader("🛡 Reporte de fiabilidad (Regla 1 — Valores perdidos)")
+
+    report = calcular_valores_perdidos(analysis)
+
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("Total de análisis", report.total)
+    col_b.metric(
+        "🗑 % Basura digital (CÓDIGO 99)",
+        f"{report.pct_basura}%",
+        help=f"{report.n_basura_digital} de {report.total} registros",
+    )
+    col_c.metric(
+        "🧯 % Violencia común (sin sesgo)",
+        f"{report.pct_violencia_comun}%",
+        help=f"{report.n_violencia_comun} de {report.total} registros",
+    )
+
+    if report.nivel == "critica":
+        st.error(f"🚨 {report.mensaje}")
+    elif report.nivel == "preventiva":
+        st.warning(f"⚠️ {report.mensaje}")
+    else:
+        st.success(f"✅ {report.mensaje}")
+
+    if report.detalle_basura_codigos:
+        with st.expander("🔍 Detalle de códigos de basura digital"):
+            codigos_df = pd.DataFrame(
+                [
+                    {
+                        "Código": codigo,
+                        "Cantidad": cant,
+                        "Porcentaje": round(cant / max(report.n_basura_digital, 1) * 100, 1),
+                    }
+                    for codigo, cant in sorted(
+                        report.detalle_basura_codigos.items(),
+                        key=lambda x: -x[1],
+                    )
+                ]
+            )
+            st.dataframe(codigos_df, width="stretch", hide_index=True)
+
+    return report.to_dict()
+
+
+def render_reliability_metrics_section(analysis: list[dict]) -> None:
+    """Render the Regla 6 reliability/validity section.
+
+    Computes the confusion matrix and Precision/Recall/F1 from human
+    feedback (which is the ground truth per the document). Shows the
+    matrix, the three metrics, and the supporting sample size.
+    """
+    from src.report.metrics import render_metrics_report
+
+    st.divider()
+    st.subheader("🔬 Confiabilidad y validez de la IA (Regla 6)")
+
+    # Load feedback from the DB.
+    from src.storage import get_database
+
+    db = get_database()
+    feedback_rows = db.list_feedback()
+
+    # Build a lookup of analysis_results by id so the metrics module can
+    # recover the AI prediction for each feedback row.
+    analysis_lookup: dict = {}
+    for a in analysis:
+        aid = a.get("id") or a.get("analysis_id")
+        if aid is not None:
+            analysis_lookup[aid] = a
+
+    if not feedback_rows:
+        st.info(
+            "Sin feedback humano todavía. Marcá análisis en la pestaña "
+            "**Validación** de `app.py` para alimentar esta métrica."
+        )
+        return
+
+    report = render_metrics_report(feedback_rows, analysis_lookup=analysis_lookup)
+    cm_dict = report["confusion_matrix"]
+    metrics = report["metrics"]
+
+    st.caption(f"**Soporte (n)**: {report['soporte']} análisis con feedback humano.")
+
+    # --- Confusion matrix ---
+    st.markdown("**Matriz de confusión (Paso 6.1)**")
+    cm_df = report["confusion_matrix_df"]
+    st.dataframe(cm_df, width="stretch", hide_index=True)
+
+    col_vp, col_vn, col_fp, col_fn = st.columns(4)
+    col_vp.metric("Verdaderos Positivos", cm_dict["VP"])
+    col_vn.metric("Verdaderos Negativos", cm_dict["VN"])
+    col_fp.metric("Falsos Positivos", cm_dict["FP"])
+    col_fn.metric("Falsos Negativos", cm_dict["FN"])
+
+    # --- Reliability metrics ---
+    st.markdown("**Métricas de fiabilidad algorítmica (Paso 6.2)**")
+    col_p, col_r, col_f = st.columns(3)
+    col_p.metric(
+        "🎯 Precisión",
+        f"{metrics['Precisión'] * 100:.1f}%",
+        help="VP / (VP + FP)",
+    )
+    col_r.metric(
+        "📡 Sensibilidad (Recall)",
+        f"{metrics['Sensibilidad (Recall)'] * 100:.1f}%",
+        help="VP / (VP + FN)",
+    )
+    col_f.metric(
+        "⚖ F1-Score",
+        f"{metrics['F1-Score'] * 100:.1f}%",
+        help="Media armónica de precisión y sensibilidad",
+    )
+
+    st.caption(
+        "Paso 6.3 del documento: estas métricas certifican que los resultados "
+        "descriptivos provienen de un instrumento válido y confiable."
+    )
+
+
+def render_descriptive_statistics(
+    analysis: list[dict],
+    posts: list[dict] | None = None,
+) -> None:
+    """Render the descriptive statistics section (Reglas 2, 3 y 4).
+
+    Includes:
+    * Tabla de Distribución de Frecuencias (4 columnas, Regla 2).
+    * Moda con detección bimodal y texto automatizado (Regla 3).
+    * Tabulaciones cruzadas: categoría × subdimensión / página / fecha
+      (Regla 4) con porcentajes marginales de columna.
+    """
+    from src.report.stats import (
+        compute_crosstabs,
+        compute_frequency_distribution,
+        compute_mode,
+    )
+    from src.ui.utils import CATEGORIA_LABELS
+
+    st.divider()
+    st.header("📊 Estadística descriptiva (Reglas 2, 3 y 4)")
+
+    # --- Regla 2: Tabla de Distribución de Frecuencias ---
+    st.subheader("Regla 2 · Distribución de frecuencias")
+    ft = compute_frequency_distribution(analysis, categoria_labels=CATEGORIA_LABELS)
+
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("📑 Válidos analizados", ft.total_validos)
+    col_b.metric("🚫 Excluidos (basura+común)", ft.n_excluidos)
+    col_c.metric("📐 Categorías detectadas", sum(1 for r in ft.rows if r.frecuencia_absoluta > 0))
+
+    st.caption(
+        "El **porcentaje válido** excluye los valores perdidos (CÓDIGO 99) y la "
+        "violencia común, y se calcula sobre los registros válidos. El "
+        "**porcentaje acumulado** suma progresivamente de mayor a menor hasta 100%."
+    )
+    st.dataframe(ft.to_dataframe(), width="stretch", hide_index=True)
+
+    # --- Regla 3: Moda ---
+    st.subheader("Regla 3 · Moda (medida de tendencia central)")
+    mode = compute_mode(analysis, categoria_labels=CATEGORIA_LABELS)
+
+    if mode.modas:
+        if mode.es_multimodal:
+            cualif = "bimodal" if len(mode.modas) == 2 else "multimodal"
+            st.warning(
+                f"⚠️ La distribución es **{cualif}** ({len(mode.modas)} categorías "
+                f"empatan en {max(mode.frecuencias.values())} casos)."
+            )
+        nombres = [CATEGORIA_LABELS.get(m, m) for m in mode.modas]
+        st.markdown("**Categorías modales:** " + ", ".join(f"*{n}*" for n in nombres))
+    st.info(mode.texto_descriptivo)
+
+    # --- Regla 4: Tabulaciones cruzadas ---
+    st.subheader("Regla 4 · Análisis bivariado (tablas de contingencia)")
+
+    tab_sub, tab_page, tab_date = st.tabs(
+        ["Categoría × Subdimensión", "Categoría × Página", "Categoría × Mes"]
+    )
+
+    with tab_sub:
+        ct = compute_crosstabs(
+            analysis, dimension="subdimension", categoria_labels=CATEGORIA_LABELS
+        )
+        if not ct.filas:
+            st.info("Sin datos válidos para el cruce.")
+        else:
+            st.caption("**Frecuencias observadas (n):**")
+            st.dataframe(ct.to_dataframe(), width="stretch")
+            st.caption(
+                "**Porcentajes marginales de columna (%):** "
+                "'Del total de la subdimensión X, qué porcentaje cae en cada categoría.'"
+            )
+            st.dataframe(ct.to_porcentajes_dataframe(), width="stretch")
+            if ct.alerta_patron:
+                st.success(f"🎯 **Patrón relacional:** {ct.alerta_patron}")
+
+    with tab_page:
+        page_lookup: dict[str, str] = {}
+        for p in posts or []:
+            pid = p.get("id")
+            if pid:
+                page_lookup[pid] = p.get("title") or "Sin título"
+            page_id = p.get("page_id")
+            if page_id:
+                page_lookup[page_id] = p.get("title") or "Sin título"
+        ct = compute_crosstabs(
+            analysis,
+            dimension="pagina",
+            posts=posts or [],
+            page_lookup=page_lookup,
+            categoria_labels=CATEGORIA_LABELS,
+        )
+        if not ct.filas:
+            st.info("Sin datos válidos para el cruce por página.")
+        else:
+            st.caption("**Frecuencias observadas (n):**")
+            st.dataframe(ct.to_dataframe(), width="stretch")
+            st.caption("**Porcentajes marginales de columna (%):**")
+            st.dataframe(ct.to_porcentajes_dataframe(), width="stretch")
+            if ct.alerta_patron:
+                st.success(f"🎯 **Patrón relacional:** {ct.alerta_patron}")
+
+    with tab_date:
+        ct = compute_crosstabs(
+            analysis,
+            dimension="fecha",
+            posts=posts or [],
+            categoria_labels=CATEGORIA_LABELS,
+        )
+        if not ct.filas:
+            st.info("Sin datos válidos para el cruce por mes.")
+        else:
+            st.caption("**Frecuencias observadas (n):**")
+            st.dataframe(ct.to_dataframe(), width="stretch")
+            st.caption("**Porcentajes marginales de columna (%):**")
+            st.dataframe(ct.to_porcentajes_dataframe(), width="stretch")
+            if ct.alerta_patron:
+                st.success(f"🎯 **Patrón relacional:** {ct.alerta_patron}")
 
 
 def render_chart_tabs(results: list[dict]) -> None:
-    """Render the pie + bar charts inside a post/comment/all tab."""
+    """Render the pie + bar charts inside a post/comment/all tab.
+
+    Per Regla 5.4 the frequency distribution table is rendered BELOW the
+    visualisations (not in a side expander).
+    """
+    from src.report.stats import compute_frequency_distribution
+
     tab_all, tab_posts, tab_comments = st.tabs(["Todos", "Posts", "Comments"])
     tabs = {
         "all": tab_all,
@@ -177,12 +470,17 @@ def render_chart_tabs(results: list[dict]) -> None:
                 st.subheader("📊 Distribución por categoría")
                 bar_df = compute_bar_data(subset)
                 st.altair_chart(build_bar_chart(bar_df), width="stretch")
-                with st.expander("Ver tabla con valores"):
-                    st.dataframe(
-                        bar_df[["Categoría", "Cantidad", "Porcentaje"]],
-                        width="stretch",
-                        hide_index=True,
-                    )
+
+            # Tabla de Distribución de Frecuencias (Regla 5.4) — debajo
+            # de las gráficas, no en un expander lateral.
+            st.markdown("---")
+            st.markdown("**Tabla de distribución de frecuencias (Regla 2)**")
+            ft = compute_frequency_distribution(subset, categoria_labels=CATEGORIA_LABELS)
+            st.caption(
+                "Porcentaje válido excluye los registros con CÓDIGO 99 / "
+                "VIOLENCIA_COMUN. Porcentaje acumulado suma de mayor a menor."
+            )
+            st.dataframe(ft.to_dataframe(), width="stretch", hide_index=True)
 
 
 def render_inspector(analysis: list[dict], posts: list[dict], comments: list[dict]) -> None:
@@ -225,31 +523,62 @@ def render_inspector(analysis: list[dict], posts: list[dict], comments: list[dic
     dim = selected.get("dimension") or "—"
     sev = selected.get("severidad", "ninguna")
     tiene = selected.get("tiene_violencia", "unknown")
-    fpp = selected.get("es_falso_positivo_probable", "false")
-    marcadores = selected.get("marcadores_detectados") or "—"
-    evidencia = (selected.get("evidencia") or "").strip() or "—"
-    justificacion = (selected.get("justificacion") or "").strip() or "—"
+    labels = list(selected.get("labels") or [])
 
     sev_emoji = {"baja": "🟢", "media": "🟡", "alta": "🔴", "ninguna": "⚪"}.get(sev, "⚪")
     tiene_emoji = "🚨" if tiene == "true" else "✅"
 
+    # Show the data source: AI vs human-adjusted
+    if selected.get("adjusted_by_human"):
+        st.info(
+            "🧑 **Esta categoría/dimensión/justificación fue corregida por un humano.** "
+            "El reporte del landing refleja la versión ajustada."
+        )
+    elif selected.get("has_feedback"):
+        st.caption("✅ Revisado por humano — coincide con la IA.")
+    else:
+        st.caption("🤖 Aún sin revisión humana.")
+
     col_a, col_b, col_c, col_d = st.columns(4)
     col_a.metric("Violencia", f"{tiene_emoji} {tiene}")
-    col_b.metric("Categoría", label_for(cat))
-    col_c.metric("Dimensión", dim)
-    col_d.metric("Severidad", f"{sev_emoji} {sev}")
+    col_b.metric("Categoría (primaria)", label_for(cat))
+    col_c.metric("Dimensión (primaria)", dim)
+    col_d.metric("Severidad global", f"{sev_emoji} {sev}")
 
-    if fpp == "true":
-        st.warning("⚠️ Marcado como **falso positivo probable** por la categoría 5 (Salvaguarda).")
-
-    with st.expander("📋 Detalle completo del análisis", expanded=False):
-        st.markdown(f"**Regla disparada:** `{selected.get('regla_disparada') or '—'}`")
-        st.markdown(f"**Marcadores detectados:** `{marcadores}`")
-        st.markdown(f"**Score de ajuste:** `{selected.get('score_ajuste') or '—'}`")
-        st.markdown("**Evidencia:**")
-        st.write(evidencia)
-        st.markdown("**Justificación:**")
-        st.write(justificacion)
+    if labels:
+        with st.expander(
+            f"🏷 Etiquetas detectadas ({len(labels)})",
+            expanded=len(labels) > 1,
+        ):
+            for i, lbl in enumerate(labels, start=1):
+                lc = lbl.get("categoria") or "ninguna"
+                ld = lbl.get("dimension") or "—"
+                ls = lbl.get("severidad") or "ninguna"
+                lsev_emoji = {"baja": "🟢", "media": "🟡", "alta": "🔴", "ninguna": "⚪"}.get(
+                    ls, "⚪"
+                )
+                st.markdown(f"**#{i} — {label_for(lc)} / {ld}** {lsev_emoji} `{ls}`")
+                if lbl.get("es_falso_positivo_probable") in (True, "true", "True", 1):
+                    st.caption("⚠️ Marcado como **falso positivo probable**.")
+                st.write(f"  - **Justificación:** {lbl.get('justificacion') or '—'}")
+                st.write(f"  - **Evidencia:** {lbl.get('evidencia') or '—'}")
+                st.write(f"  - **Marcadores:** {lbl.get('marcadores_detectados') or '—'}")
+    else:
+        fpp = selected.get("es_falso_positivo_probable", "false")
+        if fpp == "true":
+            st.warning(
+                "⚠️ Marcado como **falso positivo probable** por la categoría 5 (Salvaguarda)."
+            )
+        with st.expander("📋 Detalle completo del análisis", expanded=False):
+            st.markdown(f"**Regla disparada:** `{selected.get('regla_disparada') or '—'}`")
+            st.markdown(
+                f"**Marcadores detectados:** `{selected.get('marcadores_detectados') or '—'}`"
+            )
+            st.markdown(f"**Score de ajuste:** `{selected.get('score_ajuste') or '—'}`")
+            st.markdown("**Evidencia:**")
+            st.write((selected.get("evidencia") or "").strip() or "—")
+            st.markdown("**Justificación:**")
+            st.write((selected.get("justificacion") or "").strip() or "—")
 
 
 def render_knowledge_section() -> None:
@@ -394,17 +723,38 @@ def main() -> None:
     content_type = render_sidebar()
     render_hero()
 
-    stats, analysis, posts, pages = load_data()
+    stats, raw_analysis, posts, pages = load_data()
+
+    # Build the *adjusted* dataset by merging raw analysis with the
+    # latest human feedback. All KPIs / charts below operate on this
+    # merged view so the public dashboard reflects the reviewed truth.
+    from src.storage import get_database as get_sqlite_db
+
+    db = get_sqlite_db()
+    feedback_rows = db.list_feedback()
+    analysis = build_adjusted_analysis(raw_analysis, feedback_rows)
+    adjustment = compute_adjustment_breakdown(analysis)
+
     kpis = compute_kpis(stats, analysis, knowledge_summary())
-    render_kpis(kpis)
+    render_kpis(kpis, adjustment)
+
+    render_reliability_banner(analysis)
 
     st.divider()
-    st.header("📈 Resultados del análisis")
+    st.header("📈 Resultados del análisis (ajustados)")
+    adj_pct = adjustment.get("adjusted_pct", 0.0)
+    aut_pct = adjustment.get("autonomous_pct", 0.0)
     st.caption(
         f"Mostrando: **{ {'all': 'todos', 'post': 'posts', 'comment': 'comentarios'}[content_type] }** · "
-        f"Categoría más frecuente con violencia: **{kpis['top_category']}**"
+        f"Categoría más frecuente con violencia: **{kpis['top_category']}** · "
+        f"Ajustado por humanos: **{adj_pct}%** · "
+        f"Autónomo: **{aut_pct}%**"
     )
     render_chart_tabs(analysis)
+
+    render_descriptive_statistics(analysis, posts)
+
+    render_reliability_metrics_section(analysis)
 
     render_inspector(analysis, posts, [])
     render_knowledge_section()

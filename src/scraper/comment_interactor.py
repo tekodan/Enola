@@ -18,6 +18,90 @@ from src.scraper.models import Comment
 logger = logging.getLogger(__name__)
 
 
+# Regex used by ``clean_comment_text`` to strip the trailing UI bits
+# that Facebook appends to every comment (``N sem Me gusta Responder 17``).
+#
+# Group 1: relative time (``"18 sem"``, ``"5 min"``, ``"3 días"`` ...)
+# Group 2: optional ``Editado`` marker
+# Group 3: trailing reply count (optional, may be empty)
+_TIME_AGO_PATTERN = r"(\d+\s*(?:sem|min|h|días?|semanas?|horas?)(?:\s*y\s*medias?)?)"
+_TRAILING_UI_PATTERN = re.compile(
+    rf"\s+{_TIME_AGO_PATTERN}\s+Me\s+gusta\s+Responder\s*(Editado\s+)?(\d+)?\s*$",
+    re.IGNORECASE,
+)
+# Captures the optional ``Fan destacado`` prefix and the author name
+# at the very start of the comment text. Limits to 3 words max so it
+# doesn't gobble up real comment content for unknown authors; the
+# known_author path is preferred for precision.
+_AUTHOR_PREFIX_PATTERN = re.compile(
+    r"^(?:Fan\s+destacado\s+)?"
+    r"(?P<author>(?:[A-Z][\w\.\-áéíóúñÑÁÉÍÓÚüÜ]{1,30}\s+){0,3})"
+    r"(?=\S)",
+    re.UNICODE,
+)
+
+
+def clean_comment_text(
+    raw_text: str, known_author: str | None = None
+) -> tuple[str, str | None, int]:
+    """Strip the author prefix and the trailing UI bits from a comment.
+
+    Facebook renders each comment as a single string::
+
+        [Fan destacado ] <author> <body> <N> sem Me gusta Responder [Editado] <count>
+
+    This helper extracts ``(clean_text, time_ago, responses)`` so the
+    body goes into ``Comment.text`` and the metadata goes into the
+    dedicated columns (``time_ago``, ``responses``).
+
+    Args:
+        raw_text: Text as extracted from the DOM (includes author
+            prefix and trailing buttons).
+        known_author: Author of the comment (when known). If supplied,
+            the prefix is removed by direct comparison instead of a
+            regex guess, which is more robust for non-Spanish names.
+
+    Returns:
+        Tuple of ``(clean_text, time_ago, responses)``. When no
+        trailing UI bits are found, ``time_ago`` is ``None`` and
+        ``responses`` is 0.
+    """
+    if not raw_text:
+        return "", None, 0
+
+    text = raw_text.strip()
+    time_ago: str | None = None
+    responses = 0
+
+    # Strip trailing UI: "N sem Me gusta Responder [Editado] <count>"
+    trail = _TRAILING_UI_PATTERN.search(text)
+    if trail:
+        time_ago = trail.group(1)
+        if trail.group(3):
+            try:
+                responses = int(trail.group(3))
+            except (TypeError, ValueError):
+                responses = 0
+        text = text[: trail.start()].rstrip()
+
+    # Strip the author prefix. Prefer the known_author for accuracy.
+    if known_author:
+        prefix_options = [
+            "Fan destacado " + known_author + " ",
+            known_author + " ",
+        ]
+        for prefix in prefix_options:
+            if text.startswith(prefix):
+                text = text[len(prefix) :]
+                break
+    else:
+        m = _AUTHOR_PREFIX_PATTERN.match(text)
+        if m:
+            text = text[m.end() :]
+
+    return text.strip(), time_ago, responses
+
+
 class CommentInteractor:
     """Extracts Facebook comments from modal dialogs using Playwright.
 
@@ -85,8 +169,10 @@ class CommentInteractor:
                         if await el.is_visible():
                             links.append(el)
                     except Exception:
+                        logger.debug("Button visibility check failed", exc_info=True)
                         continue
             except Exception:
+                logger.debug("find_all_comment_buttons locator failed", exc_info=True)
                 continue
         return links
 
@@ -95,6 +181,7 @@ class CommentInteractor:
         try:
             return await self.page.locator(self.POST_SELECTOR).all()
         except Exception:
+            logger.debug("find_all_post_elements failed", exc_info=True)
             return []
 
     async def find_comment_button(self, post_idx: int) -> object | None:
@@ -102,23 +189,6 @@ class CommentInteractor:
 
         1. Page-wide visible links (matched by DOM order)
         2. Falls back to the post container element
-        """
-        buttons = await self.find_all_comment_buttons()
-        if post_idx < len(buttons):
-            return buttons[post_idx]
-
-        posts = await self.find_all_post_elements()
-        if post_idx < len(posts):
-            logger.debug("Fallback: clicking post element for post %d", post_idx)
-            return posts[post_idx]
-
-        return None
-
-    async def find_comment_button(self, post_idx: int) -> object | None:
-        """Get clickable element for post at ``post_idx``.
-
-        1. Finds visible post/photo/video links
-        2. Falls back to post container elements
         """
         buttons = await self.find_all_comment_buttons()
         if post_idx < len(buttons):
@@ -148,9 +218,10 @@ class CommentInteractor:
                             logger.debug("Found visible modal dialog")
                             return d
                     except Exception:
+                        logger.debug("Modal visibility check failed", exc_info=True)
                         continue
             except Exception:
-                pass
+                logger.debug("Modal dialog locator failed", exc_info=True)
             await asyncio.sleep(0.5)
         logger.debug("No visible modal found after waiting")
         return None
@@ -177,9 +248,11 @@ class CommentInteractor:
                     if await loc.nth(i).is_visible():
                         elements.append(loc.nth(i))
                 except Exception:
+                    logger.debug("Comment element visibility failed", exc_info=True)
                     continue
             return elements
         except Exception:
+            logger.debug("find_comment_elements_in failed", exc_info=True)
             return []
 
     async def find_more_buttons_in(self, container) -> list:
@@ -193,9 +266,11 @@ class CommentInteractor:
                     if await loc.nth(i).is_visible():
                         buttons.append(loc.nth(i))
                 except Exception:
+                    logger.debug("More-button visibility failed", exc_info=True)
                     continue
             return buttons
         except Exception:
+            logger.debug("find_more_buttons_in failed", exc_info=True)
             return []
 
     async def _find_reply_buttons_in(self, container) -> list:
@@ -209,15 +284,18 @@ class CommentInteractor:
                     if await loc.nth(i).is_visible():
                         buttons.append(loc.nth(i))
                 except Exception:
+                    logger.debug("Reply-button visibility failed", exc_info=True)
                     continue
             return buttons
         except Exception:
+            logger.debug("_find_reply_buttons_in failed", exc_info=True)
             return []
 
     async def expand_and_extract(self, container) -> list[Comment]:
         """Inside a container: expand comments, extract, return list."""
         all_comments = []
         seen_texts = set()
+        attempt = 0
 
         for attempt in range(12):
             if len(all_comments) >= self.max_comments:
@@ -235,12 +313,10 @@ class CommentInteractor:
 
             # Scroll inside container to trigger lazy loading
             try:
-                await container.evaluate(
-                    "el => el.scrollTop = el.scrollHeight"
-                )
+                await container.evaluate("el => el.scrollTop = el.scrollHeight")
                 await asyncio.sleep(0.3)
             except Exception:
-                pass
+                logger.debug("Container scroll failed", exc_info=True)
 
             # Find "Ver más" buttons AND reply buttons
             more = await self.find_more_buttons_in(container)
@@ -250,12 +326,10 @@ class CommentInteractor:
             if not all_buttons:
                 # One more scroll + retry
                 try:
-                    await container.evaluate(
-                        "el => el.scrollTop = el.scrollHeight"
-                    )
+                    await container.evaluate("el => el.scrollTop = el.scrollHeight")
                     await asyncio.sleep(0.5)
                 except Exception:
-                    pass
+                    logger.debug("Retry scroll failed", exc_info=True)
                 all_buttons = more + await self._find_reply_buttons_in(container)
 
             if not all_buttons:
@@ -268,6 +342,7 @@ class CommentInteractor:
                     await btn.click(force=True)
                     await asyncio.sleep(self.delay * 0.7)
                 except Exception:
+                    logger.debug("Click on expand button failed", exc_info=True)
                     continue
 
             await asyncio.sleep(self.delay)
@@ -286,6 +361,7 @@ class CommentInteractor:
         try:
             text = await element.inner_text()
         except Exception:
+            logger.debug("inner_text failed on comment element", exc_info=True)
             return None
         if not text or len(text.strip()) < 5:
             return None
@@ -294,13 +370,12 @@ class CommentInteractor:
         try:
             aria = await element.get_attribute("aria-label") or ""
         except Exception:
+            logger.debug("aria-label read failed", exc_info=True)
             pass
 
         author = ""
         time_str = ""
-        match = re.search(
-            r"Comentario de (.+?) (?:hace|ago|·)", aria, re.IGNORECASE
-        )
+        match = re.search(r"Comentario de (.+?) (?:hace|ago|·)", aria, re.IGNORECASE)
         if match:
             author = match.group(1).strip()
             time_m = re.search(r"(hace .+)", aria, re.IGNORECASE)
@@ -313,7 +388,7 @@ class CommentInteractor:
                 if await link.count() > 0:
                     author = (await link.inner_text()).strip()
             except Exception:
-                pass
+                logger.debug("Author link read failed", exc_info=True)
 
         likes = 0
         try:
@@ -322,22 +397,59 @@ class CommentInteractor:
             if lm:
                 likes = int(lm.group(1))
         except Exception:
-            pass
+            logger.debug("Likes regex failed", exc_info=True)
+
+        # Strip the author prefix and trailing UI bits so the body
+        # stored in ``text`` is clean and the metadata lands in the
+        # dedicated columns (``time_ago`` and ``responses``).
+        clean_body, time_ago, responses = clean_comment_text(
+            text.strip(), known_author=author or None
+        )
+        clean_body = self._clean(clean_body)
 
         return {
-            "text": self._clean(text.strip()),
+            "text": clean_body,
             "author": author,
             "date": time_str,
             "likes": likes,
+            "time_ago": time_ago,
+            "responses": responses,
         }
 
     @staticmethod
     def _clean(text: str) -> str:
-        """Remove Facebook scramble: single chars separated by spaces."""
-        cleaned = re.sub(r"(?:\s+[a-zA-Z0-9]\s*){3,}", " ", text)
+        """Remove Facebook scramble: single chars separated by spaces.
+
+        Uses threshold 10 to avoid eating real short-word comments.
+        """
+        cleaned = re.sub(r"(?:\s+[a-zA-Z0-9]\s*){10,}", " ", text)
         return re.sub(r"\s+", " ", cleaned).strip()
 
     # ---------- per-post flow ----------
+
+    async def _click_with_retry(self, btn, post_idx: int) -> bool:
+        """Click a button with exponential backoff retry.
+
+        Returns True if the click succeeded, False otherwise.
+        """
+        for attempt in range(3):
+            try:
+                tag = await btn.evaluate("el => el.tagName")
+                if tag == "A":
+                    await btn.scroll_into_view_if_needed()
+                await btn.click(force=True)
+                return True
+            except Exception as e:
+                wait = 1 * (2**attempt)  # 1s, 2s, 4s
+                logger.warning(
+                    "Click failed for post %d (attempt %d/3), retrying in %ds: %s",
+                    post_idx,
+                    attempt + 1,
+                    wait,
+                    e,
+                )
+                await asyncio.sleep(wait)
+        return False
 
     async def extract_comments_for_post(self, post_idx: int) -> list[Comment]:
         """Full per-post flow: click button → modal → extract → close.
@@ -353,14 +465,7 @@ class CommentInteractor:
             logger.debug("No clickable element for post %d", post_idx)
             return []
 
-        try:
-            # Only scroll if the element is a link (post containers are already visible)
-            tag = await btn.evaluate("el => el.tagName")
-            if tag == "A":
-                await btn.scroll_into_view_if_needed()
-            await btn.click(force=True)
-        except Exception as e:
-            logger.warning("Failed to click button for post %d: %s", post_idx, e)
+        if not await self._click_with_retry(btn, post_idx):
             return []
 
         await asyncio.sleep(self.delay)
@@ -415,6 +520,8 @@ class CommentInteractor:
                     date=None,
                     likes=item.get("likes", 0),
                     url="",
+                    time_ago=item.get("time_ago"),
+                    responses=item.get("responses", 0),
                 )
             )
         return comments

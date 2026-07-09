@@ -16,7 +16,11 @@ from pydantic import BaseModel
 
 from src.config import get_settings
 from src.scraper.facebook_preprocessor import FacebookPreprocessor
-from src.scraper.models import Comment, Post, ScrapeResult
+from src.scraper.models import Comment, ContentSource, Post, ScrapeResult
+from src.scraper.strategies import (
+    ExtractionStrategy,  # noqa: F401  (kept for public API compatibility)
+)
+from src.scraper.url_utils import is_facebook_reel_url
 
 # Valid JSON escape sequences: " \\ / b f n r t uXXXX
 _INVALID_JSON_ESCAPE = re.compile(r'\\([^"\\/bfnrtu])')
@@ -28,7 +32,7 @@ def _fix_json_escapes(raw: str) -> str:
     Ollama sometimes returns JSON with invalid escapes like ``\\[``, ``\\]``,
     ``\\_`` which are not valid per the JSON spec.
     """
-    return _INVALID_JSON_ESCAPE.sub(r'\1', raw)
+    return _INVALID_JSON_ESCAPE.sub(r"\1", raw)
 
 
 def _parse_json_safe(raw: str) -> Any:
@@ -44,6 +48,11 @@ def _parse_json_safe(raw: str) -> Any:
         return json.loads(raw)
     except json.JSONDecodeError:
         pass
+
+    # Last-resort cleanup: only replace single quotes when the LLM
+    # returned Python-style dicts (``{'key': 'val'}``). This is a
+    # blunt hammer that can break valid JSON with apostrophes inside
+    # values, so we try it only after strict parsing fails.
     cleaned = raw.replace("'", '"')
     try:
         return json.loads(cleaned)
@@ -58,19 +67,22 @@ def _parse_json_safe(raw: str) -> Any:
     try:
         return ast.literal_eval(fixed)
     except (ValueError, SyntaxError, MemoryError):
-        pass
+        logger.debug("_parse_json_safe could not parse LLM output", exc_info=True)
     return None
+
 
 logger = logging.getLogger(__name__)
 
 
 class _PostList(BaseModel):
     """Wrapper model for LLM structured output of posts."""
+
     posts: list[dict]
 
 
 class _CommentList(BaseModel):
     """Wrapper model for LLM structured output of comments."""
+
     comments: list[dict]
 
 
@@ -83,6 +95,8 @@ class FacebookScraper:
         max_comments: int = 100,
         delay: float = 2.0,
         headless: bool = True,
+        use_interactive: bool | None = None,
+        strategy: ExtractionStrategy | None = None,
     ):
         """Initialize Facebook scraper.
 
@@ -91,29 +105,142 @@ class FacebookScraper:
             max_comments: Maximum comments per post
             delay: Delay between requests in seconds
             headless: Run browser in headless mode
+            use_interactive: Use interactive comment extraction via Playwright
+            strategy: Extraction strategy to use (default: DOMExtractionStrategy)
         """
         self.settings = get_settings()
         self.max_posts = max_posts
         self.max_comments = max_comments
         self.delay = delay
-        self.headless = self.settings.scraper.headless if hasattr(self.settings.scraper, 'headless') else headless
+        self.headless = (
+            self.settings.scraper.headless
+            if hasattr(self.settings.scraper, "headless")
+            else headless
+        )
+        if use_interactive is not None:
+            self.use_interactive = use_interactive
+        else:
+            self.use_interactive = getattr(self.settings.scraper, "use_interactive", True)
+        # ``strategy`` is accepted for API compatibility but currently
+        # unused — the scraper calls FacebookPreprocessor directly.
 
-    def _generate_post_id(self, url: str, author: str, date: str) -> str:
-        """Generate unique post ID from URL and metadata."""
-        content = f"{url}_{author}_{date}"
+    def _generate_post_id(
+        self, url: str, author: str, date: str, text: str = "", idx: int = 0
+    ) -> str:
+        """Generate unique post ID from URL, metadata, and content hash.
+
+        Uses a truncated text hash to avoid collisions when multiple posts
+        from the same page have identical or missing author/date.
+        """
+        text_hash = hashlib.md5(text.encode()).hexdigest()[:8]
+        content = f"{url}_{author}_{date}_{text_hash}_{idx}"
         return hashlib.md5(content.encode()).hexdigest()[:16]
 
-    def _generate_comment_id(self, url: str, author: str, date: str) -> str:
-        """Generate unique comment ID."""
-        content = f"{url}_{author}_{date}_comment"
+    @staticmethod
+    def _extract_post_id_from_url(url: str) -> str | None:
+        """Extract the numeric post id from a Facebook post/reel URL.
+
+        Supports:
+          - ``/posts/<id>``         (regular posts)
+          - ``story.php?story_fbid=`` (legacy story permalinks)
+          - ``/reel/<id>``          (reels)
+
+        Returns ``None`` if the URL doesn't match a known pattern.
+        """
+        m = re.search(r"/posts/(\d+)", url)
+        if m:
+            return m.group(1)
+        m = re.search(r"story_fbid=(\d+)", url)
+        if m:
+            return m.group(1)
+        m = re.search(r"/reel/(\d+)", url)
+        if m:
+            return m.group(1)
+        return None
+
+    def _generate_comment_id(
+        self, url: str, author: str, date: str, text: str = "", idx: int = 0
+    ) -> str:
+        """Generate unique comment ID from URL, metadata, and content hash."""
+        text_hash = hashlib.md5(text.encode()).hexdigest()[:8]
+        content = f"{url}_{author}_{date}_{text_hash}_{idx}_comment"
         return hashlib.md5(content.encode()).hexdigest()[:16]
+
+    @staticmethod
+    def _detect_login_wall(html: str) -> bool:
+        """Detect if Facebook is showing a login wall.
+
+        Uses tight indicators that only appear on the actual login page,
+        avoiding false positives from notifications or nav links that
+        mention "iniciar sesión" inside real posts.
+
+        A real login wall shows a centered form with the email/password
+        inputs and a primary submit button. We look for the form's
+        ``name="email"`` input or the password field combined with
+        a dedicated login heading.
+        """
+        lower = html.lower()
+        indicators = [
+            'name="email"',
+            'name="pass"',
+            'id="login_form"',
+            'autocomplete="current-password"',
+            # Spanish login page heading, not a notification
+            'class="_9ay7"',
+            'aria-label="iniciar sesión"',
+        ]
+        # Require at least 2 indicators to reduce false positives from
+        # stray occurrences of a single term.
+        return sum(1 for ind in indicators if ind in lower) >= 2
+
+    @staticmethod
+    def _detect_captcha(html: str) -> bool:
+        """Detect if Facebook is showing a captcha/security check.
+
+        Uses tight indicators (form/iframe/wrapper for the challenge),
+        avoiding noisy internal references like ``arkose_captcha`` that
+        appear in normal Facebook pages.
+        """
+        lower = html.lower()
+        indicators = [
+            'name="captcha_response"',
+            'id="captcha"',
+            "checkpoint/checktest",  # Facebook's URL pattern for security checks
+            "security_check_challenge",
+            "por favor, completa el siguiente control de seguridad",
+            "please complete the following security check",
+        ]
+        return any(ind in lower for ind in indicators)
+
+    USER_AGENTS: list[str] = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:132.0) Gecko/20100101 Firefox/132.0",
+    ]
+
+    # Magic-number defaults. Override via Settings where it matters;
+    # keep these as constants so they show up in one place.
+    MAX_PAGE_SCROLLS: int = 15
+    PAGE_SCROLL_STALE_THRESHOLD: int = 2
+    POST_NAVIGATE_WAIT_MS: int = 2000
+    SCROLL_PAUSE_MS: int = 1500
+    COMMENTS_PANEL_WAIT_MS: int = 3000
+    REEL_POLL_ATTEMPTS: int = 5
+    REEL_POLL_PAUSE_MS: int = 2000
+
+    def _get_user_agent(self) -> str:
+        """Return a rotated user-agent string."""
+        return random.choice(self.USER_AGENTS)
 
     def _build_llm_config(self) -> dict:
         """Build ScrapeGraphAI config from settings."""
         storage_path = self.settings.storage.database_path
-        auth_file = (
-            Path(storage_path).parent.parent / "data" / "facebook_auth.json"
-        )
+        auth_file = Path(storage_path).parent.parent / "data" / "facebook_auth.json"
         config: dict = {
             "llm": {
                 "model": f"ollama/{self.settings.ollama.llm_model}",
@@ -124,6 +251,7 @@ class FacebookScraper:
             "loader_kwargs": {
                 "timeout": self.settings.scraper.timeout * 1000,
                 "load_state": "load",
+                "user_agent": self._get_user_agent(),
             },
             "headless": self.headless,
             "verbose": self.settings.app.debug,
@@ -134,6 +262,53 @@ class FacebookScraper:
             config["storage_state"] = str(auth_file)
             logger.info("Usando sesión guardada de Facebook: %s", auth_file)
         return config
+
+    def _cache_path(self, url: str) -> Path:
+        """Return cache file path for a given URL."""
+        url_hash = hashlib.md5(url.encode()).hexdigest()[:16]
+        cache_dir = Path(self.settings.storage.database_path).parent / "cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        return cache_dir / f"{url_hash}.html"
+
+    async def _fetch_html_cached(self, url: str, ttl_hours: int = 24) -> str:
+        """Fetch HTML with file-based caching.
+
+        Returns cached HTML if it exists and is younger than ``ttl_hours``.
+        Otherwise fetches fresh HTML and writes it to cache.
+
+        If the freshly fetched HTML is a login wall or captcha page,
+        the cache file is evicted so subsequent calls don't keep
+        serving the bad response for ``ttl_hours``.
+        """
+        cache_file = self._cache_path(url)
+        if cache_file.exists():
+            age_hours = (
+                datetime.now() - datetime.fromtimestamp(cache_file.stat().st_mtime)
+            ).total_seconds() / 3600
+            if age_hours < ttl_hours:
+                logger.info("Using cached HTML for %s (age: %.1fh)", url, age_hours)
+                return cache_file.read_text(encoding="utf-8")
+
+        html = await self._fetch_html_directly(url)
+        if html:
+            # Don't cache blocked pages — they will resolve once
+            # the user re-authenticates or the rate limit clears.
+            if self._detect_login_wall(html) or self._detect_captcha(html):
+                self._evict_cache(url)
+            else:
+                cache_file.write_text(html, encoding="utf-8")
+                logger.info("Cached HTML for %s (%d chars)", url, len(html))
+        return html
+
+    def _evict_cache(self, url: str) -> None:
+        """Delete the cache file for ``url`` if it exists."""
+        cache_file = self._cache_path(url)
+        try:
+            if cache_file.exists():
+                cache_file.unlink()
+                logger.info("Evicted cache for %s", url)
+        except OSError as e:
+            logger.warning("Failed to evict cache for %s: %s", url, e)
 
     async def _fetch_html_directly(self, url: str) -> str:
         """Fetch HTML directly using Playwright to allow preprocessing.
@@ -152,41 +327,56 @@ class FacebookScraper:
 
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=headless)
+                try:
+                    # Create context with saved session if available
+                    context = await browser.new_context(
+                        storage_state=storage_state if storage_state else None
+                    )
 
-                # Create context with saved session if available
-                context = await browser.new_context(
-                    storage_state=storage_state if storage_state else None
-                )
+                    page = await context.new_page()
 
-                page = await context.new_page()
+                    # Set timeout
+                    page.set_default_timeout(timeout)
 
-                # Set timeout
-                page.set_default_timeout(timeout)
+                    # Navigate to URL
+                    logger.info("Navigating to %s", url)
+                    await page.goto(url, wait_until=load_state)
 
-                # Navigate to URL
-                logger.info("Navigating to %s", url)
-                await page.goto(url, wait_until=load_state)
+                    # Wait a bit for dynamic content
+                    await page.wait_for_timeout(self.POST_NAVIGATE_WAIT_MS)
 
-                # Wait a bit for dynamic content
-                await page.wait_for_timeout(2000)
+                    # Scroll to load more posts (adaptive: stop when scrollHeight stalls)
+                    last_height = await page.evaluate("document.body.scrollHeight")
+                    stale_scrolls = 0
+                    max_scrolls = self.MAX_PAGE_SCROLLS
 
-                # Scroll to load more posts
-                for scroll_i in range(10):
-                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                    await page.wait_for_timeout(1500)
-                    cur = len(await page.locator(
-                        'div[aria-label*="publicación" i]'
-                    ).all())
-                    if cur >= 5:
-                        break
+                    for scroll_i in range(max_scrolls):
+                        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        await page.wait_for_timeout(self.SCROLL_PAUSE_MS)
 
-                # Get HTML content
-                html = await page.content()
+                        new_height = await page.evaluate("document.body.scrollHeight")
+                        if new_height == last_height:
+                            stale_scrolls += 1
+                            if stale_scrolls >= self.PAGE_SCROLL_STALE_THRESHOLD:
+                                logger.info(
+                                    "Scroll height stalled after %d scrolls, stopping",
+                                    scroll_i + 1,
+                                )
+                                break
+                        else:
+                            stale_scrolls = 0
+                            last_height = new_height
 
-                await browser.close()
+                    # Get HTML content
+                    html = await page.content()
 
-                logger.info("Fetched HTML from %s (%d chars)", url, len(html))
-                return html
+                    logger.info("Fetched HTML from %s (%d chars)", url, len(html))
+                    return html
+                finally:
+                    try:
+                        await browser.close()
+                    except Exception:
+                        logger.debug("Failed to close browser", exc_info=True)
 
         except Exception as e:
             logger.error("Error fetching HTML from %s: %s", url, e)
@@ -198,7 +388,7 @@ class FacebookScraper:
         """Run SmartScraperGraph with HTML preprocessing."""
         try:
             # Step 1: Fetch HTML directly
-            html = await self._fetch_html_directly(url)
+            html = await self._fetch_html_cached(url)
             if not html:
                 return '{"posts": []}' if "posts" in prompt else '{"comments": []}'
 
@@ -210,31 +400,21 @@ class FacebookScraper:
             extracted_posts = FacebookPreprocessor.extract_posts(html, url)
             extracted_comments = FacebookPreprocessor.extract_comments(html, url)
 
-            logger.info("Extracted %d posts, %d comments from HTML",
-                       len(extracted_posts), len(extracted_comments))
+            logger.info(
+                "Extracted %d posts, %d comments from HTML",
+                len(extracted_posts),
+                len(extracted_comments),
+            )
 
-            # Step 3: Build preprocessed content from extracted data
+            # Step 3: Build preprocessed content from extracted data.
+            # Use the shared helper that handles line breaks correctly.
             if extracted_posts:
-                preprocessed_content = FacebookPreprocessor.create_hierarchical_json(html, url)
-                # Convert to readable text
-                lines = []
-                lines.append(f"PÁGINA: {preprocessed_content['page'].get('title', '')}")
-                lines.append(f"URL: {url}")
-                lines.append("=" * 50)
-
-                for i, post in enumerate(preprocessed_content['posts'], 1):
-                    lines.append(f"\\nPUBLICACIÓN {i}:")
-                    lines.append(f"Autor: {post.get('author', 'Desconocido')}")
-                    lines.append(f"Fecha: {post.get('date', 'Desconocida')}")
-                    lines.append(f"Likes: {post.get('likes', 0)}")
-                    lines.append(f"Comentarios: {post.get('comments_count', 0)}")
-                    lines.append(f"Compartidos: {post.get('shares', 0)}")
-                    lines.append("-" * 40)
-                    lines.append(f"Texto:\\n{post.get('text', '')}")
-
-                preprocessed_content = "\\n".join(lines)
-                logger.info("Built preprocessed content from %d posts (%d chars)",
-                           len(extracted_posts), len(preprocessed_content))
+                preprocessed_content = FacebookPreprocessor.preprocess_for_llm(html, url)
+                logger.info(
+                    "Built preprocessed content from %d posts (%d chars)",
+                    len(extracted_posts),
+                    len(preprocessed_content),
+                )
             else:
                 # Fallback: reduce HTML and use it
                 logger.warning("No posts extracted from HTML, using reduced HTML as fallback")
@@ -257,15 +437,12 @@ class FacebookScraper:
             config["force"] = True  # Force markdown conversion
 
             # Debug: log what we're sending to LLM
-            logger.debug("Content being sent to LLM (first 500 chars):\\n%s", preprocessed_content[:500])
+            logger.debug(
+                "Content being sent to LLM (first 500 chars):\\n%s", preprocessed_content[:500]
+            )
 
             # Use the temp file as source
-            graph = SmartScraperGraph(
-                prompt=prompt,
-                source=temp_file,
-                config=config,
-                schema=schema
-            )
+            graph = SmartScraperGraph(prompt=prompt, source=temp_file, config=config, schema=schema)
 
             loop = asyncio.get_event_loop()
             raw = await loop.run_in_executor(None, graph.run)
@@ -302,9 +479,7 @@ class FacebookScraper:
             return result
         return str(raw)
 
-    async def _run_graph(
-        self, url: str, prompt: str, schema: type[BaseModel] | None = None
-    ) -> str:
+    async def _run_graph(self, url: str, prompt: str, schema: type[BaseModel] | None = None) -> str:
         """Run SmartScraperGraph and return raw response as string.
 
         Uses preprocessing by default, falls back to original if needed.
@@ -329,15 +504,18 @@ class FacebookScraper:
                 posts_data = extracted
 
         posts = []
-        for item in posts_data[: self.max_posts]:
+        for idx, item in enumerate(posts_data[: self.max_posts]):
             try:
+                text = item.get("text", item.get("content", ""))
                 post = Post(
                     id=self._generate_post_id(
                         item.get("url", ""),
                         item.get("author", ""),
                         item.get("date", ""),
+                        text=text,
+                        idx=idx,
                     ),
-                    text=item.get("text", item.get("content", "")),
+                    text=text,
                     author=item.get("author", ""),
                     date=self._parse_date(item.get("date")),
                     likes=int(item.get("likes", 0) or 0),
@@ -370,15 +548,18 @@ class FacebookScraper:
                 comments_data = extracted
 
         comments = []
-        for item in comments_data[: self.max_comments]:
+        for idx, item in enumerate(comments_data[: self.max_comments]):
             try:
+                text = item.get("text", item.get("content", ""))
                 comment = Comment(
                     id=self._generate_comment_id(
                         item.get("url", ""),
                         item.get("author", ""),
                         item.get("date", ""),
+                        text=text,
+                        idx=idx,
                     ),
-                    text=item.get("text", item.get("content", "")),
+                    text=text,
                     author=item.get("author", ""),
                     date=self._parse_date(item.get("date")),
                     likes=int(item.get("likes", 0) or 0),
@@ -420,12 +601,42 @@ class FacebookScraper:
             List of Post objects
         """
         try:
-            # Step 1: Fetch HTML directly
-            html = await self._fetch_html_directly(page_url)
+            # Step 1: Fetch HTML (with cache)
+            html = await self._fetch_html_cached(page_url)
             if not html:
                 logger.warning("No HTML retrieved from %s", page_url)
-                self._save_page_to_db(page_url, [], html_size=0, scrape_status="error",
-                                     error_message="No HTML retrieved")
+                self._save_page_to_db(
+                    page_url,
+                    [],
+                    html_size=0,
+                    scrape_status="error",
+                    error_message="No HTML retrieved",
+                )
+                return []
+
+            # Step 1b: Detect blocking states
+            if self._detect_login_wall(html):
+                logger.error("Facebook login wall detected for %s", page_url)
+                self._evict_cache(page_url)
+                self._save_page_to_db(
+                    page_url,
+                    [],
+                    html_size=len(html),
+                    scrape_status="error",
+                    error_message="Facebook login wall detected — session may have expired",
+                )
+                return []
+
+            if self._detect_captcha(html):
+                logger.error("Facebook captcha/security check detected for %s", page_url)
+                self._evict_cache(page_url)
+                self._save_page_to_db(
+                    page_url,
+                    [],
+                    html_size=len(html),
+                    scrape_status="error",
+                    error_message="Facebook captcha/security check detected",
+                )
                 return []
 
             # Step 2: Try to extract posts using DOM-based preprocessor
@@ -433,12 +644,12 @@ class FacebookScraper:
             extracted_comments = FacebookPreprocessor.extract_comments(html, page_url)
 
             if extracted_posts:
-                logger.info("Preprocessor extracted %d posts, %d comments from %s",
-                          len(extracted_posts), len(extracted_comments), page_url)
-
-                # Attach comments to posts (simple strategy: all comments to first post)
-                if extracted_comments and extracted_posts:
-                    extracted_posts[0]["comments"] = extracted_comments
+                logger.info(
+                    "Preprocessor extracted %d posts, %d comments from %s",
+                    len(extracted_posts),
+                    len(extracted_comments),
+                    page_url,
+                )
 
                 # Get page metadata
                 page_meta = FacebookPreprocessor.extract_page_metadata(html, page_url)
@@ -458,15 +669,18 @@ class FacebookScraper:
 
                 # Convert to Post objects
                 posts = []
-                for item in extracted_posts[: self.max_posts]:
+                for idx, item in enumerate(extracted_posts[: self.max_posts]):
                     try:
+                        text = item.get("text", "")
                         post = Post(
                             id=self._generate_post_id(
                                 item.get("url", ""),
                                 item.get("author", ""),
                                 item.get("date", ""),
+                                text=text,
+                                idx=idx,
                             ),
-                            text=item.get("text", ""),
+                            text=text,
                             author=item.get("author", ""),
                             date=self._parse_date(item.get("date")),
                             likes=int(item.get("likes", 0) or 0),
@@ -531,12 +745,28 @@ class FacebookScraper:
 
         except Exception as e:
             logger.error("Error scraping page %s: %s", page_url, e)
-            self._save_page_to_db(page_url, [], html_size=0, scrape_status="error", error_message=str(e))
+            self._save_page_to_db(
+                page_url, [], html_size=0, scrape_status="error", error_message=str(e)
+            )
             return []
 
     def _generate_page_id(self, url: str) -> str:
         """Generate unique page ID from URL."""
         return hashlib.md5(url.encode()).hexdigest()[:16]
+
+    @staticmethod
+    def _clean_posts_for_db(posts_data: list[dict]) -> list[dict]:
+        """Remove non-serializable BeautifulSoup tags before saving to DB."""
+        cleaned = []
+        for post in posts_data:
+            clean_post = {k: v for k, v in post.items() if not k.startswith("_")}
+            if "comments" in clean_post:
+                clean_post["comments"] = [
+                    {k: v for k, v in c.items() if not k.startswith("_")}
+                    for c in clean_post["comments"]
+                ]
+            cleaned.append(clean_post)
+        return cleaned
 
     def _save_page_to_db(
         self,
@@ -573,7 +803,7 @@ class FacebookScraper:
                 page_id=pid,
                 url=page_url,
                 title=title,
-                posts_data=posts_data,
+                posts_data=self._clean_posts_for_db(posts_data),
                 html_size=html_size,
                 preprocessed_data=preprocessed_data,
                 raw_metadata=raw_metadata,
@@ -618,6 +848,454 @@ class FacebookScraper:
             logger.error("Error scraping comments %s: %s", post_url, e)
             return []
 
+    async def _scrape_comments_from_url(self, post_id: str, post_url: str) -> list[Comment]:
+        """Try to scrape comments from ``facebook.com/{post_id}/comments/``.
+
+        Facebook loads comments lazily on the post page, but the
+        ``/comments/`` endpoint sometimes returns a page with the first
+        batch already in the HTML. This is a cheaper alternative to the
+        interactive scroll-and-click approach.
+
+        Args:
+            post_id: Numeric post id extracted from the JSON.
+            post_url: Original post URL (used as a base for the comments URL
+                and as ``parent_id`` for the resulting ``Comment`` objects).
+
+        Returns:
+            List of ``Comment`` objects, empty if the request fails or
+            no comments are found.
+        """
+        if not post_id or not str(post_id).isdigit():
+            return []
+
+        comments_url = f"https://www.facebook.com/{post_id}/comments/"
+        logger.info("Trying /comments/ URL for post %s: %s", post_id, comments_url)
+
+        try:
+            html = await self._fetch_html_cached(comments_url)
+        except Exception as e:
+            logger.warning("Failed to fetch /comments/ URL %s: %s", comments_url, e)
+            return []
+
+        if not html:
+            return []
+        if self._detect_login_wall(html) or self._detect_captcha(html):
+            logger.warning("Login wall/captcha on /comments/ URL %s", comments_url)
+            self._evict_cache(comments_url)
+            return []
+
+        comments_data = FacebookPreprocessor.extract_comments(html, comments_url)
+        if not comments_data:
+            logger.info("No comments found via /comments/ URL for %s", post_id)
+            return []
+
+        out: list[Comment] = []
+        for idx, c in enumerate(comments_data):
+            try:
+                text = (c.get("text") or "").strip()
+                if len(text) < 5:
+                    continue
+                out.append(
+                    Comment(
+                        id=self._generate_comment_id(
+                            comments_url,
+                            c.get("author", ""),
+                            c.get("date", ""),
+                            text=text,
+                            idx=idx,
+                        ),
+                        text=text,
+                        author=c.get("author", "Unknown"),
+                        date=self._parse_date(c.get("date")),
+                        likes=int(c.get("likes", 0) or 0),
+                        post_id=post_id,
+                        url=c.get("url", f"{comments_url}#comment_{idx}"),
+                    )
+                )
+            except Exception as e:
+                logger.debug("Failed to build Comment from /comments/ data: %s", e)
+                continue
+
+        logger.info("Extracted %d comments from /comments/ URL %s", len(out), post_id)
+        return out
+
+    async def _scrape_comments_interactive(self, post_url: str) -> list[Comment]:
+        """Open the post in a browser, click the comments button, and
+        expand the dialog to extract visible comments.
+
+        Used as a fallback for posts/reels where neither the HTML nor the
+        ``/comments/`` endpoint exposes a usable comment list. Returns an
+        empty list on any failure (timeouts, EPIPE, missing buttons).
+        """
+        try:
+            from playwright.async_api import async_playwright
+
+            from src.scraper.comment_interactor import CommentInteractor
+
+            config = self._build_llm_config()
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=config.get("headless", True))
+                context = await browser.new_context(
+                    storage_state=config.get("storage_state") or None
+                )
+                page = await context.new_page()
+                page.set_default_timeout(self.settings.scraper.timeout * 1000)
+                await page.goto(post_url, wait_until="domcontentloaded")
+                await page.wait_for_timeout(self.COMMENTS_PANEL_WAIT_MS)
+
+                interactor = CommentInteractor(
+                    page=page,
+                    max_comments=self.max_comments,
+                    delay=self.delay,
+                )
+                comments = await interactor.extract_all_visible_comments()
+                await browser.close()
+                return comments
+        except Exception as e:
+            logger.warning("Interactive comment extraction failed for %s: %s", post_url, e)
+            return []
+
+    async def _scrape_reel_comments_interactive(self, reel_url: str) -> list[Comment]:
+        """Open a reel in a browser and click the comment count to load
+        the comments panel.
+
+        Unlike posts, reels don't have a "Comments" button that opens a
+        modal. The trick is to click the engagement count element
+        (``aria-label="Comentar"`` or the text ``"<n> mil"``) which
+        expands the comments inline. This method:
+
+        1. Navigates to the reel URL
+        2. Clicks the "Comentar" / comment-count element
+        3. Scrolls the now-expanded panel to load more comments
+        4. Clicks "Ver más comentarios" as needed
+        5. Extracts comment elements with ``aria-label="Comentario de..."``
+
+        Returns an empty list on any failure.
+        """
+        browser = None
+        try:
+            from playwright.async_api import async_playwright
+
+            from src.scraper.comment_interactor import CommentInteractor
+
+            config = self._build_llm_config()
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=config.get("headless", True))
+                context = await browser.new_context(
+                    storage_state=config.get("storage_state") or None
+                )
+                page = await context.new_page()
+                # Cap timeout to avoid hanging on slow loads
+                page.set_default_timeout(min(self.settings.scraper.timeout * 1000, 20000))
+                await page.goto(reel_url, wait_until="domcontentloaded", timeout=20000)
+                await page.wait_for_timeout(self.COMMENTS_PANEL_WAIT_MS)
+
+                # Try to click the "Comentar" / comment-count element
+                # to expand the comments inline.
+                clicked = False
+                try:
+                    comment_btn = page.locator('[aria-label="Comentar" i]').first
+                    if await comment_btn.count() > 0:
+                        await comment_btn.click(timeout=5000)
+                        clicked = True
+                        logger.info("Clicked 'Comentar' button for reel %s", reel_url)
+                except Exception as e:
+                    logger.debug("Could not click 'Comentar' button: %s", e)
+
+                if not clicked:
+                    try:
+                        count_btn = page.locator("text=/^\\d+([.,]\\d+)?\\s*mil$/i").first
+                        if await count_btn.count() > 0:
+                            await count_btn.click(timeout=5000)
+                            clicked = True
+                            logger.info("Clicked count text for reel %s", reel_url)
+                    except Exception as e:
+                        logger.debug("Could not click count text: %s", e)
+
+                if not clicked:
+                    logger.warning("Could not find comment button for reel %s", reel_url)
+                    try:
+                        await browser.close()
+                    except Exception:
+                        logger.debug("Failed to close browser", exc_info=True)
+                    return []
+
+                # Give Facebook time to start loading, then poll for
+                # comments with scroll-and-retry to handle reels where
+                # the lazy load is slow. Up to ~10s total.
+                interactor = CommentInteractor(
+                    page=page,
+                    max_comments=self.max_comments,
+                    delay=self.delay,
+                )
+
+                elements: list = []
+                for attempt in range(5):
+                    try:
+                        # Try to wait for the first comment element with
+                        # a short timeout on the last attempts only.
+                        if attempt == 0:
+                            try:
+                                await page.wait_for_selector(
+                                    '[aria-label^="Comentario de" i]',
+                                    timeout=8000,
+                                    state="visible",
+                                )
+                            except Exception:
+                                logger.debug("wait_for_selector for Comentario de timed out")
+
+                        # Scroll down a bit to trigger lazy loading of
+                        # comments that may be below the fold.
+                        try:
+                            await page.evaluate(
+                                "window.scrollBy(0, window.innerHeight * 0.6)",
+                                timeout=5000,
+                            )
+                            await page.wait_for_timeout(1500)
+                        except Exception:
+                            logger.debug("Scroll after Comentar failed", exc_info=True)
+
+                        elements = await interactor.find_comment_elements_in(page)
+                        if elements:
+                            logger.info(
+                                "Found %d comment elements on attempt %d for %s",
+                                len(elements),
+                                attempt + 1,
+                                reel_url,
+                            )
+                            break
+                    except Exception:
+                        logger.debug(
+                            "Comment polling attempt %d failed for %s",
+                            attempt + 1,
+                            reel_url,
+                            exc_info=True,
+                        )
+                    await page.wait_for_timeout(2000)
+
+                if not elements:
+                    logger.info("No comment elements after polling for %s", reel_url)
+
+                # Parse each comment element directly without scrolling
+                comments: list[Comment] = []
+                if elements:
+                    for idx, el in enumerate(elements[: self.max_comments]):
+                        try:
+                            parsed = await interactor._parse_element(el)
+                            if parsed and parsed.get("text"):
+                                cid = self._generate_comment_id(
+                                    reel_url,
+                                    parsed.get("author", ""),
+                                    "",
+                                    text=parsed.get("text", ""),
+                                    idx=idx,
+                                )
+                                comments.append(
+                                    Comment(
+                                        id=cid,
+                                        text=parsed.get("text", ""),
+                                        author=parsed.get("author", "Unknown"),
+                                        likes=parsed.get("likes", 0),
+                                        post_id=self._extract_post_id_from_url(reel_url) or "",
+                                        url=f"{reel_url}#comment_{idx}",
+                                    )
+                                )
+                        except Exception:
+                            logger.debug(
+                                "Failed to parse reel comment %d for %s",
+                                idx,
+                                reel_url,
+                                exc_info=True,
+                            )
+                            continue
+
+                try:
+                    await browser.close()
+                except Exception:
+                    logger.debug("Failed to close browser", exc_info=True)
+                return comments
+        except Exception as e:
+            logger.warning("Reel interactive comment extraction failed for %s: %s", reel_url, e)
+            if browser:
+                try:
+                    await browser.close()
+                except Exception:
+                    logger.debug("Failed to close browser", exc_info=True)
+            return []
+
+    async def scrape_post(self, post_url: str) -> list[Post]:
+        """Scrape a single Facebook post/reel (URL + comments).
+
+        Args:
+            post_url: URL of the Facebook post or reel
+
+        Returns:
+            List with a single Post object (or empty on failure)
+        """
+        is_reel = is_facebook_reel_url(post_url)
+        content_type = "reel" if is_reel else "post"
+
+        try:
+            html = await self._fetch_html_cached(post_url)
+            if not html:
+                logger.warning("No HTML retrieved from %s", post_url)
+                return []
+
+            if self._detect_login_wall(html):
+                logger.error("Facebook login wall detected for %s", post_url)
+                self._evict_cache(post_url)
+                return []
+
+            if self._detect_captcha(html):
+                logger.error("Facebook captcha detected for %s", post_url)
+                self._evict_cache(post_url)
+                return []
+
+            # Try DOM extraction first
+            extracted_posts = FacebookPreprocessor.extract_posts(html, post_url)
+            page_meta = FacebookPreprocessor.extract_page_metadata(html, post_url)
+
+            if not extracted_posts:
+                logger.info(
+                    "No %s found via preprocessor, falling back to LLM for %s",
+                    content_type,
+                    post_url,
+                )
+                prompt = (
+                    f"Extraé el {content_type} visible en esta URL de Facebook. "
+                    "Devolvé un objeto JSON con la clave 'posts' conteniendo un array "
+                    "con un único objeto que tenga estos campos:\n"
+                    "- text: texto completo del post\n"
+                    "- author: nombre del autor o página\n"
+                    "- date: fecha en formato ISO (YYYY-MM-DD)\n"
+                    "- likes: número de likes\n"
+                    "- comments_count: número de comentarios\n"
+                    "- shares: número de compartidos\n"
+                    "- url: URL completa\n\n"
+                    'Si no hay contenido, devolvé {"posts": []}.\n'
+                    "Solo JSON válido, sin explicaciones."
+                )
+                raw = await self._run_graph(post_url, prompt, schema=_PostList)
+                extracted_posts = [
+                    {
+                        "text": p.text,
+                        "author": p.author,
+                        "date": p.date.isoformat() if p.date else "",
+                        "likes": p.likes,
+                        "comments_count": p.comments_count,
+                        "shares": p.shares,
+                        "url": p.url,
+                    }
+                    for p in self._parse_post_list(raw)
+                ]
+
+            if not extracted_posts:
+                logger.warning("No %s content extracted from %s", content_type, post_url)
+                return []
+
+            # Build single Post object from first extracted item
+            item = extracted_posts[0]
+            text = item.get("text", "")
+            post_id = self._generate_post_id(
+                post_url,
+                item.get("author", ""),
+                item.get("date", ""),
+                text=text,
+                idx=0,
+            )
+            post = Post(
+                id=post_id,
+                text=text,
+                author=item.get("author", ""),
+                date=self._parse_date(item.get("date")),
+                likes=int(item.get("likes", 0) or 0),
+                comments_count=int(item.get("comments_count", 0) or 0),
+                shares=int(item.get("shares", 0) or 0),
+                url=post_url,
+                source=ContentSource.FACEBOOK_POST,
+            )
+
+            # Extract comments using a three-level fallback strategy:
+            #   1. /comments/ endpoint (cheap, may have first batch)
+            #   2. Interactive (dialog for posts, scroll for reels)
+            #   3. LLM on the post HTML (last resort, often empty since
+            #      comments are loaded lazily)
+            comments: list[Comment] = []
+            # Only pass a numeric post_id to the /comments/ endpoint:
+            # share/photo/story URLs lack a numeric id and would be
+            # silently rejected by the endpoint's isdigit() check.
+            numeric_post_id = self._extract_post_id_from_url(post_url)
+            comments = await self._scrape_comments_from_url(numeric_post_id or "", post_url)
+            if not comments and self.use_interactive:
+                if is_reel:
+                    comments = await self._scrape_reel_comments_interactive(post_url)
+                else:
+                    comments = await self._scrape_comments_interactive(post_url)
+            if not comments:
+                comments = await self.scrape_comments(post_url, post.id)
+
+            post.comments = comments
+            post.comments_count = len(comments)
+
+            # Save to DB
+            self._save_page_to_db(
+                page_url=post_url,
+                posts_data=[
+                    {
+                        "id": post.id,
+                        "text": post.text,
+                        "author": post.author,
+                        "date": post.date.isoformat() if post.date else "",
+                        "likes": post.likes,
+                        "comments_count": post.comments_count,
+                        "shares": post.shares,
+                        "url": post.url,
+                        "source": post.source.value,
+                        "comments": [c.to_dict() for c in comments],
+                    }
+                ],
+                html_size=len(html),
+                page_id=self._generate_page_id(post_url),
+                title=page_meta.get("title", ""),
+                preprocessed_data=FacebookPreprocessor.create_hierarchical_json(html, post_url),
+                scrape_status="success",
+            )
+
+            logger.info(
+                "Scraped %s from %s with %d comments", content_type, post_url, len(comments)
+            )
+            return [post]
+
+        except Exception as e:
+            logger.error("Error scraping %s %s: %s", content_type, post_url, e)
+            return []
+
+    async def scrape_reel(self, reel_url: str) -> list[Post]:
+        """Scrape a single Facebook reel.
+
+        Reels are handled similarly to posts but logged/distinguished separately.
+        Future enhancements may use reel-specific selectors.
+        """
+        logger.info("Scraping reel: %s", reel_url)
+        return await self.scrape_post(reel_url)
+
+    def _run_sync(self, coro):
+        """Run an async coroutine from sync code, creating a loop if needed."""
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+
+    def scrape_post_sync(self, post_url: str) -> list[Post]:
+        """Synchronous version of scrape_post."""
+        return self._run_sync(self.scrape_post(post_url))
+
+    def scrape_reel_sync(self, reel_url: str) -> list[Post]:
+        """Synchronous version of scrape_reel."""
+        return self._run_sync(self.scrape_reel(reel_url))
+
     async def scrape_full(self, page_url: str) -> ScrapeResult:
         """Scrape page and all comments.
 
@@ -630,18 +1308,25 @@ class FacebookScraper:
         result = ScrapeResult(success=True)
 
         try:
-            posts = await self.scrape_page(page_url)
-            result.posts.extend(posts)
-            result.posts_found = len(posts)
+            if self.use_interactive:
+                posts = await self.scrape_page_interactive(page_url)
+                result.posts.extend(posts)
+                result.posts_found = len(posts)
+                result.comments_found = sum(len(p.comments) for p in posts)
+            else:
+                posts = await self.scrape_page(page_url)
+                result.posts.extend(posts)
+                result.posts_found = len(posts)
 
-            for i, post in enumerate(posts):
-                if post.url:
-                    if i > 0:
-                        await asyncio.sleep(self.delay * random.uniform(0.5, 1.5))
-                    comments = await self.scrape_comments(post.url, post.id)
-                    result.comments.extend(comments)
+                for i, post in enumerate(posts):
+                    if post.url:
+                        if i > 0:
+                            await asyncio.sleep(self.delay * random.uniform(0.5, 1.5))
+                        comments = await self.scrape_comments(post.url, post.id)
+                        result.comments.extend(comments)
 
-            result.comments_found = len(result.comments)
+                result.comments_found = len(result.comments)
+
             result.pages_scraped = 1
 
         except Exception as e:
@@ -680,7 +1365,7 @@ class FacebookScraper:
                 page.set_default_timeout(self.settings.scraper.timeout * 1000)
 
                 await page.goto(page_url, wait_until="load")
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(self.COMMENTS_PANEL_WAIT_MS)
 
                 # ---- Scroll para cargar más posts ----
                 max_posts_target = min(self.max_posts, 10)
@@ -694,16 +1379,20 @@ class FacebookScraper:
                     await page.wait_for_timeout(1500)
 
                     try:
-                        post_count = len(await page.locator(
-                            'div[aria-label*="publicación" i], '
-                            'div[aria-label*="Acciones en esta" i]'
-                        ).all())
+                        post_count = len(
+                            await page.locator(
+                                'div[aria-label*="publicación" i], '
+                                'div[aria-label*="Acciones en esta" i]'
+                            ).all()
+                        )
                     except Exception:
+                        logger.debug("Failed to count posts on scroll", exc_info=True)
                         post_count = 0
 
                     logger.info(
                         "Scroll %d: %d posts visible",
-                        scroll_attempt + 1, post_count,
+                        scroll_attempt + 1,
+                        post_count,
                     )
 
                     if post_count >= max_posts_target:
@@ -713,7 +1402,9 @@ class FacebookScraper:
                     if post_count == last_count:
                         stale_scrolls += 1
                         if stale_scrolls >= 2:
-                            logger.info("No new posts after %d stale scrolls, stopping", stale_scrolls)
+                            logger.info(
+                                "No new posts after %d stale scrolls, stopping", stale_scrolls
+                            )
                             break
                     else:
                         stale_scrolls = 0
@@ -736,10 +1427,13 @@ class FacebookScraper:
 
                 posts_with_comments = []
                 for idx, item in enumerate(extracted_posts[: self.max_posts]):
+                    text = item.get("text", "")
                     post_id = self._generate_post_id(
                         item.get("url", ""),
                         item.get("author", ""),
                         item.get("date", ""),
+                        text=text,
+                        idx=idx,
                     )
 
                     post_obj = Post(
@@ -827,36 +1521,16 @@ class FacebookScraper:
 
     def scrape_page_sync(self, page_url: str) -> list[Post]:
         """Synchronous version of scrape_page."""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(self.scrape_page(page_url))
+        return self._run_sync(self.scrape_page(page_url))
 
     def scrape_comments_sync(self, post_url: str, post_id: str = "") -> list[Comment]:
         """Synchronous version of scrape_comments."""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(self.scrape_comments(post_url, post_id))
+        return self._run_sync(self.scrape_comments(post_url, post_id))
 
     def scrape_page_interactive_sync(self, page_url: str) -> list[Post]:
         """Synchronous version of scrape_page_interactive."""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(self.scrape_page_interactive(page_url))
+        return self._run_sync(self.scrape_page_interactive(page_url))
 
     def scrape_full_sync(self, page_url: str) -> ScrapeResult:
         """Synchronous version of scrape_full."""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(self.scrape_full(page_url))
+        return self._run_sync(self.scrape_full(page_url))

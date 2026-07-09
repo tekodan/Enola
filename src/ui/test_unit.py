@@ -113,6 +113,25 @@ def test_compute_bar_data_empty_returns_all_zeros():
     assert len(df) == 6
 
 
+def test_compute_bar_data_multi_label_counts_each_label():
+    """A row with two labels contributes two votes."""
+    rows = [
+        {
+            "tiene_violencia": "true",
+            "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+            "labels": [
+                {"categoria": "VDG_VIOLENCIA_SIMBOLICA"},
+                {"categoria": "VDG_HOSTILIDAD_FEMINICIDIO"},
+            ],
+        }
+    ]
+    df = compute_bar_data(rows)
+    simb = df.loc[df["Código"] == "VDG_VIOLENCIA_SIMBOLICA", "Cantidad"].iloc[0]
+    host = df.loc[df["Código"] == "VDG_HOSTILIDAD_FEMINICIDIO", "Cantidad"].iloc[0]
+    assert simb == 1
+    assert host == 1
+
+
 def test_compute_kpis_basic():
     stats = {
         "analysis_results_count": 10,

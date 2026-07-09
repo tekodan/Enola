@@ -115,17 +115,19 @@ class ExportManager:
                         "Content Type",
                         "Content ID",
                         "Violencia",
-                        "Categoria",
-                        "Dimension",
+                        "Categoria (primaria)",
+                        "Dimension (primaria)",
                         "Codigo",
-                        "Severidad",
+                        "Severidad (primaria)",
                         "Confianza",
-                        "Justificacion",
+                        "Justificacion (primaria)",
+                        "N° etiquetas",
                     ]
                 )
 
                 results = self.database.get_analysis_results()
                 for result in results:
+                    labels = result.get("labels") or []
                     writer.writerow(
                         [
                             result.get("id", ""),
@@ -138,8 +140,47 @@ class ExportManager:
                             result.get("severidad", ""),
                             result.get("confianza", "") or "",
                             result.get("justificacion", "")[:500],
+                            len(labels),
                         ]
                     )
+
+                # --- Multi-label detail ---
+                writer.writerow([])
+                writer.writerow(["=== ANALYSIS LABELS (multi-etiqueta) ==="])
+                writer.writerow(
+                    [
+                        "Analysis Result ID",
+                        "Orden",
+                        "Categoria",
+                        "Dimension",
+                        "Severidad",
+                        "Confianza",
+                        "Score Ajuste",
+                        "Falso Positivo Probable",
+                        "Regla Disparada",
+                        "Marcadores Detectados",
+                        "Justificacion",
+                        "Evidencia",
+                    ]
+                )
+                for result in results:
+                    for lbl in result.get("labels") or []:
+                        writer.writerow(
+                            [
+                                result.get("id", ""),
+                                lbl.get("orden", ""),
+                                lbl.get("categoria", ""),
+                                lbl.get("dimension", "") or "",
+                                lbl.get("severidad", ""),
+                                lbl.get("confianza", "") or "",
+                                lbl.get("score_ajuste", "") or "",
+                                lbl.get("es_falso_positivo_probable", "false"),
+                                lbl.get("regla_disparada", "") or "",
+                                "|".join(lbl.get("marcadores_detectados") or []),
+                                (lbl.get("justificacion", "") or "")[:500],
+                                (lbl.get("evidencia", "") or "")[:500],
+                            ]
+                        )
 
         return str(output_path)
 
@@ -194,6 +235,10 @@ class ExportManager:
             data["analysis_results"] = self.database.get_analysis_results()
 
         data["seed_pages"] = self.database.get_seed_pages()
+
+        if include_analysis and data.get("analysis_results"):
+            # Inject the corrected-label lists per feedback row too.
+            data["analysis_feedback"] = self.database.list_feedback()
 
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
