@@ -22,7 +22,10 @@ from src.storage.models import (
     PageModel,
     PostModel,
     SeedPageModel,
+    SessionModel,
+    UserModel,
 )
+from src.storage.models.session import SESSION_TTL_HOURS
 
 
 class Database:
@@ -148,6 +151,61 @@ class Database:
         if "analysis_results" not in existing_tables:
             return
 
+        # Users table — created if missing. The review/admin accounts for
+        # the NiceGUI login.
+        if "users" not in existing_tables:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE users (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username VARCHAR NOT NULL UNIQUE,
+                            password_hash VARCHAR NOT NULL,
+                            role VARCHAR NOT NULL DEFAULT 'reviewer',
+                            full_name VARCHAR,
+                            is_active VARCHAR NOT NULL DEFAULT 'true',
+                            created_at DATETIME NOT NULL,
+                            last_login DATETIME
+                        )
+                        """
+                    )
+                )
+                conn.execute(text("CREATE UNIQUE INDEX ix_users_username ON users(username)"))
+
+        # Sessions table — persistent login sessions so the NiceGUI
+        # dashboard survives server restarts. Without this, ``app.storage.user``
+        # is in-memory only and every reboot logs everyone out.
+        if "sessions" not in existing_tables:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE sessions (
+                            id VARCHAR PRIMARY KEY,
+                            user_id INTEGER NOT NULL,
+                            username VARCHAR NOT NULL,
+                            created_at DATETIME NOT NULL,
+                            expires_at DATETIME NOT NULL,
+                            last_seen_at DATETIME NOT NULL,
+                            user_agent VARCHAR
+                        )
+                        """
+                    )
+                )
+                conn.execute(text("CREATE INDEX ix_sessions_user_id ON sessions(user_id)"))
+                conn.execute(text("CREATE INDEX ix_sessions_expires_at ON sessions(expires_at)"))
+
+        # analysis_feedback columns for reviewer identity. Populated by
+        # the NiceGUI validation UI; left NULL for legacy rows.
+        feedback_additions: list[tuple[str, str]] = []
+        if "analysis_feedback" in existing_tables:
+            feedback_cols = {c["name"] for c in inspector.get_columns("analysis_feedback")}
+            if "reviewer_user_id" not in feedback_cols:
+                feedback_additions.append(("reviewer_user_id", "INTEGER"))
+            if "reviewer_username" not in feedback_cols:
+                feedback_additions.append(("reviewer_username", "VARCHAR"))
+
         existing_cols = {c["name"] for c in inspector.get_columns("analysis_results")}
 
         additions: list[tuple[str, str]] = []
@@ -197,6 +255,7 @@ class Database:
             and "confidence" not in existing_cols
             and not seed_additions
             and not comment_additions
+            and not feedback_additions
         ):
             return
 
@@ -235,6 +294,11 @@ class Database:
 
             for col_name, col_type in comment_additions:
                 conn.execute(text(f"ALTER TABLE comments ADD COLUMN {col_name} {col_type}"))
+
+            for col_name, col_type in feedback_additions:
+                conn.execute(
+                    text(f"ALTER TABLE analysis_feedback ADD COLUMN {col_name} {col_type}")
+                )
 
     @contextmanager
     def get_session(self) -> Generator[Session, None, None]:
@@ -386,6 +450,14 @@ class Database:
     def save_comments_batch(self, comments_data: list[dict]) -> int:
         """Save multiple comments in batch.
 
+        Before insertion, the batch is de-duplicated by
+        :func:`src.scraper.comment_dedup.find_duplicate_groups` so two
+        copies of the same comment (same ``post_id`` + ``author``,
+        normalized text identical or fuzzy ≥ ``0.95``) collapse to a
+        single row. The survivor is chosen by
+        :func:`src.scraper.comment_dedup.pick_canonical` (longest text,
+        then most likes, then earliest created_at).
+
         Args:
             comments_data: List of comment dictionaries
 
@@ -393,6 +465,22 @@ class Database:
             Number of comments saved
         """
         from sqlalchemy import inspect
+
+        from src.scraper.comment_dedup import find_duplicate_groups, pick_canonical
+
+        # De-dupe within the batch. ``find_duplicate_groups`` returns
+        # only the duplicate groups (size ≥ 2); singletons pass through.
+        # Within each group we drop the non-canonical copies and keep
+        # the survivor chosen by ``pick_canonical``.
+        groups = find_duplicate_groups(comments_data, threshold=0.95)
+        if groups:
+            drop_ids: set[int] = set()
+            for group in groups:
+                canonical = pick_canonical(group)
+                for c in group:
+                    if c is not canonical:
+                        drop_ids.add(id(c))
+            comments_data = [c for c in comments_data if id(c) not in drop_ids]
 
         valid_keys = {c.key for c in inspect(CommentModel).mapper.columns}
         saved = 0
@@ -500,6 +588,26 @@ class Database:
             for post_idx, post_data in enumerate(posts_data):
                 # Extract comments from post data if present
                 comments = post_data.pop("comments", [])
+
+                # De-dupe comments within this post: the scraper can
+                # emit the same comment twice when the DOM path and the
+                # LLM fallback both fire, or when polling retries see
+                # the same elements. See comment_dedup for the rules.
+                if comments:
+                    from src.scraper.comment_dedup import (
+                        find_duplicate_groups,
+                        pick_canonical,
+                    )
+
+                    inline_groups = find_duplicate_groups(comments, threshold=0.95)
+                    if inline_groups:
+                        drop_ids: set[int] = set()
+                        for group in inline_groups:
+                            canonical = pick_canonical(group)
+                            for c in group:
+                                if c is not canonical:
+                                    drop_ids.add(id(c))
+                        comments = [c for c in comments if id(c) not in drop_ids]
 
                 # Generate unique post_id: prefer preprocessor's id, else use idx-based
                 post_id = post_data.get("id")
@@ -670,6 +778,19 @@ class Database:
         with self.get_session() as session:
             comments = session.query(CommentModel).filter_by(post_id=post_id).limit(limit).all()
             return [c.to_dict() for c in comments]
+
+    def get_orphan_comments(self) -> list[dict]:
+        """Get comments whose post_id doesn't exist in the posts table.
+
+        Returns:
+            List of orphan comment dictionaries
+        """
+        with self.get_session() as session:
+            post_ids = {p.id for p in session.query(PostModel).all()}
+            orphan_comments = (
+                session.query(CommentModel).filter(~CommentModel.post_id.in_(post_ids)).all()
+            )
+            return [c.to_dict() for c in orphan_comments]
 
     def get_analysis_results(self, content_type: str | None = None) -> list[dict]:
         """Get analysis results from database.
@@ -1195,14 +1316,43 @@ class Database:
         fb.corrected_justificacion = primary["justificacion"]
 
     def get_feedback_for_analysis(self, analysis_result_id: int) -> dict | None:
-        """Return the feedback for a single analysis result, or ``None``."""
+        """Return the feedback for a single analysis result, or ``None``.
+
+        The returned dict is enriched with a ``labels`` key carrying the
+        ordered list of corrected labels from
+        ``analysis_feedback_labels`` (so the validation UI can re-render
+        the multi-label form with all existing overrides — not just
+        the primary flat-column one).
+        """
         with self.get_session() as session:
             row = (
                 session.query(AnalysisFeedbackModel)
                 .filter_by(analysis_result_id=analysis_result_id)
                 .first()
             )
-            return row.to_dict() if row else None
+            if not row:
+                return None
+            out = row.to_dict()
+            label_rows = (
+                session.query(AnalysisFeedbackLabelModel)
+                .filter_by(analysis_feedback_id=row.id)
+                .order_by(AnalysisFeedbackLabelModel.orden.asc())
+                .all()
+            )
+            out["labels"] = [
+                {
+                    "categoria": lr.categoria,
+                    "dimension": lr.dimension,
+                    "severidad": lr.severidad,
+                    "justificacion": lr.justificacion,
+                    "evidencia": lr.evidencia,
+                    "es_falso_positivo_probable": lr.es_falso_positivo_probable,
+                    "regla_disparada": lr.regla_disparada,
+                    "marcadores_detectados": lr.marcadores_detectados,
+                }
+                for lr in label_rows
+            ]
+            return out
 
     def list_feedback(
         self,
@@ -1352,6 +1502,249 @@ class Database:
             row.chromadb_id = None
             row.chromadb_indexed_at = None
             return True
+
+    # ----- Users (admin / reviewer accounts) -----
+
+    @staticmethod
+    def _hash_password(password: str) -> str:
+        """Return the bcrypt hash of ``password`` using passlib."""
+        from passlib.context import CryptContext
+
+        return CryptContext(schemes=["bcrypt"], deprecated="auto").hash(password)
+
+    @staticmethod
+    def _verify_password(password: str, hashed: str) -> bool:
+        """Return True if ``password`` matches the bcrypt ``hashed`` value."""
+        from passlib.context import CryptContext
+
+        try:
+            return CryptContext(schemes=["bcrypt"], deprecated="auto").verify(password, hashed)
+        except (ValueError, TypeError):
+            return False
+
+    def create_user(
+        self,
+        username: str,
+        password: str,
+        role: str = "reviewer",
+        full_name: str | None = None,
+    ) -> int:
+        """Create a new user. Idempotent: returns the existing id on conflict.
+
+        Args:
+            username: Unique login (case-sensitive).
+            password: Plaintext password — hashed with bcrypt before storage.
+            role: ``"admin"`` or ``"reviewer"``. Defaults to ``"reviewer"``.
+            full_name: Optional display name.
+
+        Returns:
+            PK of the (new or existing) user row.
+        """
+        from datetime import datetime
+
+        normalized = str(username or "").strip()
+        if not normalized:
+            raise ValueError("username cannot be empty")
+        if role not in {"admin", "reviewer"}:
+            raise ValueError(f"role must be 'admin' or 'reviewer' — got {role!r}")
+
+        with self.get_session() as session:
+            existing = session.query(UserModel).filter_by(username=normalized).first()
+            if existing:
+                return existing.id
+            row = UserModel(
+                username=normalized,
+                password_hash=self._hash_password(password),
+                role=role,
+                full_name=full_name,
+                is_active="true",
+                created_at=datetime.now(),
+            )
+            session.add(row)
+            session.flush()
+            return row.id
+
+    def verify_credentials(self, username: str, password: str) -> dict | None:
+        """Return the user dict if ``(username, password)`` is valid.
+
+        Inactive users always fail even with the right password. Unknown
+        usernames return ``None`` (never raise) so the UI can render a
+        generic "invalid credentials" message.
+        """
+        from datetime import datetime
+
+        normalized = str(username or "").strip()
+        if not normalized or not password:
+            return None
+        with self.get_session() as session:
+            row = session.query(UserModel).filter_by(username=normalized).first()
+            if not row:
+                return None
+            if str(row.is_active).lower() != "true":
+                return None
+            if not self._verify_password(password, row.password_hash):
+                return None
+            row.last_login = datetime.now()
+            return row.to_dict()
+
+    def find_user_by_username(self, username: str) -> dict | None:
+        """Return the user dict for ``username`` (without password hash)."""
+        with self.get_session() as session:
+            row = session.query(UserModel).filter_by(username=str(username or "").strip()).first()
+            return row.to_dict() if row else None
+
+    def find_user_by_id(self, user_id: int) -> dict | None:
+        """Return the user dict by id (without password hash)."""
+        with self.get_session() as session:
+            row = session.query(UserModel).filter_by(id=user_id).first()
+            return row.to_dict() if row else None
+
+    def list_users(self) -> list[dict]:
+        """Return all users, ordered by username ascending."""
+        with self.get_session() as session:
+            rows = session.query(UserModel).order_by(UserModel.username.asc()).all()
+            return [r.to_dict() for r in rows]
+
+    def set_user_active(self, user_id: int, active: bool) -> bool:
+        """Activate / deactivate a user. Returns False if the id is unknown."""
+        flag = "true" if active else "false"
+        with self.get_session() as session:
+            row = session.query(UserModel).filter_by(id=user_id).first()
+            if not row:
+                return False
+            row.is_active = flag
+            return True
+
+    def set_user_role(self, user_id: int, role: str) -> bool:
+        """Change a user's role. Returns False if the id is unknown."""
+        if role not in {"admin", "reviewer"}:
+            raise ValueError(f"role must be 'admin' or 'reviewer' — got {role!r}")
+        with self.get_session() as session:
+            row = session.query(UserModel).filter_by(id=user_id).first()
+            if not row:
+                return False
+            row.role = role
+            return True
+
+    def set_user_password(self, user_id: int, password: str) -> bool:
+        """Replace a user's password (hashed with bcrypt)."""
+        with self.get_session() as session:
+            row = session.query(UserModel).filter_by(id=user_id).first()
+            if not row:
+                return False
+            row.password_hash = self._hash_password(password)
+            return True
+
+    # ----- Sessions (persistent login state) -----
+
+    @staticmethod
+    def _generate_session_id() -> str:
+        """Return a fresh opaque session id."""
+        import uuid
+
+        return uuid.uuid4().hex
+
+    def create_session(
+        self,
+        user_id: int,
+        username: str,
+        *,
+        ttl_hours: int | None = None,
+        user_agent: str | None = None,
+    ) -> dict:
+        """Create a persistent login session for ``user_id``.
+
+        Args:
+            user_id: FK to ``users.id``.
+            username: Denormalized for fast lookup without a JOIN.
+            ttl_hours: Time-to-live in hours. Defaults to
+                :data:`SESSION_TTL_HOURS` (24).
+            user_agent: Optional browser UA string for diagnostics.
+
+        Returns:
+            Session dict (with ``id``) — store the ``id`` in the
+            browser-side cookie so the next request can look it up.
+        """
+        from datetime import datetime, timedelta
+
+        ttl = ttl_hours if ttl_hours is not None else SESSION_TTL_HOURS
+        now = datetime.now()
+        expires = now + timedelta(hours=ttl)
+        sid = self._generate_session_id()
+        with self.get_session() as session:
+            row = SessionModel(
+                id=sid,
+                user_id=int(user_id),
+                username=username,
+                created_at=now,
+                expires_at=expires,
+                last_seen_at=now,
+                user_agent=user_agent,
+            )
+            session.add(row)
+            session.flush()
+        return {
+            "id": sid,
+            "user_id": int(user_id),
+            "username": username,
+            "created_at": now.isoformat(),
+            "expires_at": expires.isoformat(),
+        }
+
+    def find_session(self, session_id: str) -> dict | None:
+        """Return the session row, or ``None`` if missing / expired.
+
+        Expired rows are NOT deleted here — use :meth:`purge_expired_sessions`
+        for cleanup. They just stop being honored for auth.
+        """
+        if not session_id:
+            return None
+        with self.get_session() as session:
+            row = session.query(SessionModel).filter_by(id=session_id).first()
+            if not row:
+                return None
+            from datetime import datetime
+
+            if row.expires_at and datetime.now() >= row.expires_at:
+                return None
+            return row.to_dict()
+
+    def touch_session(self, session_id: str) -> bool:
+        """Bump ``last_seen_at`` so idle sessions don't appear stale."""
+        from datetime import datetime
+
+        if not session_id:
+            return False
+        with self.get_session() as session:
+            row = session.query(SessionModel).filter_by(id=session_id).first()
+            if not row:
+                return False
+            row.last_seen_at = datetime.now()
+            return True
+
+    def delete_session(self, session_id: str) -> bool:
+        """Remove a session (logout / explicit revocation)."""
+        if not session_id:
+            return False
+        with self.get_session() as session:
+            row = session.query(SessionModel).filter_by(id=session_id).first()
+            if not row:
+                return False
+            session.delete(row)
+            return True
+
+    def purge_expired_sessions(self) -> int:
+        """Delete every expired session row. Returns the number purged."""
+        from datetime import datetime
+
+        with self.get_session() as session:
+            expired = (
+                session.query(SessionModel).filter(SessionModel.expires_at <= datetime.now()).all()
+            )
+            count = len(expired)
+            for row in expired:
+                session.delete(row)
+            return count
 
 
 def _to_str_or_none(value: object) -> str | None:

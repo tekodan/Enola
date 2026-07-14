@@ -81,6 +81,18 @@ def _primary_override(labels: list[dict]) -> dict[str, object]:
     return max(labels, key=lambda lbl: (_rank(lbl), 1))
 
 
+def _is_violent_category(cat: str) -> bool:
+    """Return True if the category represents violence, False otherwise."""
+    if not cat:
+        return True
+    cat_upper = cat.upper()
+    if cat_upper == "NINGUNA":
+        return False
+    if "SALVAGUARDA" in cat_upper:
+        return False
+    return True
+
+
 def build_adjusted_analysis(
     analysis_rows: list[dict[str, object]] | None,
     feedback_rows: list[dict[str, object]] | None,
@@ -141,10 +153,17 @@ def build_adjusted_analysis(
             if primary.get("justificacion"):
                 out["justificacion"] = primary["justificacion"]
             changed = True
+
+            primary_cat = str(primary.get("categoria") or "")
+            has_fpp = bool(primary.get("es_falso_positivo_probable"))
+            out["tiene_violencia"] = (
+                "false" if has_fpp or not _is_violent_category(primary_cat) else "true"
+            )
         else:
             # Legacy single-label fallback.
-            if fb.get("corrected_categoria"):
-                out["categoria"] = fb["corrected_categoria"]
+            corrected_cat = fb.get("corrected_categoria")
+            if corrected_cat:
+                out["categoria"] = corrected_cat
                 changed = True
             if fb.get("corrected_dimension"):
                 out["dimension"] = fb["corrected_dimension"]
@@ -152,6 +171,10 @@ def build_adjusted_analysis(
             if fb.get("corrected_justificacion"):
                 out["justificacion"] = fb["corrected_justificacion"]
                 changed = True
+
+            out["tiene_violencia"] = (
+                "false" if not _is_violent_category(str(corrected_cat or "")) else "true"
+            )
 
         out["adjusted_by_human"] = changed
         adjusted.append(out)

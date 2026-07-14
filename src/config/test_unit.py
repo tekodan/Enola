@@ -39,6 +39,15 @@ class TestAppConfig:
         assert config.debug is True
         assert config.log_level == "DEBUG"
 
+    def test_nicegui_url_default(self):
+        """The NiceGUI URL defaults to localhost:8080."""
+        config = AppConfig()
+        assert config.nicegui_url == "http://127.0.0.1:8080"
+
+    def test_nicegui_url_custom(self):
+        config = AppConfig(nicegui_url="http://0.0.0.0:9090")
+        assert config.nicegui_url == "http://0.0.0.0:9090"
+
 
 class TestOllamaConfig:
     """Tests for OllamaConfig."""

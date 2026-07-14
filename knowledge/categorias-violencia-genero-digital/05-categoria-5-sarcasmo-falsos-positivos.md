@@ -75,3 +75,20 @@ Esta categoría opera como **módulo de salvaguarda** del sistema. Aplica de for
 - **Criterio de contexto pragmático** (ver [Protocolo algorítmico general](./00-protocolo-algoritmico.md), sección 3): toda clasificación de las categorías 1-4 y 6 debe pasar por un filtro pragmático antes de confirmarse como ataque. La Regla 3 de esta categoría es la implementación concreta de ese filtro.
 
 > **Recomendación de implementación:** entrenar un clasificador binario auxiliar `es_ataque_real | es_reapropiación` que se ejecute *después* de que el clasificador principal haya marcado un mensaje como positivo en cualquiera de las otras cinco categorías. El objetivo es reducir la tasa de falsos positivos que castigan a víctimas y activistas.
+
+## Bloque para prompt
+
+```
+USO DE Cat. 5 (ortogonal):
+- 5.1 sarcasmo/ironía que vehiculariza un ATAQUE → es VDG, devolve la
+  categoría sustantiva correspondiente (1.x, 2.x, etc.) y agregá 5.1
+  SOLO si el sarcasmo ES la carga agresiva principal.
+- 5.2 humor hostil que ENMASCARA una agresión → es VDG, mismo criterio.
+- 5.3 reapropiación endogrupal / cita / denuncia con marcadores
+  mitigadores → NO es VDG, devolvé `clasificaciones: []` con
+  `es_falso_positivo_probable: true`. Esta categoría casi nunca
+  coexiste con otra sustantiva.
+Si NO estás seguro entre 5.x y otra categoría, priorizá la categoría
+sustantiva (1.x, 2.x, etc.) y dejá `es_falso_positivo_probable: true`
+en lugar de inventar una 5.x.
+```

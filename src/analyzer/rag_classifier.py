@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from src.analyzer.category_mapping import (
     MAX_LABELS,
+    load_prompt_block,
     map_gravedad,
     max_severity,
     render_severidad_prompt,
@@ -43,6 +44,14 @@ from src.analyzer.category_mapping import (
 )
 from src.analyzer.exclusion_filter import evaluar_exclusiones
 from src.analyzer.violence_types import Severity
+
+# Constantes que apuntan a los markdowns bajo glosario/. Las reglas
+# viven en documentación — este código solo las carga.
+_PROMPT_BLOCK_MARCADORES = load_prompt_block("glosario/marcadores-por-subdimension.md")
+_PROMPT_BLOCK_LEETSPEAK = load_prompt_block("glosario/leetspeak-decoder.md")
+_PROMPT_BLOCK_MITIGADORES = load_prompt_block("glosario/marcadores-mitigadores.md")
+_PROMPT_BLOCK_COOCURRENCIA = load_prompt_block("glosario/referentes-femeninos.md")
+_PROMPT_BLOCK_CAT5 = load_prompt_block("05-categoria-5-sarcasmo-falsos-positivos.md")
 
 if TYPE_CHECKING:
     from src.knowledge_base.feedback_store import FeedbackStore
@@ -271,7 +280,30 @@ class ClassificationResult(BaseModel):
                     response = response[3:]
                 if response.endswith("```"):
                     response = response[:-3]
+
+                # Extract JSON block first to handle LLM output interleaving
+                import re
+
+                json_start = response.find("{")
+                json_end = response.rfind("}") + 1
+                if json_start != -1 and json_end > json_start:
+                    response = response[json_start:json_end]
+
+                # Strip LLM thinking tags (模型输出思考过程)
+
+                response = re.sub(r"<think>[\s\S]*?</think>", "", response)
+                response = re.sub(r"<tool_calls>[\s\S]*?</tool_calls>", "", response)
+                response = re.sub(r"<system-reminder>[\s\S]*?</system-reminder>", "", response)
+                response = re.sub(r"</?[^>]+>", "", response)
                 response = response.strip()
+
+                if not response:
+                    logger.warning("LLM returned empty response")
+                    return cls(
+                        tiene_violencia=False,
+                        severidad_global=Severity.NINGUNA,
+                        clasificaciones=[],
+                    )
 
                 data = json.loads(response)
             else:
@@ -279,8 +311,38 @@ class ClassificationResult(BaseModel):
 
             # --- multi-label preferred path ---
             labels: list[LabelAssignment]
+
+            # Handle VIOLENCIA_COMUN specially - it's an exclusion label, not a category
+            raw_cat = str(data.get("categoria", "")).strip()
+            if raw_cat.upper() == "VIOLENCIA_COMUN":
+                return cls(
+                    tiene_violencia=False,
+                    severidad_global=Severity.NINGUNA,
+                    clasificaciones=[],
+                    exclusion_label="VIOLENCIA_COMUN",
+                    exclusion_codigo=data.get("codigo") or "VIOLENCIA_COMUN_LLM",
+                    exclusion_justificacion=str(
+                        data.get("justificacion") or "Violencia común / sin sesgo de género."
+                    ),
+                )
+
             if isinstance(data.get("clasificaciones"), list):
                 labels = validate_clasificaciones(data["clasificaciones"])
+                # Handle VIOLENCIA_COMUN in clasificaciones - it's an exclusion, not a category
+                violencia_comun_labels = [
+                    lbl for lbl in labels if lbl.categoria == "VIOLENCIA_COMUN"
+                ]
+                if violencia_comun_labels:
+                    return cls(
+                        tiene_violencia=False,
+                        severidad_global=Severity.NINGUNA,
+                        clasificaciones=[],
+                        exclusion_label="VIOLENCIA_COMUN",
+                        exclusion_codigo=violencia_comun_labels[0].regla_disparada
+                        or "VIOLENCIA_COMUN_LLM",
+                        exclusion_justificacion=violencia_comun_labels[0].justificacion
+                        or "Violencia común / sin sesgo de género.",
+                    )
             else:
                 # --- legacy single-label path: wrap in 1-element list ---
                 cat, dim = validate_codigo(data.get("categoria"), data.get("dimension"))
@@ -336,6 +398,14 @@ class ClassificationResult(BaseModel):
             )
 
         except (json.JSONDecodeError, KeyError, TypeError) as e:
+            truncated_response = (
+                response[:500] if isinstance(response, str) and len(response) > 500 else response
+            )
+            logger.warning(
+                "LLM parsing error: %s | Response (truncated): %r",
+                str(e),
+                truncated_response,
+            )
             return cls(
                 tiene_violencia=False,
                 severidad_global=Severity.NINGUNA,
@@ -541,6 +611,11 @@ class RAGClassifier:
 
         tabla_canonica = render_tabla_canonica_prompt()
         escala_severidad = render_severidad_prompt()
+        marcadores_bloque = _PROMPT_BLOCK_MARCADORES
+        leetspeak_bloque = _PROMPT_BLOCK_LEETSPEAK
+        mitigadores_bloque = _PROMPT_BLOCK_MITIGADORES
+        coocurrencia_bloque = _PROMPT_BLOCK_COOCURRENCIA
+        cat5_bloque = _PROMPT_BLOCK_CAT5
 
         prompt = f"""Analizá el siguiente texto y determiná si contiene violencia de género digital según el marco teórico almacenado en la base vectorial ChromaDB (colección "violencia_genero").
 
@@ -559,6 +634,16 @@ FILTRO DE EXCLUSIÓN PRÉVIO (INTENCIÓN PRAGMÁTICA, OBLIGATORIO):
 {escala_severidad}
 
 {tabla_canonica}
+
+{marcadores_bloque}
+
+{leetspeak_bloque}
+
+{mitigadores_bloque}
+
+{coocurrencia_bloque}
+
+{cat5_bloque}
 
 INSTRUCCIONES TAXONÓMICAS (IMPORTANTES):
 - Devolvé una LISTA `clasificaciones` con 1..{self.max_labels} elementos (uno por cada categoría y subdimensión que aplique). NO repitas el mismo par (categoria, dimension).
@@ -652,8 +737,17 @@ SOLO JSON, SIN TEXTO ADICIONAL."""
         these rows so they participate in the missing-values report
         (Regla 1) and statistics (Reglas 2-4).
         """
+        if not text or not text.strip():
+            logger.warning("Empty text received for classification")
+            return ClassificationResult(
+                tiene_violencia=False,
+                severidad_global=Severity.NINGUNA,
+                clasificaciones=[],
+            )
+
         exclusion = evaluar_exclusiones(text)
         if exclusion.excluded:
+            logger.debug("Text excluded by pre-filter: %s", exclusion.etiqueta)
             return ClassificationResult(
                 tiene_violencia=False,
                 severidad_global=Severity.NINGUNA,
@@ -667,11 +761,16 @@ SOLO JSON, SIN TEXTO ADICIONAL."""
         feedback_chunks = self._retrieve_feedback(text)
         prompt = self._build_prompt(text, context_chunks, feedback_chunks)
 
+        logger.debug("Classifying text: %r (len=%d)", text[:100], len(text))
+
         if self.llm_client is None:
             return self._rule_based_classify(text, context_chunks)
 
         try:
             response = await self.llm_client.generate(prompt)
+            logger.debug(
+                "LLM response length: %d, first 200 chars: %r", len(response), response[:200]
+            )
             result = ClassificationResult.from_llm_response(response)
             result.fuente_chunks = context_chunks
             return result

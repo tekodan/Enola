@@ -27,18 +27,25 @@ rows are explicitly excluded from the violence-incidence denominators.
 
 from __future__ import annotations
 
+import logging
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 import pandas as pd
 
-from src.analyzer.category_mapping import CATEGORIAS_ORDENADAS
+from src.analyzer.category_mapping import (
+    CATEGORIAS_ORDENADAS,
+    SUBDIMENSIONES_ORDENADAS,
+)
 from src.analyzer.exclusion_filter import (
     EXCLUSION_BASURA_DIGITAL,
     EXCLUSION_VIOLENCIA_COMUN,
 )
+
+logger = logging.getLogger(__name__)
 
 # ----- shared helpers -----
 
@@ -130,41 +137,55 @@ def compute_frequency_distribution(
     analysis: Sequence[dict],
     *,
     categoria_labels: dict[str, str] | None = None,
+    subdimension_labels: dict[str, str] | None = None,
+    level: Literal["categoria", "subdimension"] = "categoria",
 ) -> FrequencyTable:
     """Calcular la distribución de frecuencias (Paso 2.1 - 2.4).
 
     * Excluye filas ``CODIGO_99`` / ``VIOLENCIA_COMUN`` del denominador
       (porcentaje válido).
     * Soporta multi-label: cada ``LabelAssignment`` cuenta como un voto
-      independiente por categoría.
+      independiente por categoría / subdimensión.
+    * ``level="categoria"`` (default) produce 6 filas; ``level="subdimension"``
+      produce hasta 18 filas ordenadas por jerarquía de categoría padre.
     * Devuelve la tabla con **4 columnas exactas** según el documento:
       Categoría / Frecuencia Absoluta / Porcentaje Válido / Porcentaje
-      Acumulado.
+      Acumulado (la cabecera "Categoría" cambia su sentido según ``level``
+      pero se preservan los nombres de campos).
     """
     counter: Counter[str] = Counter()
-    for cat, _dim in _iter_violence_labels(analysis):
-        counter[cat] += 1
+    if level == "categoria":
+        for cat, _dim in _iter_violence_labels(analysis):
+            counter[cat] += 1
+        universo = CATEGORIAS_ORDENADAS
+    else:
+        for cat, dim in _iter_violence_labels(analysis):
+            if dim and dim != "—":
+                counter[dim] += 1
+        universo = list(SUBDIMENSIONES_ORDENADAS)
 
     total = sum(counter.values())
     n_excluidos = sum(1 for a in analysis if _is_excluded(a))
 
-    counts_per_cat: list[tuple[str, int]] = []
-    for code in CATEGORIAS_ORDENADAS:
-        counts_per_cat.append((code, counter.get(code, 0)))
-    # ensure descending order by frequency (Paso 2.3)
-    counts_per_cat.sort(key=lambda x: -x[1])
-
-    label_map = categoria_labels or {}
+    counts_per_code: list[tuple[str, int]] = [(code, counter.get(code, 0)) for code in universo]
+    # ensure descending order by frequency (Paso 2.3) — preserve zeros at the tail.
+    counts_per_code.sort(key=lambda x: -x[1])
 
     rows: list[FrequencyRow] = []
     acumulado = 0.0
-    for code, n in counts_per_cat:
+    for code, n in counts_per_code:
         pct = (n / total * 100.0) if total > 0 else 0.0
         acumulado += pct
+        if level == "categoria":
+            label_map = categoria_labels or {}
+            label = label_map.get(code, _categoria_label(code))
+        else:
+            label_map = subdimension_labels or {}
+            label = label_map.get(code, code)
         rows.append(
             FrequencyRow(
                 categoria=code,
-                categoria_label=label_map.get(code, _categoria_label(code)),
+                categoria_label=label,
                 frecuencia_absoluta=n,
                 porcentaje_valido=round(pct, 2),
                 porcentaje_acumulado=round(acumulado, 2),
@@ -210,19 +231,31 @@ def compute_mode(
     analysis: Sequence[dict],
     *,
     categoria_labels: dict[str, str] | None = None,
+    subdimension_labels: dict[str, str] | None = None,
+    level: Literal["categoria", "subdimension"] = "categoria",
 ) -> ModeResult:
-    """Calcular la moda de las categorías (Regla 3).
+    """Calcular la moda (Regla 3).
 
-    Maneja bimodalidad (Paso 3.3): si dos o más categorías comparten la
+    Maneja bimodalidad (Paso 3.3): si dos o más códigos comparten la
     frecuencia máxima, devuelve la lista completa y marca
     ``es_multimodal=True``. El texto descriptivo del Paso 3.4 se
     construye a partir de las etiquetas legibles.
+
+    ``level="subdimension"`` opera sobre los 18 códigos numéricos
+    (``"X.Y"``) y produce un texto equivalente con terminología de
+    subdimensión.
     """
     label_map = categoria_labels or {}
+    sub_label_map = subdimension_labels or {}
 
     counter: Counter[str] = Counter()
-    for cat, _dim in _iter_violence_labels(analysis):
-        counter[cat] += 1
+    if level == "categoria":
+        for cat, _dim in _iter_violence_labels(analysis):
+            counter[cat] += 1
+    else:
+        for cat, dim in _iter_violence_labels(analysis):
+            if dim and dim != "—":
+                counter[dim] += 1
 
     if not counter:
         return ModeResult(
@@ -237,27 +270,41 @@ def compute_mode(
     max_freq = max(counter.values())
     modas = sorted(c for c, n in counter.items() if n == max_freq)
 
+    def _lbl(code: str) -> str:
+        if level == "categoria":
+            return label_map.get(code, _categoria_label(code))
+        return sub_label_map.get(code, code)
+
     if len(modas) >= 2:
         cualif = "bimodal" if len(modas) == 2 else "multimodal"
-        nombres = _format_modas(modas, label_map)
+        noun = "subdimensiones" if level == "subdimension" else "categorías"
+        nombres = _format_modas(modas, {m: _lbl(m) for m in modas})
         texto = (
             "Atendiendo a los principios de la estadística descriptiva, la "
             f"distribución de esta extracción es {cualif} con {len(modas)} "
-            f"categorías empatadas en la frecuencia máxima ({max_freq} casos "
+            f"{noun} empatadas en la frecuencia máxima ({max_freq} casos "
             f"cada una): {nombres}. Este empate refleja que múltiples "
             f"tácticas de ciberviolencia de género digital operan con la "
             f"misma intensidad en la presente muestra."
         )
     else:
-        cat = modas[0]
-        nombre = label_map.get(cat, _categoria_label(cat))
-        texto = (
-            "Atendiendo a los principios de la estadística descriptiva, la MODA "
-            f"de esta extracción es la Categoría {nombre}, lo que demuestra "
-            f"empíricamente que este es el patrón o táctica de ciberviolencia de "
-            f"género digital que predomina y rige el discurso de odio en la "
-            f"presente muestra ({max_freq} casos)."
-        )
+        code = modas[0]
+        nombre = _lbl(code)
+        if level == "categoria":
+            texto = (
+                "Atendiendo a los principios de la estadística descriptiva, la MODA "
+                f"de esta extracción es la Categoría {nombre}, lo que demuestra "
+                f"empíricamente que este es el patrón o táctica de ciberviolencia de "
+                f"género digital que predomina y rige el discurso de odio en la "
+                f"presente muestra ({max_freq} casos)."
+            )
+        else:
+            texto = (
+                "Atendiendo a los principios de la estadística descriptiva, la MODA "
+                f"de esta extracción a nivel de subdimensión es {nombre}, lo que "
+                f"demuestra empíricamente que esta variante específica predomina "
+                f"dentro de su categoría padre en la presente muestra ({max_freq} casos)."
+            )
 
     return ModeResult(
         frecuencias=dict(counter),
@@ -377,9 +424,9 @@ def compute_crosstabs(
     label_map = categoria_labels or {}
 
     if dimension == "subdimension":
-        columnas_set: set[str] = set()
         filas_set: set[str] = set()
         cells: Counter[tuple[str, str]] = Counter()
+        n_dropped_missing_dim = 0
         for row in analysis:
             if _is_excluded(row) or row.get("tiene_violencia") != "true":
                 continue
@@ -395,17 +442,31 @@ def compute_crosstabs(
                 ]
             for lbl in label_iter:
                 cat = lbl.get("categoria") or "ninguna"
-                dim = lbl.get("dimension") or "—"
                 if cat == "ninguna":
                     continue
+                dim = lbl.get("dimension")
+                if not dim:
+                    n_dropped_missing_dim += 1
+                    continue
                 filas_set.add(cat)
-                columnas_set.add(dim)
                 cells[(cat, dim)] += 1
 
-        filas = sorted(filas_set, key=lambda c: -sum(cells[(c, d)] for d in columnas_set))
-        columnas = sorted(columnas_set)
-        freqs = [[cells[(f, c)] for c in columnas] for f in filas]
-        col_totals = [sum(freqs[i][j] for i in range(len(filas))) for j in range(len(columnas))]
+        if n_dropped_missing_dim:
+            logger.debug(
+                "compute_crosstabs(subdimension): %d etiqueta(s) sin dimensión descartadas",
+                n_dropped_missing_dim,
+            )
+
+        # Canonical layout: 6 categorías × 18 sub-dimensiones, siempre (el
+        # método "cat × subdim" se documenta como un cruce exógeno cuya
+        # cobertura es completa). Si una celda no recibe votos aparece como
+        # ``0``.
+        filas = list(CATEGORIAS_ORDENADAS)
+        columnas = list(SUBDIMENSIONES_ORDENADAS)
+        freqs = [
+            [cells[(cat, dim)] if cat in filas_set else 0 for dim in columnas] for cat in filas
+        ]
+        col_totals = [sum(row[j] for row in freqs) for j in range(len(columnas))]
         pcts = [
             [
                 (freqs[i][j] / col_totals[j] * 100.0) if col_totals[j] > 0 else 0.0
@@ -469,7 +530,7 @@ def compute_crosstabs(
             post = post_by_id.get(post_id or "")
             date_str = None
             if post:
-                date_str = post.get("date")
+                date_str = post.get("date") or post.get("created_at")
             bucket = _date_bucket(date_str, "%Y-%m")
             for lbl in _iter_labels(row):
                 cat = lbl["categoria"]
@@ -507,6 +568,19 @@ def compute_crosstabs(
     )
 
 
+def _normalizar_dimension_key(dimension_nombre: str) -> str:
+    """Normaliza ``dimension_nombre`` a una clave canónica en minúsculas sin tildes.
+
+    Acepta tanto ``"página"`` como ``"pagina"`` y ``"subdimensión"`` como
+    ``"subdimension"`` para que el mapping de artículos funcione
+    independientemente de cómo lo escriba el call site.
+    """
+    import unicodedata
+
+    nfkd = unicodedata.normalize("NFKD", dimension_nombre or "")
+    return "".join(c for c in nfkd if not unicodedata.combining(c)).lower()
+
+
 def _emitir_alerta_patron(
     filas: Sequence[str],
     columnas: Sequence[str],
@@ -528,14 +602,22 @@ def _emitir_alerta_patron(
 
     pct, fila, col, n = best
     cat_nombre = label_map.get(fila, _categoria_label(fila))
-    texto_col = (
-        f"la subdimensión {col}"
-        if dimension_nombre == "subdimension"
-        else f"el {dimension_nombre} {col}"
+    # Concordancia de género: la página y la subdimensión son femeninos;
+    # el mes (fecha) es masculino. El call site pasa el nombre legible
+    # (``"página"``, ``"fecha"``, ``"subdimension"``) — lo normalizamos
+    # para tolerar variantes con/sin tilde.
+    articulo_por_dim = {
+        "subdimension": "la subdimensión",
+        "pagina": "la página",
+        "fecha": "el mes",
+    }
+    texto_col = articulo_por_dim.get(
+        _normalizar_dimension_key(dimension_nombre),
+        f"el {dimension_nombre}",
     )
     return (
         f"Al ejecutar la tabulación cruzada, el sistema detecta que "
-        f"{texto_col} detona principalmente la categoría de {cat_nombre} "
+        f"{texto_col} {col} detona principalmente la categoría de {cat_nombre} "
         f"({pct:.1f}% de los casos válidos de esa columna, n={n}), "
         f"evidenciando un patrón de comportamiento relacional en la muestra."
     )

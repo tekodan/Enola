@@ -134,16 +134,35 @@ El scraper usa la configuración de config.yaml:
 - Manejo de páginas con contenido dinámico
 
 ## Tests
-- test_unit.py — Tests de modelos Pydantic
-- test_integration.py — Tests de serialización y fixtures
-- test_preprocessor.py — Tests del FacebookPreprocessor
-- test_scraper_preprocessing.py — Tests del flujo scraper + preprocessor
-- test_interactor.py — Tests del CommentInteractor
+- `test_unit.py` — Tests de modelos Pydantic
+- `test_integration.py` — Tests de serialización y fixtures
+- `test_preprocessor.py` — Tests del FacebookPreprocessor
+- `test_scraper_preprocessing.py` — Tests del flujo scraper + preprocessor
+- `test_interactor.py` — Tests del CommentInteractor
+- `test_comment_cleaner.py` — Tests de `clean_comment_text` (backwards-compat shim)
+- `test_text_cleaner.py` — Tests de `src.scraper.text_cleaner` (limpieza centralizada)
+
+## Text Cleaning
+
+Toda la limpieza de texto (números sueltos, "Ver más", "Comentar como",
+URL+spam, anti-scrape obfuscation, prefijos de autor) vive ahora en
+`src/scraper/text_cleaner.py`. Tres funciones públicas:
+
+* `strip_post_noise(text, author="")` — agresiva, para posts.
+* `strip_comment_noise(text, known_author=None)` — liviana, devuelve
+  `(body, time_ago, responses)`.
+* `strip_standalone_numbers(text)` — helper para números sueltos.
+
+Se aplican en TODOS los paths de extracción (LLM + preprocessor +
+reel interactive + modal de comentarios). El script
+`scripts/clean_texts.py` aplica las mismas funciones a los datos ya
+persistidos en SQLite (modo dry-run por defecto, `--apply` para escribir).
 
 ## Estructura de archivos
 - `facebook.py` — Scraper principal
 - `facebook_preprocessor.py` — Preprocesador DOM
 - `comment_interactor.py` — Interacción con modales de comentarios
+- `text_cleaner.py` — Limpieza centralizada de posts / comments
 - `models.py` — Modelos Pydantic
 - `strategies.py` — Estrategias de extracción (Strategy pattern)
 - `mock_facebook.py` — Mock para testing sin Facebook

@@ -162,7 +162,171 @@ def test_main_prints_help_when_no_subcommand(capsys, monkeypatch):
 
 def test_subcommand_func_attribute_set():
     parser = _build_parser()
-    for sub in ("scrape", "analyze", "serve", "status", "report", "all"):
+    for sub in ("scrape", "analyze", "serve", "status", "report", "all", "dedup"):
         args = parser.parse_args([sub])
         assert hasattr(args, "func"), f"{sub} missing 'func' attribute"
         assert callable(args.func), f"{sub} 'func' is not callable"
+
+
+def test_dedup_subcommand_defaults():
+    parser = _build_parser()
+    args = parser.parse_args(["dedup"])
+    assert args.command == "dedup"
+    assert args.apply is False
+    assert args.threshold == 0.95
+    assert args.json is False
+
+
+def test_dedup_subcommand_full_flags():
+    parser = _build_parser()
+    args = parser.parse_args(["dedup", "--apply", "--threshold", "0.85", "--json"])
+    assert args.apply is True
+    assert args.threshold == 0.85
+    assert args.json is True
+
+
+class TestDedupSubcommand:
+    """End-to-end tests for ``tfm dedup`` against an isolated DB."""
+
+    def _seed_db(self, tmp_path: Path):
+        """Create a fresh DB with two duplicate comments + analysis rows.
+
+        The DB lives at ``tmp_path/tfm.db`` so the backup step finds it.
+        """
+        from src.storage import database as db_module
+        from src.storage import get_database
+        from src.storage.models import (
+            AnalysisResultModel,
+            CommentModel,
+            PageModel,
+            PostModel,
+        )
+
+        url = f"sqlite:///{tmp_path / 'tfm.db'}"
+        # Reset module-level singleton so each test gets a fresh DB.
+        db_module._database = None
+        db = get_database(url)
+
+        with db.get_session() as session:
+            session.add(PageModel(id="p1", url="https://facebook.com/page1", title="Test"))
+            session.add(
+                PostModel(
+                    id="post1",
+                    text="body",
+                    author="Page",
+                    page_id="p1",
+                    comments_count=3,
+                )
+            )
+            session.add(
+                CommentModel(
+                    id="c1",
+                    text="Meza Jose Honestidad y respeto e gusta Responder",
+                    author="Meza Jose",
+                    post_id="post1",
+                )
+            )
+            session.add(
+                CommentModel(
+                    id="c2",
+                    text="Meza Jose Honestidad y respeto e gusta Responder",
+                    author="Meza Jose",
+                    post_id="post1",
+                )
+            )
+            session.add(
+                CommentModel(
+                    id="c3",
+                    text="Otro comentario completamente distinto",
+                    author="Otro Autor",
+                    post_id="post1",
+                )
+            )
+            session.add(
+                AnalysisResultModel(
+                    content_type="comment",
+                    content_id="c1",
+                    comment_id="c1",
+                    categoria="ninguna",
+                )
+            )
+            session.add(
+                AnalysisResultModel(
+                    content_type="comment",
+                    content_id="c2",
+                    comment_id="c2",
+                    categoria="ninguna",
+                )
+            )
+
+        return db
+
+    def test_dry_run_prints_plan_without_modifying(self, tmp_path: Path, monkeypatch, capsys):
+        import src.cli.__main__ as cli_main
+
+        db = self._seed_db(tmp_path)
+        monkeypatch.setattr(cli_main, "_db", lambda: db)
+        monkeypatch.setattr(cli_main, "_db_url", lambda: f"sqlite:///{tmp_path / 'tfm.db'}")
+
+        cli_main.cmd_dedup(argparse.Namespace(threshold=0.95, apply=False, json=False))
+
+        captured = capsys.readouterr().out
+        assert "DEDUP" in captured
+        assert "Grupos:" in captured
+        assert "c2" in captured  # The dup id is named in the plan
+        assert "dry-run" in captured
+
+        # No rows deleted.
+        with db.get_session() as session:
+            from src.storage.models import CommentModel
+
+            assert session.query(CommentModel).count() == 3
+
+    def test_apply_deletes_duplicates_and_repoints_fks(self, tmp_path: Path, monkeypatch, capsys):
+        import src.cli.__main__ as cli_main
+
+        db = self._seed_db(tmp_path)
+        monkeypatch.setattr(cli_main, "_db", lambda: db)
+        monkeypatch.setattr(cli_main, "_db_url", lambda: f"sqlite:///{tmp_path / 'tfm.db'}")
+
+        cli_main.cmd_dedup(argparse.Namespace(threshold=0.95, apply=True, json=False))
+
+        captured = capsys.readouterr().out
+        assert "Aplicado" in captured
+        assert "Backup creado" in captured
+
+        from src.storage.models import AnalysisResultModel, CommentModel
+
+        with db.get_session() as session:
+            assert session.query(CommentModel).count() == 2
+            # Both analysis rows now point at the surviving comment.
+            fks = {row.comment_id for row in session.query(AnalysisResultModel).all()}
+            assert len(fks) == 1
+            assert "c1" in fks  # c1 was the canonical (same length, lower id)
+
+        # Backup file was created next to the original.
+        backups = list(tmp_path.glob("tfm.db.bak-*.db"))
+        assert len(backups) == 1
+        assert backups[0].stat().st_size > 0
+
+    def test_json_output_is_valid_json(self, tmp_path: Path, monkeypatch, capsys):
+        import json
+
+        import src.cli.__main__ as cli_main
+
+        db = self._seed_db(tmp_path)
+        monkeypatch.setattr(cli_main, "_db", lambda: db)
+        monkeypatch.setattr(cli_main, "_db_url", lambda: f"sqlite:///{tmp_path / 'tfm.db'}")
+
+        cli_main.cmd_dedup(argparse.Namespace(threshold=0.95, apply=False, json=True))
+
+        captured = capsys.readouterr().out
+        payload = json.loads(captured)
+        assert payload["groups"] == 1
+        assert payload["duplicates_to_delete"] == 1
+        # Only the analysis row pointing to c2 (the duplicate) needs
+        # to be re-pointed; the row pointing to c1 (the canonical)
+        # stays as-is.
+        assert payload["fks_to_repoint"] == 1
+        assert payload["apply"] is False
+        assert payload["groups_detail"][0]["duplicate_ids"] == ["c2"]

@@ -542,7 +542,7 @@ def render_inspector(analysis: list[dict], posts: list[dict], comments: list[dic
     col_a, col_b, col_c, col_d = st.columns(4)
     col_a.metric("Violencia", f"{tiene_emoji} {tiene}")
     col_b.metric("Categoría (primaria)", label_for(cat))
-    col_c.metric("Dimensión (primaria)", dim)
+    col_c.metric("Subdimensión (primaria)", dim)
     col_d.metric("Severidad global", f"{sev_emoji} {sev}")
 
     if labels:

@@ -28,6 +28,11 @@ pytest
 # Single module or file
 pytest src/analyzer/
 pytest src/analyzer/test_unit.py
+
+# Clean text of already-persisted posts / comments (dry-run by default)
+python scripts/clean_texts.py --dry-run      # preview only
+python scripts/clean_texts.py --target all --apply  # write changes
+python scripts/clean_texts.py --db-path data/otra.db --target comments --apply
 ```
 
 ## Test Layout
@@ -77,27 +82,68 @@ from src.analyzer import RAGClassifier, ClassificationResult
 - **Line length**: 100 chars (ruff, black, isort). Target Python: 3.12.
 - **pytest addopts**: `-v --tb=short --cov=src --cov-report=term-missing` — coverage runs automatically.
 - **ruff select**: `["E", "F", "I", "N", "W", "UP"]` — import sorting (`I`) included in lint step.
+- **Pinned deps**: `passlib>=1.7.4,<2.0` + `bcrypt>=4.0.0,<4.1`. Newer `bcrypt 5.x` is incompatible with `passlib 1.7.4` (see `pyproject.toml`).
 
 ## Human-in-the-loop feedback
 
-The validation tab in `app.py` (`✅ Validación`) lets a reviewer agree or
-disagree with each RAG analysis. The corrections flow through two stores:
+The validation UI lives in the **NiceGUI dashboard** at `/validacion`
+(`src/ui/nicegui_app/pages/validacion.py`). The legacy Streamlit tab
+in `app.py` is **deprecated** and now shows a redirect banner unless
+`ENOLA_SHOW_DEPRECATED_TAB=true`.
 
-- **SQLite** (`analysis_feedback` table) — single source of truth for the
-  reviewer's verdict, free-text reason and override fields
-  (`categoria` / `dimension` / `justificacion`). Upsert by
+### Login & roles
+
+- **`users` table** in SQLite (`src/storage/models/user.py`) — bcrypt
+  password hashes via `passlib`. Roles: `admin` (puede crear/bloquear
+  usuarios vía CLI) y `reviewer` (sólo valida).
+- **Sesión**: `app.storage.user["current"]`, sólo navegador (sin
+  cookie persistente). Close la pestaña → logout automático.
+- **Bootstrap admin**: lee `ENOLA_ADMIN_USERNAME` + `ENOLA_ADMIN_PASSWORD`
+  del entorno en `__main__.py`. Idempotente.
+- **CLI**: `python -m src.cli users add|list|set-active|set-role|set-password`
+  para gestión. Si no pasás `--password`, lo pide por stdin (oculto) o
+  genera uno aleatorio y lo imprime una sola vez.
+
+### Reviews flow
+
+The validation page lets a reviewer agree or disagree with each RAG
+analysis. The corrections flow through two stores:
+
+- **SQLite** (`analysis_feedback` table) — single source of truth for
+  the reviewer's verdict, free-text reason and override fields. The
+  row carries `reviewer_user_id` (FK to `users.id`) and
+  `reviewer_username` (denormalized for quick listing). Upsert by
   `analysis_result_id`.
 - **ChromaDB** (`feedback_corrections` collection) — only the
-  *disagreements with corrections* are pushed here. `RAGClassifier`
-  retrieves the top-3 relevant corrections per call and injects them
-  into the prompt as `[VALIDADO POR HUMANO]` few-shots, so the LLM
-  re-trains implicitly on each batch run.
+  *disagreements with corrections* are pushed here. Each doc carries
+  metadata `user_id`, `added_by_username`, `added_at` for full
+  traceability. `RAGClassifier` retrieves the top-3 relevant
+  corrections per call and injects them into the prompt as
+  `[VALIDADO POR HUMANO]` few-shots, so the LLM re-trains implicitly on
+  each batch run.
 
-The **landing** page (`src/ui/landing.py`) shows the *adjusted* report:
-KPIs and charts are computed from `build_adjusted_analysis(...)` which
-overlays the latest feedback on top of the raw `analysis_results`. The
-sub-section in the "Reportes" tab of `app.py` keeps the raw view for
-debugging and exports a CSV/JSON of all reviewed rows.
+### Validación UI (`/validacion`)
+
+- **KPIs header**: pendientes, total revisiones, acuerdo, corregidas,
+  indexadas en ChromaDB.
+- **Panel ChromaDB** (expander): botón "🚀 Indexar pendientes".
+- **Filtros**: tipo (post/comment/all), estado (todos/pendientes/
+  acuerdo/corregidos), sólo violentos.
+- **Formulario multi-etiqueta** (hasta `MAX_LABELS = 5`):
+  categoria / dimensión / severidad / FPP / justificación / evidencia.
+  Validación cruzada: cada `(categoria, dimension)` debe ser válido.
+- **Dos CTAs**: `💾 Guardar` (SQLite sólo) y
+  `💾+🔎 Guardar e indexar` (SQLite + ChromaDB con metadata user).
+- **Auditoría**: cada feedback lleva `reviewer_user_id` +
+  `reviewer_username`. La metadata de ChromaDB incluye
+  `added_by_username`.
+
+The **landing** page (`src/ui/landing.py` / NiceGUI `/inicio`) shows
+the *adjusted* report: KPIs and charts are computed from
+`build_adjusted_analysis(...)` which overlays the latest feedback on
+top of the raw `analysis_results`. The legacy Streamlit "Reportes"
+tab keeps the raw view for debugging and exports a CSV/JSON of all
+reviewed rows.
 
 ## Multi-label classification (multi-categoría)
 
@@ -120,7 +166,7 @@ justificación, evidencia, marcadores, etc.). The architecture is:
 - **Feedback**: same pattern — `analysis_feedback_labels` side table
   carries the reviewer's overrides; flat `corrected_*` columns mirror
   the primary override.
-- **UI**: validation tab (`app.py:786`) renders a dynamic list of
+- **UI**: validation tab (`/validacion` in NiceGUI) renders a dynamic list of
   per-label rows (categoria, dimensión, severidad, justificación,
   evidencia, FPP), with `+ Agregar etiqueta` / `➖ Quitar` buttons
   capped at `MAX_LABELS = 5`. The Inspector (`landing.py`) and
@@ -148,12 +194,32 @@ DE VIOLENCIA COMÚN``.
 
 - **Pre-filter (``src/analyzer/exclusion_filter.py``)** — runs FIRST in
   `RAGClassifier.classify()`, before the LLM and ChromaDB lookups. Detects
-  basura digital (CÓDIGO 99) under three conditions: empty/NaN payload,
-  orphan hyperlink, typographic noise (punctuation/emojis/repeated
-  chars with no lexical structure). The violencia-común heuristic is
-  exposed for the rule-based fallback path but the primary
-  discrimination lives in the LLM prompt (instructions block at the
-  start of `classify()`).
+  basura digital (CÓDIGO 99) under **five** conditions: **(1)** empty/NaN
+  payload (incl. stickers/GIFs/imágenes sin texto), **(2)** orphan
+  hyperlink, **(3)** typographic noise (punctuation/emojis/repeated
+  chars with no lexical structure), **(4)** pure laughter
+  (``jajaja``/``jeje``/``haha``/``rsrs``/``lol``/``xd`` —
+  ``COND_4_SOLO_RISA``), **(5)** short reactions, muletillas o
+  monosílabos sueltos (``ok``/``si``/``no``/``ya``/``dale``/``je``/
+  ``ah``/``se``/``pues``/``que``/``qué``/``quiza``/``tal``/``como``/
+  ``donde``/``cuando``/``también``/``tampoco``/``vale``/``venga``/
+  ``ahí``/``aquí``/``allá``/``acá``/``a ver``/``q``/``k`` —
+  ``COND_5_REACCION_CORTA``). Patterns for COND_4/COND_5 are loaded
+  from
+  ``knowledge/categorias-violencia-genero-digital/glosario/patrones-basura-digital.md``
+  via ``_load_basura_digital_patterns()`` (same design as the gender
+  /aggression glosarios). The violencia-común heuristic is exposed
+  for the rule-based fallback path but the primary discrimination
+  lives in the LLM prompt (instructions block at the start of
+  `classify()`).
+- **Exclusión documentada en la taxonomía** — Las pseudo-categorías
+  pre-clasificatorias (``EXC_BASURA_DIGITAL``, ``EXC_VIOLENCIA_COMUN``)
+  viven ahora en una sección aparte ``categorias_exclusion`` del
+  frontmatter de ``knowledge/taxonomia/TAXONOMIA.md`` (no cuentan
+  para el invariante de 6 categorías operativas). ``Taxonomy.exclusion_codes()``
+  devuelve el mapeo ``EXC_*`` → ``CODIGO_*`` y
+  ``canonical_exclusion_labels()`` el ``frozenset`` de códigos. El
+  modelo Pydantic es ``src.analyzer.taxonomy_loader.ExclusionCategoriaMD``.
 - **Schema** — `analysis_results` gained three columns via
   `database.py:_migrate_schema()`: `exclusion_label` (`CODIGO_99` |
   `VIOLENCIA_COMUN` | NULL), `exclusion_codigo` (e.g. `COND_2_ENLACE_HUERFANO`),

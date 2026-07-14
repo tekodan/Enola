@@ -19,6 +19,8 @@ from src.analyzer.rag_classifier import RAGClassifier
 from src.config.settings import get_settings
 from src.knowledge_base.feedback_store import get_feedback_store
 from src.knowledge_base.vector_store import get_vector_store
+from src.scraper.comment_interactor import clean_comment_text
+from src.scraper.facebook_preprocessor import FacebookPreprocessor
 from src.storage.database import Database
 
 logger = logging.getLogger(__name__)
@@ -152,8 +154,10 @@ class BatchAnalyzer:
         for item in items:
             try:
                 text = item.get("text", "")
+                author = item.get("author", "Unknown")
+                clean_text = FacebookPreprocessor._clean_post_text(text, author)
 
-                result = self.classifier.classify_sync(text)
+                result = self.classifier.classify_sync(clean_text)
 
                 self.database.save_or_update_analysis_result(
                     {
@@ -202,14 +206,24 @@ class BatchAnalyzer:
             posts = self.database.get_posts(limit=10_000)
             for p in posts:
                 items.extend(self.database.get_comments(p["id"], limit=100))
+            # Also process orphan comments (whose post_id doesn't exist in posts table)
+            orphan_comments = self.database.get_orphan_comments()
+            items.extend(orphan_comments)
+            logger.info(
+                "Processing %d regular + %d orphan comments",
+                len(items) - len(orphan_comments),
+                len(orphan_comments),
+            )
         else:
             items = self.database.get_unanalyzed_comments()
 
         for item in items:
             try:
-                text = item.get("text", "")
+                raw_text = item.get("text", "")
+                author = item.get("author", "")
+                clean_text, _, _ = clean_comment_text(raw_text, known_author=author or None)
 
-                result = self.classifier.classify_sync(text)
+                result = self.classifier.classify_sync(clean_text)
 
                 self.database.save_or_update_analysis_result(
                     {

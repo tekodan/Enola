@@ -84,6 +84,31 @@ class TestCleanCommentText:
         assert time_ago == "5 días"
         assert responses == 10
 
+    def test_strips_standalone_numbers_in_body(self):
+        """Bare digit tokens inside the body are removed; metadata still parsed."""
+        raw = "Juan Pérez Tengo 5 hijos y trabajo 10 horas al día 12 min Me gusta Responder 3"
+        clean, time_ago, responses = clean_comment_text(raw, known_author="Juan Pérez")
+        # Bare digits are gone from the body, time_ago / responses remain.
+        assert "5" not in clean.split("horas")[0] if "horas" in clean else "5" not in clean
+        assert "10" not in clean
+        assert time_ago == "12 min"
+        assert responses == 3
+
+    def test_strips_ver_mas_comentarios_inside_body(self):
+        """``Ver más comentarios`` button form is removed from the body."""
+        raw = "Juan Pérez Hola Ver más comentarios 22 min Me gusta Responder 5"
+        clean, _, _ = clean_comment_text(raw, known_author="Juan Pérez")
+        assert "Ver más comentarios" not in clean
+        assert "Hola" in clean
+
+    def test_body_equals_author_yields_empty(self):
+        """When the body after trailing UI equals the author, result is empty."""
+        raw = "Manuel Lazo 12 h Me gusta Responder"
+        clean, time_ago, responses = clean_comment_text(raw, known_author="Manuel Lazo")
+        assert clean == ""
+        assert time_ago == "12 h"
+        assert responses == 0
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

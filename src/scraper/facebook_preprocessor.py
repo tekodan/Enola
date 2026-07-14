@@ -17,6 +17,8 @@ from typing import Any
 
 from bs4 import BeautifulSoup, Tag
 
+from src.scraper.text_cleaner import strip_post_noise
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -623,7 +625,7 @@ class FacebookPreprocessor:
         )
 
         # Clean text
-        clean_text = FacebookPreprocessor._clean_post_text(full_text, author)
+        clean_text = strip_post_noise(full_text, author=author)
 
         return {
             "text": clean_text,
@@ -680,35 +682,14 @@ class FacebookPreprocessor:
 
     @staticmethod
     def _clean_post_text(full_text: str, author: str) -> str:
-        """Clean Facebook post text by removing noise."""
-        clean_text = full_text
+        """Clean Facebook post text by removing noise.
 
-        # Remove leading "Facebook" repetitions (navigation noise)
-        clean_text = re.sub(r"^(Facebook\s*){2,}", "", clean_text)
-
-        # Remove anti-scraping obfuscation (single chars separated by spaces)
-        # Threshold at 10 to avoid destroying legitimate text
-        clean_text = re.sub(r"(?:\s+[a-zA-Z0-9]\s*){10,}", " ", clean_text)
-
-        # Remove "Compartido con: Público" marker
-        clean_text = re.sub(r"\s*Compartido con:\s*P[úu]blico\s*", " ", clean_text)
-
-        # Remove author name at the start (we already have it)
-        if author != "Unknown":
-            clean_text = re.sub(r"^" + re.escape(author) + r"\s*", "", clean_text)
-
-        # Remove duplicate consecutive short words (< 6 chars)
-        words = clean_text.split()
-        deduped_words: list[str] = []
-        for word in words:
-            if not deduped_words or deduped_words[-1] != word or len(word) > 5:
-                deduped_words.append(word)
-        clean_text = " ".join(deduped_words)
-
-        # Collapse whitespace
-        clean_text = re.sub(r"\s+", " ", clean_text).strip()
-
-        return clean_text
+        Thin wrapper kept for backwards compatibility — the actual
+        cleaning lives in :func:`src.scraper.text_cleaner.strip_post_noise`
+        so the same rules apply at scrape time and in the bulk cleaning
+        script (``scripts/clean_texts.py``).
+        """
+        return strip_post_noise(full_text, author=author)
 
     @staticmethod
     def _extract_number(text: str, patterns: list[str]) -> int:

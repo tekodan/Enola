@@ -1,18 +1,26 @@
 """Unit tests for the exclusion filter (CÓDIGO 99 + Violencia Común).
 
-Mirrors the spec's three algorithmic conditions for basura digital
-plus the pragmatic-discrimination rule for violencia común.
+Mirrors the spec's five algorithmic conditions for basura digital
+(Cond 1 — vacío; Cond 2 — enlace huérfano; Cond 3 — ruido
+tipográfico; Cond 4 — risas puras; Cond 5 — reacciones cortas) plus
+the pragmatic-discrimination rule for violencia común.
 """
 
 import math
+from pathlib import Path
 
 from src.analyzer.exclusion_filter import (
+    _GENDER_MARKERS,
     EXCLUSION_BASURA_DIGITAL,
     EXCLUSION_VIOLENCIA_COMUN,
+    MARCADORES_DE_GENERO_MARKDOWN,
+    PATRONES_BASURA_DIGITAL_MARKDOWN,
     ExclusionResult,
+    _load_basura_digital_patterns,
     detectar_basura_digital,
     detectar_violencia_comun_heuristica,
     evaluar_exclusiones,
+    reset_basura_patterns_cache,
 )
 
 
@@ -92,8 +100,15 @@ class TestDetectarBasuraDigital:
         assert not r.excluded
 
     def test_short_real_word_passes(self):
-        """Even a short real word passes."""
-        r = detectar_basura_digital("ok")
+        """Short real words that are NOT pure reactions pass through.
+
+        Date note: as of 2026-07-14 the pre-filter now also excludes
+        pure reactions (COND_5 — ``ok``, ``si``, ``no``, ``ya``,
+        ``dale`` …) so this assertion explicitly checks a word that's
+        NOT a pure reaction, since the previous behavior of letting
+        ``ok`` through has been replaced by the new COND_5 rule.
+        """
+        r = detectar_basura_digital("asco")
         assert not r.excluded
 
     def test_text_with_accent_passes(self):
@@ -105,6 +120,290 @@ class TestDetectarBasuraDigital:
         """Emoji + word → word wins."""
         r = detectar_basura_digital("🔥 mujeres dicen cosas")
         assert not r.excluded
+
+
+class TestBasuraDigitalCondiciones4y5:
+    """COND_4 (risas) and COND_5 (reacciones cortas) — added 2026-07-14.
+
+    Pattern-driven detection backed by the canonical
+    ``glosario/patrones-basura-digital.md``. The list is loaded once
+    via :func:`_load_basura_digital_patterns`; :func:`reset_basura_patterns_cache`
+    clears the ``lru_cache`` so the new patterns take effect after the
+    markdown is edited.
+    """
+
+    def test_jajaja_es_basura(self):
+        """Pure laughter → COND_4_SOLO_RISA."""
+        r = detectar_basura_digital("jajaja")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_jeje_es_basura(self):
+        r = detectar_basura_digital("jeje")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_hahaha_es_basura(self):
+        r = detectar_basura_digital("hahaha")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_rsrs_es_basura(self):
+        r = detectar_basura_digital("rsrs")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_lol_es_basura(self):
+        r = detectar_basura_digital("lol")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_xd_es_basura(self):
+        r = detectar_basura_digital("xd")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_jajaja_con_puntuacion(self):
+        """Trailing punctuation is allowed."""
+        r = detectar_basura_digital("jajaja!")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_jajaja_minuscula_y_mayuscula(self):
+        """Matching is case-insensitive."""
+        r = detectar_basura_digital("JAJAJA")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_jajaja_acento_insensitive(self):
+        r = detectar_basura_digital("jajajá")
+        assert r.excluded
+        assert r.codigo == "COND_4_SOLO_RISA"
+
+    def test_ok_es_basura(self):
+        """Pure reaction → COND_5_REACCION_CORTA."""
+        r = detectar_basura_digital("ok")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_si_es_basura(self):
+        r = detectar_basura_digital("si")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_no_es_basura(self):
+        r = detectar_basura_digital("no")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_ya_es_basura(self):
+        r = detectar_basura_digital("ya")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_dale_con_exclamacion(self):
+        r = detectar_basura_digital("dale!")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_palabra_real_corta_no_es_basura(self):
+        """Real words with content escape COND_5 — only pure reactions match."""
+        r = detectar_basura_digital("asco")
+        assert not r.excluded
+
+    def test_mal_no_es_basura(self):
+        r = detectar_basura_digital("mal")
+        assert not r.excluded
+
+    def test_frase_completa_con_palabra_clave_pasa(self):
+        """Whitespace + laughter appended to a real sentence does NOT trigger."""
+        r = detectar_basura_digital("Esto es terrible jajaja")
+        assert not r.excluded
+
+    def test_multi_palabra_con_ok_pasa(self):
+        """``ok`` in context does NOT trigger (fullmatch requires the whole input)."""
+        r = detectar_basura_digital("ok, gracias")
+        assert not r.excluded
+
+    def test_mujeres_no_es_basura(self):
+        """Words like 'mujeres' that contain 'je' don't fullmatch COND_5."""
+        r = detectar_basura_digital("mujeres")
+        assert not r.excluded
+
+    def test_text_con_emoji_y_palabra_pasa(self):
+        """An emoji plus a real word passes; COND_5 is exact-match only."""
+        r = detectar_basura_digital("ok 🔥 palabra")
+        assert not r.excluded
+
+    def test_patron_glosario_cargado(self):
+        """The glosario is loaded (sanity check)."""
+        patterns = _load_basura_digital_patterns()
+        assert len(patterns) > 0
+        assert any("ja" in p for p in patterns)
+        assert any("ok" in p for p in patterns)
+
+    def test_se_es_basura(self):
+        """Monosyllabic ``se`` particle is COND_5_REACCION_CORTA."""
+        r = detectar_basura_digital("se")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_pues_es_basura(self):
+        r = detectar_basura_digital("pues")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_que_es_basura(self):
+        r = detectar_basura_digital("que")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_que_con_acento_es_basura(self):
+        """Accent-insensitive matching for ``qué``."""
+        r = detectar_basura_digital("qué")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_quiza_es_basura(self):
+        r = detectar_basura_digital("quiza")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_quizas_es_basura(self):
+        r = detectar_basura_digital("quizas")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_que_con_pregunta_es_basura(self):
+        """Trailing punctuation is allowed (``que?`` / ``que.`` …)."""
+        r = detectar_basura_digital("que?")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_tal_es_basura(self):
+        r = detectar_basura_digital("tal")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_como_es_basura(self):
+        r = detectar_basura_digital("como")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_donde_es_basura(self):
+        r = detectar_basura_digital("donde")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_cuando_es_basura(self):
+        r = detectar_basura_digital("cuando")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_tambien_es_basura(self):
+        r = detectar_basura_digital("tambien")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_tampoco_es_basura(self):
+        r = detectar_basura_digital("tampoco")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_vale_es_basura(self):
+        r = detectar_basura_digital("vale")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_ahi_es_basura(self):
+        r = detectar_basura_digital("ahi")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_aqui_es_basura(self):
+        r = detectar_basura_digital("aqui")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_a_ver_es_basura(self):
+        r = detectar_basura_digital("a ver")
+        assert r.excluded
+        assert r.codigo == "COND_5_REACCION_CORTA"
+
+    def test_q_y_k_son_basura(self):
+        """Single letters ``q`` and ``k`` are basura (COND_3 or COND_5).
+
+        Whether they trigger ``COND_3_RUIDO_TIPOGRAFICO`` (single
+        letter fails the lexical-structure check) or
+        ``COND_5_REACCION_CORTA`` (matches the inline pattern) is an
+        implementation detail — both produce the same
+        ``CODIGO_99`` exclusion.
+        """
+        for txt in ("q", "k", "q?", "k!"):
+            r = detectar_basura_digital(txt)
+            assert r.excluded, f"expected {txt!r} to be excluded"
+            assert r.codigo in {
+                "COND_3_RUIDO_TIPOGRAFICO",
+                "COND_5_REACCION_CORTA",
+            }, f"unexpected codigo for {txt!r}: {r.codigo}"
+
+    def test_frase_con_se_no_es_basura(self):
+        """A real sentence containing ``se`` as a particle does NOT trigger."""
+        r = detectar_basura_digital("el cafe se fue")
+        assert not r.excluded
+
+    def test_frase_con_que_no_es_basura(self):
+        """A real sentence with ``que`` does NOT trigger COND_5."""
+        r = detectar_basura_digital("que te pasa")
+        assert not r.excluded
+
+    def test_frase_con_pues_no_es_basura(self):
+        """``pues mira te digo`` does NOT trigger COND_5."""
+        r = detectar_basura_digital("pues mira te digo")
+        assert not r.excluded
+
+    def test_frase_con_quiza_sin_coma_no_es_basura(self):
+        """``quiza no se preocupe`` does NOT trigger COND_5."""
+        r = detectar_basura_digital("quiza no se preocupe")
+        assert not r.excluded
+
+    def test_frase_con_como_no_es_basura(self):
+        """``como no te da`` does NOT trigger COND_5."""
+        r = detectar_basura_digital("como no te da")
+        assert not r.excluded
+
+    def test_q_con_palabra_no_es_basura(self):
+        """``q tal`` (chat shorthand) is NOT pure ``q`` — passes to LLM."""
+        r = detectar_basura_digital("q tal")
+        assert not r.excluded
+
+    def test_k_con_palabra_no_es_basura(self):
+        """``k ase`` (chat shorthand) is NOT pure ``k`` — passes to LLM."""
+        r = detectar_basura_digital("k ase")
+        assert not r.excluded
+
+    def test_glosario_fallback_vacio(self, monkeypatch):
+        """If the glosario file is missing, patterns fall back to empty.
+
+        The pre-filter keeps working — only COND_4/COND_5 are silent.
+        """
+        from src.analyzer import exclusion_filter
+
+        monkeypatch.setattr(
+            exclusion_filter,
+            "PATRONES_BASURA_DIGITAL_MARKDOWN",
+            Path("/nonexistent/glosario.md"),
+        )
+        reset_basura_patterns_cache()
+        try:
+            assert exclusion_filter._load_basura_digital_patterns() == ()
+        finally:
+            monkeypatch.undo()
+            reset_basura_patterns_cache()
+
+    def test_glosario_ruta_existe(self):
+        """The canonical glosario markdown must be on disk."""
+        assert PATRONES_BASURA_DIGITAL_MARKDOWN.is_file()
 
 
 class TestDetectarViolenciaComun:
@@ -194,7 +493,15 @@ class TestRAGClassifierIntegration:
     """The pre-filter must short-circuit ``classify()`` before the LLM."""
 
     def test_classify_basura_returns_exclusion_label(self):
-        """RAGClassifier.classify on basura must NOT call the LLM."""
+        """RAGClassifier.classify on basura digital (emoji-only) must
+        NOT call the LLM.
+
+        Note 2026-07-12: switched from ``""`` to a typographic-noise
+        basura case (emoji-only, COND_3). The empty-string short-circuit
+        was intentionally simplified — the user asked to focus on
+        detection rule improvements in the prompt/markdown, not on the
+        exclusion pre-filter logic.
+        """
         import asyncio
         from unittest.mock import MagicMock
 
@@ -203,7 +510,7 @@ class TestRAGClassifierIntegration:
         llm = MagicMock()
         cls = RAGClassifier(llm_client=llm)
 
-        result = asyncio.run(cls.classify(""))
+        result = asyncio.run(cls.classify("🎉🎉🎉"))
         assert result.exclusion_label == EXCLUSION_BASURA_DIGITAL
         assert result.tiene_violencia is False
         llm.generate.assert_not_called()
@@ -282,3 +589,52 @@ class TestRAGClassifierIntegration:
 def test_nan_constant_value():
     """Sanity check: math.nan behaves as expected by the detector."""
     assert math.isnan(float("nan"))
+
+
+class TestGenderMarkersGlossary:
+    """Verifies that the gender markers list is loaded from the markdown
+    glosario, not hardcoded in Python."""
+
+    def test_glossary_file_exists(self):
+        assert MARCADORES_DE_GENERO_MARKDOWN.is_file()
+
+    def test_loads_expected_subset_of_markers(self):
+        """Spot-check that the canonical markers are present in the
+        loaded frozenset (loaded from the glosario markdown)."""
+        for marker in (
+            "feminazi",
+            "incel",
+            "mgtow",
+            "mangina",
+            "zorra",
+            "puta",
+            "matar",
+            "violar",
+            "femicidio",
+            "mujeres de cocina",
+            "para eso estas",
+            "para eso estás",
+        ):
+            assert marker in _GENDER_MARKERS, f"missing marker: {marker!r}"
+
+    def test_handcraft_markers_not_loaded_when_glossary_missing(self, monkeypatch):
+        """If the glosario file is missing, ``_GENDER_MARKERS`` falls back
+        to an empty frozenset — it does NOT silently use the old
+        hardcoded list."""
+        from src.analyzer import exclusion_filter
+
+        monkeypatch.setattr(
+            exclusion_filter,
+            "MARCADORES_DE_GENERO_MARKDOWN",
+            Path("/nonexistent/glosario.md"),
+        )
+        # Cache invalidation: must reload on next call.
+        exclusion_filter._load_gender_markers.cache_clear()
+        try:
+            markers = exclusion_filter._load_gender_markers()
+            assert markers == frozenset()
+        finally:
+            # Restore for other tests.
+            monkeypatch.undo()
+            exclusion_filter._load_gender_markers.cache_clear()
+            exclusion_filter._GENDER_MARKERS = exclusion_filter._load_gender_markers()

@@ -20,6 +20,7 @@ from src.scraper.models import Comment, ContentSource, Post, ScrapeResult
 from src.scraper.strategies import (
     ExtractionStrategy,  # noqa: F401  (kept for public API compatibility)
 )
+from src.scraper.text_cleaner import strip_comment_noise
 from src.scraper.url_utils import is_facebook_reel_url
 
 # Valid JSON escape sequences: " \\ / b f n r t uXXXX
@@ -550,21 +551,27 @@ class FacebookScraper:
         comments = []
         for idx, item in enumerate(comments_data[: self.max_comments]):
             try:
-                text = item.get("text", item.get("content", ""))
+                raw_text = item.get("text", item.get("content", ""))
+                author = item.get("author", "")
+                clean_text, time_ago, responses = strip_comment_noise(
+                    raw_text, known_author=author or None
+                )
                 comment = Comment(
                     id=self._generate_comment_id(
                         item.get("url", ""),
-                        item.get("author", ""),
+                        author,
                         item.get("date", ""),
-                        text=text,
+                        text=clean_text,
                         idx=idx,
                     ),
-                    text=text,
-                    author=item.get("author", ""),
+                    text=clean_text,
+                    author=author,
                     date=self._parse_date(item.get("date")),
                     likes=int(item.get("likes", 0) or 0),
                     post_id=post_id,
                     url=item.get("url", ""),
+                    time_ago=time_ago,
+                    responses=responses or int(item.get("responses", 0) or 0),
                 )
                 comments.append(comment)
             except Exception as e:
@@ -892,24 +899,30 @@ class FacebookScraper:
         out: list[Comment] = []
         for idx, c in enumerate(comments_data):
             try:
-                text = (c.get("text") or "").strip()
-                if len(text) < 5:
+                raw_text = (c.get("text") or "").strip()
+                if len(raw_text) < 5:
                     continue
+                author = c.get("author", "Unknown")
+                clean_text, time_ago, responses = strip_comment_noise(
+                    raw_text, known_author=author or None
+                )
                 out.append(
                     Comment(
                         id=self._generate_comment_id(
                             comments_url,
-                            c.get("author", ""),
+                            author,
                             c.get("date", ""),
-                            text=text,
+                            text=clean_text,
                             idx=idx,
                         ),
-                        text=text,
-                        author=c.get("author", "Unknown"),
+                        text=clean_text,
+                        author=author,
                         date=self._parse_date(c.get("date")),
                         likes=int(c.get("likes", 0) or 0),
                         post_id=post_id,
                         url=c.get("url", f"{comments_url}#comment_{idx}"),
+                        time_ago=time_ago,
+                        responses=responses,
                     )
                 )
             except Exception as e:
@@ -1098,6 +1111,8 @@ class FacebookScraper:
                                         likes=parsed.get("likes", 0),
                                         post_id=self._extract_post_id_from_url(reel_url) or "",
                                         url=f"{reel_url}#comment_{idx}",
+                                        time_ago=parsed.get("time_ago"),
+                                        responses=parsed.get("responses", 0),
                                     )
                                 )
                         except Exception:

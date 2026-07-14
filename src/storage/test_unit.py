@@ -251,7 +251,13 @@ class TestCommentOperations:
         assert result is True
 
     def test_save_comments_batch(self, db, sample_comment):
-        """Test saving comments in batch."""
+        """Test saving comments in batch (with in-batch dedup).
+
+        10 comments with the same text + author + post collapse to
+        one row — the survivor is chosen by ``pick_canonical``. The
+        return value reports how many comments were actually saved,
+        after dedup.
+        """
         comments = []
         for i in range(10):
             comment = sample_comment.copy()
@@ -259,7 +265,32 @@ class TestCommentOperations:
             comments.append(comment)
 
         saved = db.save_comments_batch(comments)
-        assert saved == 10
+        assert saved == 1
+
+    def test_save_comments_batch_dedup_keeps_distinct(self, db, sample_comment):
+        """Distinct comments are all saved; only true duplicates collapse."""
+        distinct_texts = [
+            "Este es el primer comentario con un mensaje completamente diferente",
+            "Acá hay otro texto que habla de otro tema distinto",
+            "Lorem ipsum dolor sit amet consectetur adipiscing elit",
+            "El usuario expresa una opinión política específica sobre el tema",
+            "Una receta de cocina con ingredientes varios paso a paso",
+        ]
+        comments = []
+        for i, text in enumerate(distinct_texts):
+            comment = sample_comment.copy()
+            comment["id"] = f"comment-distinct-{i}"
+            comment["text"] = text
+            comments.append(comment)
+
+        # Plus 2 identical extras of the first one → 5 distinct + 2 dupes.
+        for i in range(2):
+            dup = comments[0].copy()
+            dup["id"] = f"comment-dup-{i}"
+            comments.append(dup)
+
+        saved = db.save_comments_batch(comments)
+        assert saved == 5
 
     def test_get_comments(self, db, sample_comment, sample_post):
         """Test getting comments for a post."""
@@ -843,3 +874,305 @@ class TestMultiLabel:
             and "CASCADE" in (fk.get("options", {}).get("ondelete") or "").upper()
             for fk in fks
         )
+
+
+class TestUsers:
+    """Tests for the ``users`` table, bcrypt auth, and feedback linkage."""
+
+    def test_users_table_created(self, db):
+        from sqlalchemy import inspect
+
+        tables = inspect(db.engine).get_table_names()
+        assert "users" in tables
+
+    def test_create_user_stores_hash_not_plain(self, db):
+        uid = db.create_user("alice", "secret-pw", role="admin", full_name="Alice")
+        u = db.find_user_by_username("alice")
+        assert u is not None
+        assert u["id"] == uid
+        assert u["role"] == "admin"
+        assert u["full_name"] == "Alice"
+        assert u["is_active"] == "true"
+        assert "password_hash" not in u
+
+    def test_create_user_is_idempotent(self, db):
+        a = db.create_user("bob", "pw-a")
+        b = db.create_user("bob", "pw-b")
+        assert a == b
+
+    def test_verify_credentials_ok(self, db):
+        db.create_user("carol", "pw-good")
+        u = db.verify_credentials("carol", "pw-good")
+        assert u is not None
+        assert u["username"] == "carol"
+        assert u["last_login"] is not None
+
+    def test_verify_credentials_wrong_password(self, db):
+        db.create_user("dan", "pw-good")
+        assert db.verify_credentials("dan", "pw-bad") is None
+
+    def test_verify_credentials_unknown_user(self, db):
+        assert db.verify_credentials("nobody", "x") is None
+
+    def test_inactive_user_blocks_login(self, db):
+        uid = db.create_user("eve", "pw-good")
+        db.set_user_active(uid, False)
+        assert db.verify_credentials("eve", "pw-good") is None
+
+    def test_set_user_role_validates(self, db):
+        uid = db.create_user("frank", "pw")
+        db.set_user_role(uid, "reviewer")
+        assert db.find_user_by_id(uid)["role"] == "reviewer"
+        with pytest.raises(ValueError):
+            db.set_user_role(uid, "godmode")
+
+    def test_set_user_password_rotates(self, db):
+        uid = db.create_user("gina", "old-pw")
+        assert db.verify_credentials("gina", "old-pw") is not None
+        db.set_user_password(uid, "new-pw")
+        assert db.verify_credentials("gina", "old-pw") is None
+        assert db.verify_credentials("gina", "new-pw") is not None
+
+    def test_list_users_ordered_by_username(self, db):
+        db.create_user("zoe", "p")
+        db.create_user("ana", "p")
+        db.create_user("marco", "p")
+        names = [u["username"] for u in db.list_users()]
+        assert names == ["ana", "marco", "zoe"]
+
+    def _seed_result(self, db):
+        db.save_post(
+            {
+                "id": "p1",
+                "text": "text",
+                "author": "x",
+                "date": datetime(2024, 1, 1),
+                "likes": 0,
+                "comments_count": 0,
+                "shares": 0,
+                "url": "u",
+                "page_id": "pg",
+                "source": "facebook_page",
+            }
+        )
+        return db.save_or_update_analysis_result(
+            {
+                "content_type": "post",
+                "content_id": "p1",
+                "post_id": "p1",
+                "tiene_violencia": "true",
+                "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                "severidad": "media",
+            }
+        )
+
+    def test_feedback_reviewer_user_id_is_persisted(self, db):
+        """``reviewer_user_id`` and ``reviewer_username`` are stored."""
+        rid = self._seed_result(db)
+        uid = db.create_user("hank", "pw", role="reviewer")
+        db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+                "corrected_categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                "reviewer_user_id": uid,
+                "reviewer_username": "hank",
+            }
+        )
+        row = db.get_feedback_for_analysis(rid)
+        assert row["reviewer_user_id"] == uid
+        assert row["reviewer_username"] == "hank"
+
+    def test_feedback_columns_migrated_on_legacy_db(self, tmp_path):
+        """Existing ``analysis_feedback`` rows get the two new columns on upgrade."""
+        import sqlite3
+
+        from sqlalchemy import inspect
+
+        db_path = tmp_path / "legacy.db"
+        url = f"sqlite:///{db_path}"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            """
+            CREATE TABLE analysis_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                analysis_result_id INTEGER NOT NULL,
+                content_type VARCHAR NOT NULL,
+                content_id VARCHAR NOT NULL,
+                text_snapshot TEXT NOT NULL,
+                agrees VARCHAR NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        db = Database(url)
+        cols = {c["name"] for c in inspect(db.engine).get_columns("analysis_feedback")}
+        assert "reviewer_user_id" in cols
+        assert "reviewer_username" in cols
+
+    def test_get_feedback_includes_all_labels(self, db):
+        """Editing existing feedback must surface every stored label.
+
+        Before this fix, ``get_feedback_for_analysis`` only returned
+        the flat ``corrected_*`` columns, so a re-render of the
+        multi-label form silently lost every label except the primary
+        — the user's other corrections vanished on save.
+        """
+        rid = self._seed_result(db)
+        db.save_feedback(
+            {
+                "analysis_result_id": rid,
+                "content_type": "post",
+                "content_id": "p1",
+                "text_snapshot": "t",
+                "agrees": "false",
+                "corrected_categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                "corrected_dimension": "1.1",
+                "corrected_justificacion": "primary",
+                "corrected_labels": [
+                    {
+                        "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                        "dimension": "1.1",
+                        "severidad": "alta",
+                        "justificacion": "stereotype",
+                    },
+                    {
+                        "categoria": "VDG_COSIFICACION_SLUTSHAMING",
+                        "dimension": "2.2",
+                        "severidad": "media",
+                        "justificacion": "slut-shaming",
+                    },
+                    {
+                        "categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                        "dimension": "3.3",
+                        "severidad": "alta",
+                        "justificacion": "apología",
+                    },
+                ],
+            }
+        )
+        row = db.get_feedback_for_analysis(rid)
+        assert "labels" in row
+        assert len(row["labels"]) == 3
+        cats = [lbl["categoria"] for lbl in row["labels"]]
+        assert cats == [
+            "VDG_VIOLENCIA_SIMBOLICA",
+            "VDG_COSIFICACION_SLUTSHAMING",
+            "VDG_HOSTILIDAD_FEMINICIDIO",
+        ]
+
+
+class TestLegacyFeedbackSchema:
+    """Tests that the schema migration works against existing DBs."""
+
+    def test_feedback_columns_migrated_on_legacy_db(self, tmp_path):
+        """Existing ``analysis_feedback`` rows get the two new columns on upgrade."""
+        import sqlite3
+
+        from sqlalchemy import inspect
+
+        db_path = tmp_path / "legacy.db"
+        url = f"sqlite:///{db_path}"
+        conn = sqlite3.connect(str(db_path))
+        conn.execute(
+            """
+            CREATE TABLE analysis_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                analysis_result_id INTEGER NOT NULL,
+                content_type VARCHAR NOT NULL,
+                content_id VARCHAR NOT NULL,
+                text_snapshot TEXT NOT NULL,
+                agrees VARCHAR NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        db = Database(url)
+        cols = {c["name"] for c in inspect(db.engine).get_columns("analysis_feedback")}
+        assert "reviewer_user_id" in cols
+        assert "reviewer_username" in cols
+
+
+class TestSessions:
+    """Tests for the persistent login sessions table."""
+
+    def test_create_session_returns_unique_id(self, db):
+        uid = db.create_user("sam", "pw", role="reviewer")
+        s1 = db.create_session(uid, "sam")
+        s2 = db.create_session(uid, "sam")
+        assert s1["id"] != s2["id"]
+        assert s1["user_id"] == uid
+        assert s1["username"] == "sam"
+        assert s1["expires_at"] > s1["created_at"]
+
+    def test_find_session_returns_existing(self, db):
+        uid = db.create_user("nina", "pw", role="reviewer")
+        s = db.create_session(uid, "nina")
+        found = db.find_session(s["id"])
+        assert found is not None
+        assert found["user_id"] == uid
+
+    def test_find_session_missing_returns_none(self, db):
+        assert db.find_session("doesnotexist") is None
+        assert db.find_session("") is None
+
+    def test_find_session_expired_returns_none(self, db):
+        from datetime import datetime, timedelta
+
+        uid = db.create_user("eve", "pw", role="reviewer")
+        s = db.create_session(uid, "eve", ttl_hours=0)
+        # Manually push expires_at into the past so we don't have to wait.
+        from src.storage.models import SessionModel
+
+        with db.get_session() as session:
+            row = session.query(SessionModel).filter_by(id=s["id"]).first()
+            assert row is not None
+            row.expires_at = datetime.now() - timedelta(seconds=1)
+        assert db.find_session(s["id"]) is None
+
+    def test_delete_session_removes_row(self, db):
+        uid = db.create_user("oscar", "pw", role="reviewer")
+        s = db.create_session(uid, "oscar")
+        assert db.find_session(s["id"]) is not None
+        assert db.delete_session(s["id"]) is True
+        assert db.find_session(s["id"]) is None
+        # Second delete is a no-op.
+        assert db.delete_session(s["id"]) is False
+
+    def test_touch_session_updates_last_seen(self, db):
+        uid = db.create_user("pam", "pw", role="reviewer")
+        s = db.create_session(uid, "pam")
+        first_seen = s["created_at"]
+        # Touch and confirm last_seen_at advances.
+        import time as _time
+
+        _time.sleep(0.05)
+        assert db.touch_session(s["id"]) is True
+        refreshed = db.find_session(s["id"])
+        assert refreshed["last_seen_at"] >= first_seen
+
+    def test_purge_expired_sessions(self, db):
+        from datetime import datetime, timedelta
+
+        uid = db.create_user("quinn", "pw", role="reviewer")
+        fresh = db.create_session(uid, "quinn", ttl_hours=24)
+        expired = db.create_session(uid, "quinn", ttl_hours=1)
+        from src.storage.models import SessionModel
+
+        with db.get_session() as session:
+            row = session.query(SessionModel).filter_by(id=expired["id"]).first()
+            row.expires_at = datetime.now() - timedelta(seconds=1)
+
+        purged = db.purge_expired_sessions()
+        assert purged == 1
+        assert db.find_session(fresh["id"]) is not None
+        assert db.find_session(expired["id"]) is None

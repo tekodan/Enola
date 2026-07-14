@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC
 from typing import Protocol
 
 from chromadb import PersistentClient
@@ -143,6 +144,9 @@ class FeedbackStore:
         reason: str | None = None,
         id: str | None = None,
         corrected_labels: list[dict] | None = None,
+        user_id: int | None = None,
+        added_by_username: str | None = None,
+        added_at: str | None = None,
     ) -> str:
         """Push a single correction as a few-shot example document.
 
@@ -152,8 +156,14 @@ class FeedbackStore:
         list. Otherwise the call falls back to a single-label
         representation for backwards compatibility.
 
+        Provenance metadata: pass ``user_id`` + ``added_by_username`` so
+        the few-shot carries a traceable "added by @user" line.
+        ``added_at`` defaults to the current UTC ISO timestamp.
+
         Returns the ChromaDB id of the new document.
         """
+        from datetime import datetime
+
         if self.collection is None:
             self.create_collection()
 
@@ -182,6 +192,8 @@ class FeedbackStore:
             primary_cat = str(primary.get("categoria") or corrected_categoria)
             primary_dim = str(primary.get("dimension") or "") or primary_dim
 
+        added_at_iso = added_at or datetime.now(UTC).isoformat(timespec="seconds")
+
         metadata: dict[str, object] = {
             "source": "human_feedback",
             "feedback_id": str(feedback_id),
@@ -191,6 +203,9 @@ class FeedbackStore:
             "corrected_dimension": primary_dim,
             "original_categoria": original_categoria or "",
             "label_count": str(len(corrected_labels) if corrected_labels else 1),
+            "user_id": str(user_id) if user_id else "",
+            "added_by_username": added_by_username or "",
+            "added_at": added_at_iso,
         }
 
         start = self.collection.count() if self.collection else 0

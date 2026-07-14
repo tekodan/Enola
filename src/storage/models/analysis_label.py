@@ -53,6 +53,7 @@ class AnalysisLabelModel(Base):
     es_falso_positivo_probable = Column(String, default="false", nullable=False)
 
     created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, nullable=False)
 
     analysis_result = relationship("AnalysisResultModel")
 

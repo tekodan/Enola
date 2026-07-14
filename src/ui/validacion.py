@@ -27,32 +27,36 @@ from src.analyzer.category_mapping import (
 CATEGORIA_CHOICES: tuple[str, ...] = tuple(CATEGORIAS_ORDENADAS)
 
 
-def categoria_choices() -> list[tuple[str, str]]:
-    """Return ``(label, value)`` pairs for the categoria selectbox."""
+def categoria_choices() -> dict[str, str]:
+    """Return ``{value: label}`` pairs for the categoria selectbox.
+
+    NiceGUI 3.14 ``ui.select`` only accepts a ``dict`` (or a flat list of
+    strings) as ``options`` — the ``[(label, value), ...]`` tuple form
+    raises ``ValueError: Invalid value: ...`` and silently breaks the
+    surrounding widget tree.
+    """
     from src.ui.utils import label_for
 
-    pairs: list[tuple[str, str]] = []
+    choices: dict[str, str] = {}
     for code in CATEGORIA_CHOICES:
-        pairs.append((label_for(code), code))
-    pairs.append(("(Sin categoría — borrar override)", ""))
-    return pairs
+        choices[code] = label_for(code)
+    choices[""] = "(Sin categoría — borrar override)"
+    return choices
 
 
-def dimension_options_for(categoria: str) -> list[tuple[str, str]]:
-    """Return ``(label, value)`` pairs of valid dimensions for ``categoria``.
+def dimension_options_for(categoria: str) -> dict[str, str]:
+    """Return ``{value: label}`` pairs of valid dimensions for ``categoria``.
 
     The label format is ``"<code> — <description>"``. Returns only the
     "(Sin dimensión)" pair if ``categoria`` is empty/``ninguna``.
     """
     if not categoria or categoria == Categoria.NINGUNA.value:
-        return [("(Sin dimensión)", "")]
+        return {"": "(Sin dimensión)"}
 
     dims = SUBDIMENSIONES_POR_CATEGORIA.get(categoria, [])
-    pairs: list[tuple[str, str]] = [
-        (f"{d} — {DESCRIPCION_SUBDIMENSION.get(d, '')}", d) for d in dims
-    ]
-    pairs.append(("(Sin dimensión)", ""))
-    return pairs
+    choices: dict[str, str] = {d: f"{d} — {DESCRIPCION_SUBDIMENSION.get(d, '')}" for d in dims}
+    choices[""] = "(Sin dimensión)"
+    return choices
 
 
 def is_valid_categoria_for_dimension(categoria: str, dimension: str) -> bool:

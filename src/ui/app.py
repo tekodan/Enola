@@ -1,6 +1,7 @@
 """Streamlit app — Upload markdown/PDF documents to ChromaDB."""
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -426,7 +427,7 @@ with tab_reports:
                         "Tipo": a.get("content_type", ""),
                         "Violencia": a.get("tiene_violencia", ""),
                         "Categoría": a.get("categoria", ""),
-                        "Dimensión": a.get("dimension", "") or "",
+                        "Subdimensión": a.get("dimension", "") or "",
                         "Código": a.get("codigo", "") or "",
                         "Severidad": a.get("severidad", ""),
                         "Evidencia": a.get("evidencia", "")[:50],
@@ -614,11 +615,22 @@ with tab_reports:
 
 # ===== TAB 4: Validación =====
 with tab_validacion:
-    st.subheader("✅ Validación humana de análisis")
+    # Migrated to the NiceGUI dashboard — feature flag controls fallback.
+    if not os.environ.get("ENOLA_SHOW_DEPRECATED_TAB"):
+        st.warning(
+            "⚠️ Esta pestaña migró a la app NiceGUI en `/validacion` "
+            "(login + ChromaDB + trazabilidad por usuario).\n\n"
+            f"Abrí **{settings.app.nicegui_url}/validacion** en otra pestaña "
+            "para revisar y corregir análisis. Necesitás un usuario — "
+            "pedíselo al administrador (`python -m src.cli users add ...`)."
+        )
+        st.stop()
+
+    st.subheader("✅ Validación humana de análisis (DEPRECATED — usar NiceGUI)")
     st.caption(
-        "Revisá las salidas de la IA. Las correcciones confirmadas se guardan "
-        "en SQLite y se inyectan como ejemplos few-shot en ChromaDB para que "
-        "la IA aprenda de los errores confirmados por humanos."
+        "Este formulario queda accesible sólo con "
+        "`ENOLA_SHOW_DEPRECATED_TAB=true`. La versión soportada vive en "
+        "`python -m src.ui.nicegui_app` → /validacion."
     )
 
     # ------- Stats header -------
@@ -773,7 +785,7 @@ with tab_validacion:
                 ai_cols = st.columns(4)
                 ai_cols[0].markdown(f"**Violencia:** `{row.get('tiene_violencia') or '—'}`")
                 ai_cols[1].markdown(f"**Categoría (primaria):** `{row.get('categoria') or '—'}`")
-                ai_cols[2].markdown(f"**Dimensión (primaria):** `{row.get('dimension') or '—'}`")
+                ai_cols[2].markdown(f"**Subdimensión (primaria):** `{row.get('dimension') or '—'}`")
                 ai_cols[3].markdown(f"**Severidad global:** `{row.get('severidad') or '—'}`")
                 if ai_labels:
                     with st.expander(
@@ -876,32 +888,32 @@ with tab_validacion:
                             ):
                                 cols_top = st.columns([2, 2])
                                 with cols_top[0]:
-                                    default_cat_idx = 0
-                                    for i, (_, val) in enumerate(cat_pairs):
-                                        if val and val == existing_row.get("categoria"):
-                                            default_cat_idx = i
-                                            break
+                                    default_cat_idx = (
+                                        list(cat_pairs.keys()).index(existing_row.get("categoria"))
+                                        if existing_row.get("categoria") in cat_pairs
+                                        else 0
+                                    )
                                     cat_choice = st.selectbox(
                                         "Categoría",
-                                        options=cat_pairs,
-                                        format_func=lambda p: p[0],
+                                        options=list(cat_pairs.keys()),
+                                        format_func=lambda v: cat_pairs.get(v, "—"),
                                         index=default_cat_idx,
                                         key=f"cat_{ar_id}_{idx}",
-                                    )[1]
+                                    )
                                 with cols_top[1]:
                                     dim_pairs = dimension_options_for(cat_choice)
-                                    default_dim_idx = 0
-                                    for i, (_, val) in enumerate(dim_pairs):
-                                        if val and val == existing_row.get("dimension"):
-                                            default_dim_idx = i
-                                            break
+                                    default_dim_idx = (
+                                        list(dim_pairs.keys()).index(existing_row.get("dimension"))
+                                        if existing_row.get("dimension") in dim_pairs
+                                        else 0
+                                    )
                                     dim_choice = st.selectbox(
-                                        "Dimensión",
-                                        options=dim_pairs,
-                                        format_func=lambda p: p[0],
+                                        "Subdimensión",
+                                        options=list(dim_pairs.keys()),
+                                        format_func=lambda v: dim_pairs.get(v, "—"),
                                         index=default_dim_idx,
                                         key=f"dim_{ar_id}_{idx}",
-                                    )[1]
+                                    )
 
                                 cols_mid = st.columns([1, 3])
                                 with cols_mid[0]:

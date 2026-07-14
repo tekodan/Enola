@@ -13,6 +13,8 @@ from src.storage.models.comment import CommentModel
 from src.storage.models.page import PageModel
 from src.storage.models.post import PostModel
 from src.storage.models.seed_page import SeedPageModel
+from src.storage.models.session import SESSION_TTL_HOURS, SessionModel
+from src.storage.models.user import UserModel
 
 __all__ = [
     "AnalysisFeedbackModel",
@@ -23,4 +25,7 @@ __all__ = [
     "PageModel",
     "PostModel",
     "SeedPageModel",
+    "SessionModel",
+    "SESSION_TTL_HOURS",
+    "UserModel",
 ]

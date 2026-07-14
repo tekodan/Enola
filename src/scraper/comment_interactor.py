@@ -14,31 +14,9 @@ import logging
 import re
 
 from src.scraper.models import Comment
+from src.scraper.text_cleaner import strip_comment_noise
 
 logger = logging.getLogger(__name__)
-
-
-# Regex used by ``clean_comment_text`` to strip the trailing UI bits
-# that Facebook appends to every comment (``N sem Me gusta Responder 17``).
-#
-# Group 1: relative time (``"18 sem"``, ``"5 min"``, ``"3 días"`` ...)
-# Group 2: optional ``Editado`` marker
-# Group 3: trailing reply count (optional, may be empty)
-_TIME_AGO_PATTERN = r"(\d+\s*(?:sem|min|h|días?|semanas?|horas?)(?:\s*y\s*medias?)?)"
-_TRAILING_UI_PATTERN = re.compile(
-    rf"\s+{_TIME_AGO_PATTERN}\s+Me\s+gusta\s+Responder\s*(Editado\s+)?(\d+)?\s*$",
-    re.IGNORECASE,
-)
-# Captures the optional ``Fan destacado`` prefix and the author name
-# at the very start of the comment text. Limits to 3 words max so it
-# doesn't gobble up real comment content for unknown authors; the
-# known_author path is preferred for precision.
-_AUTHOR_PREFIX_PATTERN = re.compile(
-    r"^(?:Fan\s+destacado\s+)?"
-    r"(?P<author>(?:[A-Z][\w\.\-áéíóúñÑÁÉÍÓÚüÜ]{1,30}\s+){0,3})"
-    r"(?=\S)",
-    re.UNICODE,
-)
 
 
 def clean_comment_text(
@@ -54,6 +32,10 @@ def clean_comment_text(
     body goes into ``Comment.text`` and the metadata goes into the
     dedicated columns (``time_ago``, ``responses``).
 
+    Thin wrapper around :func:`src.scraper.text_cleaner.strip_comment_noise`.
+    Kept here for backwards compatibility — the rest of the codebase
+    still imports ``clean_comment_text`` from this module.
+
     Args:
         raw_text: Text as extracted from the DOM (includes author
             prefix and trailing buttons).
@@ -66,40 +48,7 @@ def clean_comment_text(
         trailing UI bits are found, ``time_ago`` is ``None`` and
         ``responses`` is 0.
     """
-    if not raw_text:
-        return "", None, 0
-
-    text = raw_text.strip()
-    time_ago: str | None = None
-    responses = 0
-
-    # Strip trailing UI: "N sem Me gusta Responder [Editado] <count>"
-    trail = _TRAILING_UI_PATTERN.search(text)
-    if trail:
-        time_ago = trail.group(1)
-        if trail.group(3):
-            try:
-                responses = int(trail.group(3))
-            except (TypeError, ValueError):
-                responses = 0
-        text = text[: trail.start()].rstrip()
-
-    # Strip the author prefix. Prefer the known_author for accuracy.
-    if known_author:
-        prefix_options = [
-            "Fan destacado " + known_author + " ",
-            known_author + " ",
-        ]
-        for prefix in prefix_options:
-            if text.startswith(prefix):
-                text = text[len(prefix) :]
-                break
-    else:
-        m = _AUTHOR_PREFIX_PATTERN.match(text)
-        if m:
-            text = text[m.end() :]
-
-    return text.strip(), time_ago, responses
+    return strip_comment_noise(raw_text, known_author=known_author)
 
 
 class CommentInteractor:

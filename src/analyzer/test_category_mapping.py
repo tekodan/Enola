@@ -5,8 +5,10 @@ import logging
 from src.analyzer.category_mapping import (
     CATEGORIAS_ORDENADAS,
     DESCRIPCION_SUBDIMENSION,
+    KNOWLEDGE_ROOT,
     SUBDIMENSIONES_POR_CATEGORIA,
     Categoria,
+    load_prompt_block,
     map_gravedad,
     normalize_categoria,
     normalize_dimension,
@@ -204,3 +206,54 @@ class TestRenderSeveridad:
         assert '"media"' in text
         assert '"alta"' in text
         assert '"ninguna"' in text
+
+
+class TestLoadPromptBlock:
+    """Loads rule blocks from markdown glosarios."""
+
+    def test_loads_marcadores_block(self):
+        block = load_prompt_block("glosario/marcadores-por-subdimension.md")
+        assert "MARCADORES_CANONICOS" in block
+        assert "a lavar" in block
+        assert "1.1 (VDG_VIOLENCIA_SIMBOLICA)" in block
+        assert "aliade" in block
+
+    def test_loads_leetspeak_block(self):
+        block = load_prompt_block("glosario/leetspeak-decoder.md")
+        assert "DESCODIFICACIÓN" in block
+        assert "f3m1 nizta → feminazi" in block
+        assert "aliade → aliado" in block
+
+    def test_loads_mitigadores_block(self):
+        block = load_prompt_block("glosario/marcadores-mitigadores.md")
+        assert "MARCADORES_MITIGADORES" in block
+        assert "patriarcal" in block
+        assert "#NiUnaMenos" in block
+
+    def test_loads_referentes_block(self):
+        block = load_prompt_block("glosario/referentes-femeninos.md")
+        assert "REGLA DE COOCURRENCIA" in block
+        assert "mujer" in block
+        assert "stacy" in block
+
+    def test_loads_cat5_block_from_categoria_5_md(self):
+        block = load_prompt_block("05-categoria-5-sarcasmo-falsos-positivos.md")
+        assert "USO DE Cat. 5" in block
+        assert "5.3 reapropiación" in block
+
+    def test_returns_empty_for_missing_file(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            result = load_prompt_block("glosario/no-existe.md")
+        assert result == ""
+
+    def test_returns_empty_for_missing_anchor(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            result = load_prompt_block(
+                "glosario/leetspeak-decoder.md",
+                anchor="No Existe",
+            )
+        assert result == ""
+
+    def test_knowledge_root_points_to_markdowns(self):
+        assert (KNOWLEDGE_ROOT / "glosario" / "leetspeak-decoder.md").is_file()
+        assert (KNOWLEDGE_ROOT / "00-protocolo-algoritmico.md").is_file()
