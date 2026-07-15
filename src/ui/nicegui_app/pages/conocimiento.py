@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def _render_body() -> None:
     # --- Hero ---
-    with ui.element("div").classes("enola-hero"):
+    with ui.element("div").classes("enola-hero enola-fade-in"):
         ui.label("TFM 2026 · Universidad de Granada").classes("enola-hero-badge")
         ui.label("Conocimiento & Comunidad").classes("enola-display")
         ui.label(
@@ -44,7 +44,7 @@ def _render_body() -> None:
     # --- Knowledge base KPIs ---
     section_header(
         "Base de conocimiento",
-        "Taxonomía canónica (6 categorías, 18 subdimensiones)",
+        "Taxonomía canónica (6 categorías, 19 subdimensiones)",
         subtitle=(
             "El sistema RAG indexa esta base en ChromaDB para fundamentar "
             "cada clasificación. La descarga incluye glosario, definiciones "
@@ -88,22 +88,26 @@ def _render_body() -> None:
     # --- Download ZIP card ---
     with ui.element("div").classes("w-full mt-6"):
         with ui.element("div").style(
-            "padding: 2rem 2.5rem; border-radius: 1rem; "
-            "background: linear-gradient(135deg, rgba(107, 78, 113, 0.06), "
-            "rgba(192, 132, 151, 0.08)); "
+            "padding: 2rem 2.5rem; border-radius: 1.25rem; "
+            "background: linear-gradient(135deg, rgba(107, 78, 113, 0.06) 0%, "
+            "rgba(192, 132, 151, 0.10) 50%, rgba(191, 161, 129, 0.08) 100%); "
             "border: 1px solid rgba(191, 161, 129, 0.35); "
+            "box-shadow: 0 8px 24px -10px rgba(35, 30, 46, 0.08); "
             "display: flex; align-items: center; justify-content: space-between; "
             "gap: 1.5rem; flex-wrap: wrap;"
         ):
             with ui.column().classes("gap-1"):
-                ui.label("📥 Descargar taxonomía completa").classes("enola-display text-lg").style(
-                    "color: var(--enola-plum);"
+                ui.label("📥 Descargar taxonomía completa").classes("enola-display").style(
+                    "color: var(--enola-plum); font-size: 1.35rem; "
+                    "font-weight: 500; letter-spacing: -0.015em;"
                 )
                 ui.label(
                     "ZIP con los .md de la base de conocimiento (incluye "
                     "glosario de manosfera, definiciones operativas y "
                     "patrones por categoría)."
-                ).classes("text-sm").style("color: var(--enola-charcoal-light); max-width: 60ch;")
+                ).classes("text-sm").style(
+                    "color: var(--enola-charcoal-light); max-width: 60ch; line-height: 1.55;"
+                )
             try:
                 zip_bytes = build_knowledge_zip()
             except Exception as exc:
@@ -111,8 +115,6 @@ def _render_body() -> None:
                 zip_bytes = b""
 
             if zip_bytes:
-                # ui.download() returns None (it's a void command, not a
-                # visual element), so we wrap it in a styled button.
                 ui.button(
                     "Descargar .zip",
                     icon="download",
@@ -121,7 +123,7 @@ def _render_body() -> None:
                         filename=knowledge_zip_filename(),
                         media_type="application/zip",
                     ),
-                ).props("color=primary size=lg").style("font-weight: 500;")
+                ).props("color=primary size=lg").style("font-weight: 600;")
             else:
                 ui.label("(Directorio knowledge no disponible)").classes("text-sm italic").style(
                     "color: var(--enola-charcoal-light);"
@@ -172,7 +174,7 @@ def _render_body() -> None:
             "title": "Clasificación",
             "body": (
                 "RAGClassifier (Ollama + LangChain) clasifica contra "
-                "6 categorías VDG_* y 18 subdimensiones, con prompt "
+                "6 categorías VDG_* y 19 subdimensiones, con prompt "
                 "que incluye el filtro de violencia común."
             ),
             "icon": "psychology",
@@ -191,20 +193,21 @@ def _render_body() -> None:
 
     with ui.column().classes("w-full gap-3"):
         for step in steps:
-            with ui.element("div").style(
-                "padding: 1.25rem 1.5rem; "
-                "border-radius: 0.875rem; "
-                "background: var(--enola-cream); "
-                "border: 1px solid rgba(191, 161, 129, 0.18); "
-                "display: flex; align-items: flex-start; gap: 1.25rem;"
+            with (
+                ui.element("div")
+                .classes("enola-panel enola-fade-in")
+                .style("display: flex; align-items: flex-start; gap: 1.25rem;")
             ):
-                # Number badge
+                # Number badge with gradient
                 with ui.element("div").style(
-                    "width: 56px; height: 56px; border-radius: 50%; "
-                    f"background: {theme.PLUM}; color: {theme.CREAM}; "
+                    "width: 56px; height: 56px; border-radius: 16px; "
+                    f"background: linear-gradient(135deg, {theme.PLUM} 0%, "
+                    f"{theme.ROSE} 100%); "
+                    "color: var(--enola-cream); "
                     "display: flex; align-items: center; justify-content: center; "
                     "font-family: var(--enola-font-display); "
-                    "font-size: 1.5rem; flex-shrink: 0;"
+                    "font-size: 1.5rem; font-weight: 500; flex-shrink: 0; "
+                    f"box-shadow: 0 4px 12px -4px {theme.PLUM}55;"
                 ):
                     ui.label(step["n"])
                 with ui.column().classes("gap-1 flex-1"):
@@ -212,9 +215,9 @@ def _render_body() -> None:
                         ui.icon(step["icon"], size="18px").style(f"color: {theme.BRASS_DEEP};")
                         ui.label(step["title"]).classes(
                             "text-base font-semibold enola-display"
-                        ).style("color: var(--enola-plum);")
+                        ).style("color: var(--enola-plum); letter-spacing: -0.01em;")
                     ui.label(step["body"]).classes("text-sm leading-relaxed").style(
-                        "color: var(--enola-charcoal);"
+                        "color: var(--enola-charcoal); line-height: 1.55;"
                     )
 
     # --- Open source / collaboration ---
@@ -229,9 +232,11 @@ def _render_body() -> None:
     )
 
     with ui.element("div").style(
-        "padding: 2rem 2.5rem; border-radius: 1rem; "
-        "background: rgba(191, 161, 129, 0.10); "
-        "border-left: 3px solid var(--enola-brass);"
+        "padding: 2rem 2.5rem; border-radius: 1.25rem; "
+        "background: linear-gradient(135deg, rgba(191, 161, 129, 0.10) 0%, "
+        "rgba(192, 132, 151, 0.06) 100%); "
+        "border: 1px solid rgba(191, 161, 129, 0.30); "
+        "border-left: 4px solid var(--enola-brass);"
     ):
         with ui.column().classes("gap-3"):
             ui.label(
@@ -239,13 +244,16 @@ def _render_body() -> None:
                 "ScrapeGraphAI + Ollama + ChromaDB + LangChain + SQLite + "
                 "Streamlit + NiceGUI + sklearn. Sin dependencias externas "
                 "de pago."
-            ).classes("text-sm leading-relaxed").style("color: var(--enola-charcoal);")
+            ).classes("text-sm leading-relaxed").style(
+                "color: var(--enola-charcoal); line-height: 1.6;"
+            )
             ui.label(
                 "Stack: · Python 3.12 · ScrapeGraphAI · Ollama · ChromaDB · "
                 "LangChain · SQLite · Streamlit · NiceGUI · sklearn · "
                 "Plotly"
             ).classes("text-xs").style(
-                "color: var(--enola-charcoal-light); font-family: var(--enola-font-mono);"
+                "color: var(--enola-charcoal-light); "
+                "font-family: var(--enola-font-mono); letter-spacing: 0.02em;"
             )
 
         with ui.row().classes("gap-3 mt-4 flex-wrap"):
@@ -253,12 +261,12 @@ def _render_body() -> None:
                 "⭐ Ver repo en GitHub",
                 icon="star",
                 on_click=lambda: ui.navigate.to(GITHUB_REPO_URL, new_tab=True),
-            ).props("color=primary outline")
+            ).props("color=primary outline").style("font-weight: 500;")
             ui.button(
                 "🔀 Fork",
                 icon="fork_right",
                 on_click=lambda: ui.navigate.to(GITHUB_FORK_URL, new_tab=True),
-            ).props("color=primary outline")
+            ).props("color=primary outline").style("font-weight: 500;")
 
     # --- About this app ---
     section_header(
@@ -268,33 +276,37 @@ def _render_body() -> None:
 
     with ui.element("div").classes("w-full grid gap-4").style("grid-template-columns: 1fr 1fr;"):
         with ui.element("div").style(
-            "padding: 1.5rem 1.75rem; border-radius: 0.875rem; "
-            "background: var(--enola-blush); "
-            "border-left: 3px solid var(--enola-rose);"
+            "padding: 1.75rem 2rem; border-radius: 1rem; "
+            "background: linear-gradient(135deg, var(--enola-blush) 0%, "
+            "rgba(242, 227, 227, 0.40) 100%); "
+            "border-left: 4px solid var(--enola-rose); "
+            "border: 1px solid rgba(192, 132, 151, 0.20);"
         ):
             ui.label("🔬 Investigadora").classes(
-                "text-xs uppercase tracking-widest font-semibold"
-            ).style("color: var(--enola-brass-deep); margin-bottom: 0.5rem;")
+                "text-xs uppercase tracking-widest font-semibold enola-section-eyebrow"
+            ).style("display: inline-flex; margin-bottom: 0.5rem;")
             ui.label("Kimberly Michell Luna Eraso").classes(
-                "text-lg font-semibold enola-display"
-            ).style("color: var(--enola-plum);")
-            ui.label("TFM · Máster Interuniversitario en Cultura de Paz").classes("text-sm").style(
-                "color: var(--enola-charcoal-light); margin-top: 0.5rem;"
-            )
+                "text-xl font-semibold enola-display"
+            ).style("color: var(--enola-plum); letter-spacing: -0.01em;")
+            ui.label("TFM · Máster Interuniversitario en Cultura de Paz").classes(
+                "text-sm mt-2"
+            ).style("color: var(--enola-charcoal-light); line-height: 1.5;")
 
         with ui.element("div").style(
-            "padding: 1.5rem 1.75rem; border-radius: 0.875rem; "
-            "background: rgba(191, 161, 129, 0.10); "
-            "border-left: 3px solid var(--enola-brass);"
+            "padding: 1.75rem 2rem; border-radius: 1rem; "
+            "background: linear-gradient(135deg, rgba(191, 161, 129, 0.12) 0%, "
+            "rgba(191, 161, 129, 0.04) 100%); "
+            "border-left: 4px solid var(--enola-brass); "
+            "border: 1px solid rgba(191, 161, 129, 0.30);"
         ):
             ui.label("🎓 Tutora de proyecto").classes(
-                "text-xs uppercase tracking-widest font-semibold"
-            ).style("color: var(--enola-brass-deep); margin-bottom: 0.5rem;")
+                "text-xs uppercase tracking-widest font-semibold enola-section-eyebrow"
+            ).style("display: inline-flex; margin-bottom: 0.5rem;")
             ui.label("María del Mar García Vita").classes(
-                "text-lg font-semibold enola-display"
-            ).style("color: var(--enola-plum);")
-            ui.label("Universidad de Granada").classes("text-sm").style(
-                "color: var(--enola-charcoal-light); margin-top: 0.5rem;"
+                "text-xl font-semibold enola-display"
+            ).style("color: var(--enola-plum); letter-spacing: -0.01em;")
+            ui.label("Universidad de Granada").classes("text-sm mt-2").style(
+                "color: var(--enola-charcoal-light); line-height: 1.5;"
             )
 
 
@@ -305,4 +317,5 @@ def page_conocimiento() -> None:
         subtitle="Taxonomía canónica y comunidad",
         current_path="/conocimiento",
         body=_render_body,
+        requires_auth=False,
     )

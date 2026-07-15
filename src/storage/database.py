@@ -973,37 +973,16 @@ class Database:
     def _primary_label_dict(labels: list[dict]) -> dict:
         """Pick the primary label for filling the flat columns.
 
-        Sort by severity desc; ties keep the original order. Always
-        returns a dict with the full set of flat-column keys (filled
-        with neutral defaults when the chosen label does not carry
-        them).
+        Delegates to :func:`src.analyzer.category_mapping.primary_label`
+        — single source of truth for the severity ranking so the UI
+        layer (``adjusted_report``) and the persistence layer stay in
+        sync. Always returns a dict with the full set of flat-column
+        keys (filled with neutral defaults when the chosen label does
+        not carry them).
         """
-        sev_order = {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}
+        from src.analyzer.category_mapping import primary_label
 
-        def _rank(label: dict) -> int:
-            sev = str(label.get("severidad") or "ninguna")
-            return sev_order.get(sev, 0)
-
-        def _envelope(d: dict) -> dict:
-            return {
-                "categoria": d.get("categoria") or "ninguna",
-                "dimension": d.get("dimension"),
-                "severidad": d.get("severidad") or "ninguna",
-                "justificacion": d.get("justificacion") or "",
-                "evidencia": d.get("evidencia") or "",
-                "regla_disparada": d.get("regla_disparada"),
-                "marcadores_detectados": d.get("marcadores_detectados"),
-                "confianza": d.get("confianza"),
-                "score_ajuste": d.get("score_ajuste"),
-                "es_falso_positivo_probable": (
-                    "true" if d.get("es_falso_positivo_probable") else "false"
-                ),
-            }
-
-        if not labels:
-            return _envelope({})
-        # Sort by severity desc; ties keep the original input order.
-        return _envelope(max(labels, key=lambda lbl: (_rank(lbl), 1)))
+        return primary_label(labels)
 
     @staticmethod
     def _replace_labels_for_result(

@@ -137,7 +137,7 @@ def render_hero() -> None:
             <p>
                 Sistema RAG de detección de <strong>violencia de género digital</strong> en Facebook.
                 Inspirado en Enola Holmes, analiza conversaciones con una taxonomía
-                canónica de 6 categorías y 18 subdimensiones, asistida por Ollama y ChromaDB.
+                canónica de 6 categorías y 19 subdimensiones, asistida por Ollama y ChromaDB.
             </p>
         </div>
         """,

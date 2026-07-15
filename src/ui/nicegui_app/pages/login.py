@@ -31,44 +31,52 @@ def _render_login_body() -> None:
     ):
         with (
             ui.element("div")
-            .classes("enola-login-card")
+            .classes("enola-fade-in enola-login-card")
             .style(
-                "width: 100%; max-width: 28rem; "
-                "background: var(--enola-cream); "
-                "border: 1px solid rgba(191, 161, 129, 0.30); "
-                "border-radius: 1.25rem; "
-                "padding: 2.25rem 2rem 1.75rem 2rem; "
-                f"box-shadow: 0 12px 32px -8px {theme.PLUM}22;"
+                "width: 100%; max-width: 30rem; "
+                "background: linear-gradient(180deg, "
+                "rgba(255, 255, 255, 0.96) 0%, var(--enola-cream) 100%); "
+                "border: 1px solid rgba(191, 161, 129, 0.32); "
+                "border-radius: 1.5rem; "
+                "padding: 2.5rem 2.25rem 2rem 2.25rem; "
+                "box-shadow: 0 24px 56px -16px rgba(35, 30, 46, 0.20), "
+                "0 8px 16px -8px rgba(107, 78, 113, 0.10); "
+                "position: relative; overflow: hidden;"
             )
         ):
+            # Top brass accent bar — adds the "premium" sparkle.
+            ui.element("div").style(
+                "position: absolute; top: 0; left: 0; right: 0; height: 3px; "
+                f"background: linear-gradient(90deg, {theme.PLUM} 0%, "
+                f"{theme.ROSE} 50%, {theme.BRASS} 100%);"
+            )
+
             # Brand block
             with ui.element("div").classes("w-full flex flex-col items-center gap-2 mb-5"):
-                with ui.avatar(
-                    color=theme.PLUM,
-                    text_color=theme.CREAM,
-                    size="56px",
+                with ui.element("div").style(
+                    "width: 72px; height: 72px; border-radius: 18px; "
+                    f"background: linear-gradient(135deg, {theme.PLUM} 0%, "
+                    f"{theme.ROSE} 100%); "
+                    "display: flex; align-items: center; justify-content: center; "
+                    f"box-shadow: 0 8px 20px -6px {theme.PLUM}66;"
                 ):
-                    ui.icon("search", size="28px")
-                ui.label("Enola").classes("text-2xl font-semibold enola-display").style(
-                    f"color: {theme.PLUM}; line-height: 1;"
+                    ui.icon("auto_stories", size="34px").style(f"color: {theme.CREAM};")
+                ui.label("Enola").classes("text-3xl font-semibold enola-display").style(
+                    f"color: {theme.PLUM}; line-height: 1; "
+                    "letter-spacing: -0.02em; margin-top: 4px;"
                 )
                 ui.label("Investigadora Digital").classes("text-xs").style(
-                    "color: var(--enola-charcoal-light); letter-spacing: 0.16em; "
-                    "text-transform: uppercase;"
+                    "color: var(--enola-charcoal-light); letter-spacing: 0.22em; "
+                    "text-transform: uppercase; font-weight: 600;"
                 )
 
-            ui.separator().style(
-                "background: linear-gradient(90deg, transparent, "
-                "rgba(191, 161, 129, 0.45), transparent); margin: 0 0 1.5rem 0;"
-            )
+            ui.element("div").classes("enola-brass-divider").style("margin: 1.5rem 0 1.75rem 0;")
 
-            username_input = (
-                ui.input("Username").props("outlined dense autofocus").classes("w-full")
-            )
+            username_input = ui.input("Usuario").props("outlined dense autofocus").classes("w-full")
             password_input = (
-                ui.input("Password", password=True, password_toggle_button=True)
+                ui.input("Contraseña", password=True, password_toggle_button=True)
                 .props("outlined dense")
-                .classes("w-full mt-2")
+                .classes("w-full mt-3")
             )
 
             error_label = (
@@ -99,18 +107,38 @@ def _render_login_body() -> None:
             username_input.on("keydown.enter", _on_enter)
 
             (
-                ui.button("Iniciar sesión", on_click=_submit)
+                ui.button("Iniciar sesión", on_click=_submit, icon="login")
                 .props("unelevated color=primary")
-                .classes("w-full mt-5")
+                .classes("w-full mt-6")
                 .style(
-                    "background: var(--enola-plum); "
-                    "color: var(--enola-cream); border-radius: 0.625rem;"
+                    f"background: linear-gradient(135deg, {theme.PLUM} 0%, "
+                    f"{theme.PLUM_DEEP} 100%); "
+                    f"color: {theme.CREAM}; "
+                    "border-radius: 0.625rem; "
+                    "padding: 0.75rem 1rem; font-weight: 600; "
+                    f"box-shadow: 0 4px 12px -2px {theme.PLUM}55; "
+                    "letter-spacing: 0.01em;"
                 )
             )
 
+            with ui.element("div").classes("w-full flex items-center gap-3 mt-5"):
+                ui.element("div").style(
+                    "flex: 1; height: 1px; "
+                    "background: linear-gradient(90deg, transparent, "
+                    "rgba(191, 161, 129, 0.35), transparent);"
+                )
+                ui.label("Soporte").classes("text-xs uppercase font-semibold").style(
+                    "color: var(--enola-brass-deep); letter-spacing: 0.18em;"
+                )
+                ui.element("div").style(
+                    "flex: 1; height: 1px; "
+                    "background: linear-gradient(90deg, transparent, "
+                    "rgba(191, 161, 129, 0.35), transparent);"
+                )
+
             ui.label("¿No tenés cuenta? Hablá con el administrador.").classes(
-                "text-xs text-center mt-4"
-            ).style("color: var(--enola-charcoal-light);")
+                "text-xs text-center mt-3"
+            ).style("color: var(--enola-charcoal-light); font-style: italic;")
 
 
 @ui.page("/login")
@@ -123,7 +151,14 @@ def page_login() -> None:
 
     theme.apply_theme()
 
-    with ui.element("div").classes("w-full").style("background: var(--enola-cream);"):
+    with (
+        ui.element("div")
+        .classes("w-full enola-fade-in")
+        .style(
+            "background: linear-gradient(135deg, rgba(192, 132, 151, 0.06) 0%, "
+            "rgba(191, 161, 129, 0.04) 50%, rgba(107, 78, 113, 0.05) 100%);"
+        )
+    ):
         _render_login_body()
 
 

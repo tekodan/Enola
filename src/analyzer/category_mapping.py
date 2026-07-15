@@ -295,6 +295,57 @@ def max_severity(values: list[Severity]) -> Severity:
     return max(values, key=_severity_rank)
 
 
+_PRIMARY_LABEL_DEFAULTS: dict[str, object] = {
+    "categoria": "ninguna",
+    "dimension": None,
+    "severidad": "ninguna",
+    "justificacion": "",
+    "evidencia": "",
+    "regla_disparada": None,
+    "marcadores_detectados": None,
+    "confianza": None,
+    "score_ajuste": None,
+    "es_falso_positivo_probable": "false",
+}
+
+
+def primary_label(labels: list[dict]) -> dict[str, object]:
+    """Return the primary label dict (highest severity; ties keep order).
+
+    Used to mirror a multi-label ``analysis_labels`` row into the flat
+    ``analysis_results`` columns (``categoria``/``dimension``/
+    ``justificacion``/etc.). Empty input returns neutral defaults so
+    callers can ``.get(...)`` safely.
+
+    Severity ranking (descending): ``alta`` > ``media`` > ``baja`` >
+    ``ninguna``. Unknown values fall back to ``ninguna``.
+    """
+    if not labels:
+        return dict(_PRIMARY_LABEL_DEFAULTS)
+
+    rank = {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}
+
+    def _rank(label: dict) -> int:
+        sev = str(label.get("severidad") or "ninguna").lower()
+        return rank.get(sev, 0)
+
+    chosen = max(labels, key=lambda lbl: (_rank(lbl), 1))
+    return {
+        "categoria": chosen.get("categoria") or "ninguna",
+        "dimension": chosen.get("dimension"),
+        "severidad": chosen.get("severidad") or "ninguna",
+        "justificacion": chosen.get("justificacion") or "",
+        "evidencia": chosen.get("evidencia") or "",
+        "regla_disparada": chosen.get("regla_disparada"),
+        "marcadores_detectados": chosen.get("marcadores_detectados"),
+        "confianza": chosen.get("confianza"),
+        "score_ajuste": chosen.get("score_ajuste"),
+        "es_falso_positivo_probable": (
+            "true" if chosen.get("es_falso_positivo_probable") else "false"
+        ),
+    }
+
+
 def _coerce_float(value: object) -> float | None:
     """Best-effort float coercion for confidence/score fields."""
     if isinstance(value, bool):

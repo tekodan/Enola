@@ -53,22 +53,30 @@ def _render_body() -> None:
 
     if not feedback:
         with ui.element("div").style(
-            "padding: 2rem; border-radius: 0.875rem; "
+            "padding: 2.5rem 2rem; border-radius: 0.875rem; "
             "background: rgba(191, 161, 129, 0.08); "
-            "border-left: 3px solid var(--enola-brass); "
+            "border: 1px solid rgba(191, 161, 129, 0.30); "
             "color: var(--enola-charcoal); text-align: center;"
         ):
-            ui.icon("psychology", size="48px").style(
-                f"color: {theme.BRASS_DEEP}; margin-bottom: 0.75rem;"
-            )
-            ui.label("Sin feedback humano todavía").classes("text-lg font-semibold mb-2").style(
-                "color: var(--enola-plum);"
-            )
+            with ui.element("div").style(
+                "width: 64px; height: 64px; border-radius: 16px; margin: 0 auto 1rem; "
+                f"background: linear-gradient(135deg, {theme.PLUM} 0%, "
+                f"{theme.ROSE} 100%); "
+                "display: flex; align-items: center; justify-content: center; "
+                f"box-shadow: 0 6px 16px -6px {theme.PLUM}55;"
+            ):
+                ui.icon("psychology", size="30px").style(f"color: {theme.CREAM};")
+            ui.label("Sin feedback humano todavía").classes(
+                "text-lg font-semibold enola-display"
+            ).style(f"color: {theme.PLUM}; letter-spacing: -0.015em;")
             ui.label(
                 "Marcá análisis en la pestaña **Validación** de "
                 "`streamlit run src/ui/app.py` para alimentar estas "
                 "métricas."
-            ).classes("text-sm leading-relaxed")
+            ).classes("text-sm mt-2").style(
+                "color: var(--enola-charcoal-light); line-height: 1.6; max-width: 50ch; "
+                "margin-left: auto; margin-right: auto;"
+            )
         return
 
     # Build a lookup of analysis rows by id so the metrics module can
@@ -184,15 +192,15 @@ def _render_body() -> None:
 
     # Plain-language interpretation
     with ui.element("div").style(
-        "padding: 1.5rem 1.75rem; border-radius: 0.875rem; "
-        "background: linear-gradient(135deg, rgba(107, 78, 113, 0.06), "
-        "rgba(192, 132, 151, 0.08)); "
-        "border-left: 3px solid var(--enola-plum); "
-        "color: var(--enola-charcoal); line-height: 1.6;"
+        "padding: 1.75rem 2rem; border-radius: 1rem; "
+        "background: linear-gradient(135deg, rgba(107, 78, 113, 0.06) 0%, "
+        "rgba(192, 132, 151, 0.10) 100%); "
+        "border-left: 4px solid var(--enola-plum); "
+        "color: var(--enola-charcoal); line-height: 1.65;"
     ):
         ui.label("Lectura interpretativa").classes(
-            "text-xs uppercase tracking-widest font-semibold mb-2"
-        ).style("color: var(--enola-brass-deep);")
+            "text-xs uppercase tracking-widest font-semibold enola-section-eyebrow mb-3"
+        ).style("display: inline-flex;")
 
         prec = metrics["Precisión"] * 100
         rec = metrics["Sensibilidad (Recall)"] * 100
@@ -266,4 +274,5 @@ def page_ia() -> None:
         subtitle="Regla 6 — matriz de confusión y métricas de la IA",
         current_path="/ia",
         body=_render_body,
+        requires_auth=False,
     )

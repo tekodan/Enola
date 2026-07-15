@@ -2,7 +2,8 @@
 
 Renders a typographically rich header with:
 
-* an *eyebrow* label (small, uppercase, brass-tinted, wide-tracked),
+* an *eyebrow* label (small, uppercase, brass-tinted, wide-tracked) +
+  decorative rule,
 * a *title* in display serif (Lora),
 * an optional subtitle / description line,
 * a thin brass gradient divider underneath.
@@ -34,7 +35,5 @@ def section_header(
             ui.label(eyebrow).classes("enola-section-eyebrow")
         ui.label(title).classes("enola-section-title")
         if subtitle:
-            ui.label(subtitle).classes("text-sm mt-1").style(
-                "color: var(--enola-charcoal-light); max-width: 70ch;"
-            )
+            ui.label(subtitle).classes("enola-section-subtitle")
     ui.element("div").classes("enola-brass-divider")

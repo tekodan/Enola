@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
-from nicegui import ui
+from nicegui import app, ui
 
 # Bootstrap admin BEFORE registering routes so the database schema
 # (incl. the new ``users`` table) is ready when the first login
@@ -38,6 +39,9 @@ except Exception:  # noqa: BLE001
 # routes. This must happen BEFORE ui.run().
 from src.ui.nicegui_app.pages import (  # noqa: E402,F401  -- registers @ui.page routes
     conocimiento,
+    conocimiento_cargar,
+    conocimiento_editor,
+    conocimiento_explorar,
     estadistica,
     ia,
     inicio,
@@ -72,6 +76,14 @@ if not _storage_secret:
             # If we can't persist, just use the ephemeral secret — every
             # boot re-authenticates, which is annoying but secure.
             pass
+
+
+# Mount the logo directory (inside the package) at /static so the
+# Enola / UGR PNGs are served at predictable URLs. ``layout.side_drawer``
+# references these as ``/static/...``.
+_static_dir = Path(__file__).resolve().parent / "static"
+if _static_dir.exists():
+    app.add_static_files("/static", str(_static_dir))
 
 
 ui.run(

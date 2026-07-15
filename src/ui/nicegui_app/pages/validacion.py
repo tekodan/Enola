@@ -34,6 +34,7 @@ from src.analyzer.category_mapping import (
     SUBDIMENSIONES_POR_CATEGORIA,
     Severity,
 )
+from src.analyzer.rag_classifier import RAGClassifier
 from src.config.settings import get_settings
 from src.knowledge_base.feedback_store import get_feedback_store
 from src.storage import get_database
@@ -69,14 +70,19 @@ def page_validacion() -> None:
 
 
 def _load_data() -> tuple[list[dict], dict[str, str]]:
-    """Read analyses + feedback + posts-text-lookup from the database."""
+    """Read analyses + feedback + posts-text-lookup from the database.
+
+    Comment texts are NOT cached in ``text_lookup`` — they are fetched
+    on-demand via ``db.get_original_text()`` when not found in the
+    lookup.
+    """
     db = get_database()
     raw_analysis = db.get_analysis_results()
     feedback_rows = db.list_feedback()
     analysis = build_adjusted_analysis(raw_analysis, feedback_rows)
-    posts = db.get_posts(limit=5000)
 
     text_by_id: dict[str, str] = {}
+    posts = db.get_posts(limit=5000)
     for p in posts or []:
         pid = p.get("id")
         if pid is not None:
@@ -107,7 +113,9 @@ def _render_kpis(analysis: list[dict]) -> None:
     n_pending_rows = sum(
         1
         for a in analysis
-        if a.get("tiene_violencia") in ("true", "false") and not a.get("has_feedback")
+        if a.get("tiene_violencia") in ("true", "false")
+        and not a.get("has_feedback")
+        and (a.get("exclusion_label") or "") != "CODIGO_99"
     )
 
     try:
@@ -225,7 +233,9 @@ def _render_chromadb_panel() -> None:
                 logger.exception("Error indexando feedback %s", p.get("id"))
         status.clear()
         with status:
-            ui.label(f"✅ {ok} correcciones indexadas en ChromaDB.").classes("text-sm")
+            ui.label(f"✅ {ok} correcciones indexadas en ChromaDB.").classes("text-sm").style(
+                f"color: {theme.RELIABILITY_OK};"
+            )
             if errors:
                 with ui.expansion(f"⚠ {len(errors)} errores", value=False):
                     for err in errors:
@@ -235,7 +245,7 @@ def _render_chromadb_panel() -> None:
         "🚀 Indexar correcciones pendientes",
         on_click=_run_index,
         icon="play_arrow",
-    ).props("color=primary unelevated").classes("mt-3")
+    ).props("color=primary unelevated").classes("mt-3").style("font-weight: 500;")
 
 
 # --- Filters -----------------------------------------------------------------
@@ -363,6 +373,7 @@ def _render_feedback_form(
     user: dict,
     on_change=lambda: None,
     on_save_success: Callable[[], None] | None = None,
+    reeval_open: Callable[[str, str], None] | None = None,
 ) -> None:
     """Render the feedback form for a single analysis row.
 
@@ -438,6 +449,16 @@ def _render_feedback_form(
     state.on_refresh = verdict_region.refresh
     verdict_region()
 
+    text_for_reeval = (
+        row.get("text_snapshot")
+        or text_lookup.get(content_id)
+        or db.get_original_text(content_type, content_id)
+        or ""
+    )
+
+    if state.agrees == "no":
+        _render_correction_form(state, reeval_open, text_for_reeval)
+
 
 def _radio_to_agrees(value: str) -> str | None:
     """Map the radio display label to the short ``state.agrees`` token."""
@@ -503,7 +524,11 @@ def _render_verdict_section(
         ui.label(state.feedback_msg).classes("text-sm mt-2").style(f"color: {color};")
 
 
-def _render_correction_form(state: _RowFormState) -> None:
+def _render_correction_form(
+    state: _RowFormState,
+    reeval_open: Callable[[str, str], None] | None = None,
+    text_for_reeval: str = "",
+) -> None:
     """Render the multi-label correction form when ``state.agrees == 'no'``.
 
     Each label row is self-contained and mutates the row dict in place
@@ -545,7 +570,7 @@ def _render_correction_form(state: _RowFormState) -> None:
             state.labels = [{"categoria": "", "dimension": "", "severidad": "media"}]
 
         for idx, lbl in enumerate(state.labels):
-            _render_label_row(idx, lbl)
+            _render_label_row(idx, lbl, reeval_open, text_for_reeval)
 
         with ui.row().classes("gap-2 mt-3"):
 
@@ -571,7 +596,12 @@ def _render_correction_form(state: _RowFormState) -> None:
             ).props("outline size=sm").set_enabled(len(state.labels) > 1)
 
 
-def _render_label_row(row_idx: int, lbl: dict) -> None:
+def _render_label_row(
+    row_idx: int,
+    lbl: dict,
+    reeval_open: Callable[[str, str], None] | None = None,
+    text_for_reeval: str = "",
+) -> None:
     """Render a single label row in the multi-label editor.
 
     The row holds direct widget references (``cat_select``, ``dim_select``
@@ -682,11 +712,182 @@ def _render_label_row(row_idx: int, lbl: dict) -> None:
 
         evid_input.on_value_change(_on_evid_change)
 
+        if reeval_open and text_for_reeval:
+
+            def _on_reeval_click() -> None:
+                suggested = lbl.get("justificacion") or ""
+                reeval_open(text_for_reeval, suggested)
+
+            @ui.refreshable
+            def _reeval_response() -> None:
+                pass
+
+            lbl["_reeval_response"] = _reeval_response
+            lbl["_reeval_refresh"] = _reeval_response.refresh
+
+            ui.button(
+                "🔄 Reevaluar con IA",
+                icon="psychology",
+                on_click=_on_reeval_click,
+            ).props("outline size=sm color=primary").classes("mt-2")
+
+
+def _build_reevaluate_dialog() -> tuple[Any, Callable[[str, str], None]]:
+    """Build the reevaluation dialog and return (dialog, open_fn)."""
+    dialog = ui.dialog().props("persistent")
+    current: dict[str, Any] = {"text": "", "suggested": "", "result": None, "loading": False}
+
+    def _open(text: str, suggested: str = "") -> None:
+        current["text"] = text
+        current["suggested"] = suggested
+        current["result"] = None
+        body.refresh()
+        dialog.open()
+
+    with dialog, ui.card().classes("w-full max-w-xl").style("max-height: 85vh; overflow-y: auto;"):
+        with ui.element("div").classes("w-full flex items-center justify-between mb-3"):
+            ui.label("🔄 Reevaluación con la IA").classes("text-lg font-semibold").style(
+                "color: var(--enola-plum);"
+            )
+            ui.button(icon="close", on_click=dialog.close).props("flat round dense")
+
+        @ui.refreshable
+        def body() -> None:
+            if current["loading"]:
+                ui.label("Consultando a la IA…").classes("text-sm")
+                with ui.element("div").style("text-align: center; padding: 1rem;"):
+                    ui.spinner(size="lg")
+                return
+
+            if current["result"]:
+                result = current["result"]
+                explanation = result.get("explanation", "")
+                matched = result.get("matched_categories", [])
+                missed = result.get("missed_categories", [])
+
+                with ui.element("div").style(
+                    "padding: 1rem; "
+                    "background: rgba(107, 78, 113, 0.06); "
+                    "border-radius: 0.5rem; margin-top: 0.5rem;"
+                ):
+                    ui.label("🤖 Explicación de la IA").classes("text-sm font-semibold").style(
+                        "color: var(--enola-plum);"
+                    )
+                    if explanation:
+                        ui.label(explanation).classes("text-sm mt-1")
+                    if matched:
+                        ui.label(
+                            f"✅ Categorías aplicadas correctamente: {', '.join(matched)}"
+                        ).classes("text-sm mt-1").style("color: var(--enola-brass-deep);")
+                    if missed:
+                        ui.label(f"⚠ Categorías no detectadas: {', '.join(missed)}").classes(
+                            "text-sm mt-1"
+                        ).style("color: var(--enola-accent);")
+                    if not matched and not missed and not explanation:
+                        ui.label("La IA no proporcionó una explicación detallada.").classes(
+                            "text-sm"
+                        )
+                ui.button("Cerrar", on_click=dialog.close).props("outline mt-2")
+                return
+
+            ui.label(
+                "Indicá las categorías que creés que deberían aplicarse y la IA "
+                "te explicará por qué coincide o no con su clasificación original."
+            ).classes("text-xs mb-3").style("color: var(--enola-charcoal-light);")
+
+            ui.input(
+                label="Categorías sugeridas (ej: 1.1, 2.3, 4.3)",
+                value=current["suggested"],
+                placeholder="1.1, 2.3, 4.3",
+            ).props("outlined dense w-full").classes("mb-3").bind_value(current, "suggested")
+
+            with ui.row().classes("gap-2"):
+                ui.button(
+                    "🔄 Evaluar",
+                    icon="psychology",
+                    on_click=lambda: _run_reevaluation(current, body),
+                ).props("color=primary")
+                ui.button("Cancelar", on_click=dialog.close).props("outline")
+
+    return dialog, _open
+
+
+def _run_reevaluation(current: dict[str, Any], refresh_fn: Callable[[], None]) -> None:
+    """Call the LLM with the suggested categories and store the explanation."""
+    text = current.get("text", "")
+    suggested_raw = current.get("suggested", "")
+    if not text:
+        ui.notify("No hay texto para evaluar.", type="warning")
+        return
+
+    suggested_dims = [d.strip() for d in suggested_raw.split(",") if d.strip()]
+    current["loading"] = True
+    refresh_fn()
+
+    try:
+        classifier = RAGClassifier()
+        result = classifier.classify_sync(text)
+        ai_dims = [
+            f"{lbl.categoria}/{lbl.dimension or ''}"
+            for lbl in (result.clasificaciones or [])
+            if lbl.categoria and lbl.categoria != "ninguna"
+        ]
+
+        matched = [d for d in suggested_dims if any(d in ad or ad.endswith(d) for ad in ai_dims)]
+        missed_ai = [d for d in ai_dims if d not in matched]
+        missed_suggested = [d for d in suggested_dims if d not in matched]
+
+        if matched and missed_suggested:
+            explanation = (
+                f"La IA determinó que las categorías correctas son {', '.join(ai_dims)}. "
+                f"De las categorías que indicaste ({', '.join(suggested_dims)}), "
+                f"coinciden: {', '.join(matched)}. "
+                f"Las que no fueron detectadas: {', '.join(missed_suggested)}. "
+                f"Las categorías que la IA asignó pero vos no indicaste: {', '.join(missed_ai)}."
+            )
+        elif matched and not missed_suggested:
+            explanation = (
+                f"✅ La IA coincide con todas las categorías que indicaste ({', '.join(matched)}). "
+                f"Su clasificación: {', '.join(ai_dims)}."
+            )
+        elif not matched and missed_ai:
+            explanation = (
+                f"La IA clasificó este contenido como: {', '.join(ai_dims)}. "
+                f"Ninguna de las categorías que indicaste ({', '.join(suggested_dims)}) "
+                f"coincide con la evaluación de la IA."
+            )
+        else:
+            explanation = (
+                f"La IA clasificó como: {', '.join(ai_dims) if ai_dims else 'ninguna categoría de violencia'}. "
+                f"Indicaste: {', '.join(suggested_dims) if suggested_dims else 'ninguna'}."
+            )
+
+        current["result"] = {
+            "explanation": explanation,
+            "ai_categories": ai_dims,
+            "suggested_categories": suggested_dims,
+            "matched_categories": matched,
+            "missed_categories": missed_suggested,
+        }
+    except Exception as exc:
+        logger.exception("Reevaluation failed")
+        current["result"] = {
+            "explanation": f"Error al consultar la IA: {exc}",
+            "ai_categories": [],
+            "suggested_categories": suggested_dims,
+            "matched_categories": [],
+            "missed_categories": [],
+        }
+    finally:
+        current["loading"] = False
+        refresh_fn()
+
 
 def _render_save_buttons(
     state: _RowFormState,
     row: dict,
     user: dict,
+    reeval_dialog_open: Callable[[str], None] | None = None,
 ) -> None:
     """Render the two CTAs, gated on whether the form is submittable."""
     if state.agrees not in ("yes", "no"):
@@ -731,8 +932,6 @@ def _render_save_buttons(
             icon="cloud_upload",
             on_click=_save_and_index,
         )
-        # Index only makes sense when correcting — agreeing with the IA
-        # is already a "no correction" event.
         if state.agrees != "no":
             idx_btn.props("disable")
 
@@ -867,10 +1066,14 @@ def _render_body() -> None:
 
     _render_kpis(analysis)
 
-    with ui.element("div").style("height: 1rem;"):
+    with ui.element("div").style("height: 0.5rem;"):
         pass
 
-    with ui.expansion("🔧 Colección `feedback_corrections` (ChromaDB)").classes("w-full"):
+    with (
+        ui.expansion("🔧 Colección `feedback_corrections` (ChromaDB)")
+        .classes("w-full")
+        .props("header-class=enola-section-eyebrow")
+    ):
         _render_chromadb_panel()
 
     section_header(
@@ -979,8 +1182,10 @@ def _render_review_table(rows: list[dict], modal: Any, text_lookup: dict[str, st
     with ui.element("div").style(
         "overflow-x: auto; "
         "border: 1px solid rgba(191, 161, 129, 0.30); "
-        "border-radius: 0.5rem; "
-        "background: var(--enola-cream);"
+        "border-radius: 0.75rem; "
+        "background: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, "
+        "var(--enola-cream) 100%); "
+        "box-shadow: 0 6px 18px -10px rgba(35, 30, 46, 0.08);"
     ):
         with ui.element("table").style(
             "width: 100%; "
@@ -992,7 +1197,8 @@ def _render_review_table(rows: list[dict], modal: Any, text_lookup: dict[str, st
             # Header row
             with ui.element("thead"):
                 with ui.element("tr").style(
-                    "background: linear-gradient(180deg, rgba(107, 78, 113, 0.10), rgba(107, 78, 113, 0.04));"
+                    "background: linear-gradient(180deg, rgba(107, 78, 113, 0.10) 0%, "
+                    "rgba(107, 78, 113, 0.04) 100%);"
                 ):
                     for header_text, align in (
                         ("Tipo", "left"),
@@ -1003,13 +1209,13 @@ def _render_review_table(rows: list[dict], modal: Any, text_lookup: dict[str, st
                         ("Acción", "center"),
                     ):
                         with ui.element("th").style(
-                            f"padding: 0.65rem 0.85rem; "
+                            f"padding: 0.75rem 0.95rem; "
                             f"text-align: {align}; "
                             f"font-weight: 600; "
                             f"font-size: 0.7rem; "
-                            f"letter-spacing: 0.08em; "
+                            f"letter-spacing: 0.10em; "
                             f"text-transform: uppercase; "
-                            f"color: var(--enola-charcoal-light); "
+                            f"color: var(--enola-plum); "
                             f"border-bottom: 2px solid var(--enola-brass); "
                             f"white-space: nowrap;"
                         ):
@@ -1027,9 +1233,9 @@ def _render_review_table(rows: list[dict], modal: Any, text_lookup: dict[str, st
 
                     # Tint by review state.
                     if reviewed and fb.get("agrees") == "true":
-                        row_bg = "#e8f5e9"  # agreed — pale green
+                        row_bg = "rgba(143, 166, 142, 0.10)"  # agreed — pale green
                     elif reviewed and fb.get("agrees") == "false":
-                        row_bg = "#fdecea"  # corrected — pale red
+                        row_bg = "rgba(192, 132, 151, 0.08)"  # corrected — pale rose
                     else:
                         row_bg = "transparent"
 
@@ -1041,16 +1247,18 @@ def _render_review_table(rows: list[dict], modal: Any, text_lookup: dict[str, st
                     content_type_icon = "💬" if row.get("content_type") == "comment" else "📄"
 
                     with ui.element("tr").style(
-                        f"background: {row_bg}; border-bottom: 1px solid rgba(191, 161, 129, 0.18);"
+                        f"background: {row_bg}; "
+                        f"border-bottom: 1px solid rgba(191, 161, 129, 0.18); "
+                        f"transition: background 150ms ease;"
                     ):
                         with ui.element("td").style(
-                            "padding: 0.55rem 0.85rem; text-align: left; font-size: 0.95rem;"
+                            "padding: 0.65rem 0.95rem; text-align: left; font-size: 0.95rem;"
                         ):
                             ui.label(content_type_icon)
                         with ui.element("td").style(
-                            "padding: 0.55rem 0.85rem; "
+                            "padding: 0.65rem 0.95rem; "
                             "text-align: left; "
-                            "font-family: monospace; "
+                            "font-family: var(--enola-font-mono); "
                             "font-size: 0.75rem; "
                             "color: var(--enola-charcoal-light); "
                             "white-space: nowrap;"
@@ -1058,7 +1266,7 @@ def _render_review_table(rows: list[dict], modal: Any, text_lookup: dict[str, st
                             short_id = content_id[:24] + ("…" if len(content_id) > 24 else "")
                             ui.label(short_id)
                         with ui.element("td").style(
-                            "padding: 0.55rem 0.85rem; "
+                            "padding: 0.65rem 0.95rem; "
                             "text-align: left; "
                             "font-weight: 500; "
                             "color: var(--enola-plum); "
@@ -1066,23 +1274,23 @@ def _render_review_table(rows: list[dict], modal: Any, text_lookup: dict[str, st
                         ):
                             ui.label(cat_label)
                         with ui.element("td").style(
-                            "padding: 0.55rem 0.85rem; "
+                            "padding: 0.65rem 0.95rem; "
                             "text-align: left; "
-                            "font-family: monospace; "
+                            "font-family: var(--enola-font-mono); "
                             "font-size: 0.75rem; "
                             "color: var(--enola-charcoal-light); "
                             "white-space: nowrap;"
                         ):
                             ui.label(f"`{dim}`")
                         with ui.element("td").style(
-                            "padding: 0.55rem 0.85rem; "
+                            "padding: 0.65rem 0.95rem; "
                             "text-align: left; "
                             "font-size: 0.8rem; "
                             "white-space: nowrap;"
                         ):
                             ui.label(estado_text)
                         with ui.element("td").style(
-                            "padding: 0.45rem 0.85rem; text-align: center;"
+                            "padding: 0.55rem 0.95rem; text-align: center;"
                         ):
 
                             def _open(_r=row) -> None:
@@ -1100,7 +1308,7 @@ def _render_review_table(rows: list[dict], modal: Any, text_lookup: dict[str, st
                                     on_click=_open,
                                 )
                                 .props("outline color=primary size=sm")
-                                .style("min-width: 110px;")
+                                .style("min-width: 110px; font-weight: 500;")
                             )
 
 
@@ -1116,6 +1324,7 @@ def _build_review_modal(
     dismisses; saving also dismisses and runs ``on_after_save``.
     """
     modal = ui.dialog().props("persistent")
+    reeval_dialog, reeval_open = _build_reevaluate_dialog()
 
     current_row_ref: dict[str, Any] = {"row": None}
 
@@ -1125,10 +1334,18 @@ def _build_review_modal(
         modal.open()
 
     with modal, ui.card().classes("w-full max-w-4xl").style("max-height: 90vh; overflow-y: auto;"):
-        with ui.element("div").classes("w-full flex items-center justify-between mb-3"):
-            ui.label("📝 Revisar análisis").classes("text-xl font-semibold enola-display").style(
-                "color: var(--enola-plum);"
-            )
+        with (
+            ui.element("div")
+            .classes("w-full flex items-center justify-between mb-3")
+            .style("padding-bottom: 0.75rem; border-bottom: 1px solid rgba(191, 161, 129, 0.20);")
+        ):
+            with ui.column().classes("gap-0"):
+                ui.label("Revisar análisis").classes("text-2xl font-semibold enola-display").style(
+                    "color: var(--enola-plum); letter-spacing: -0.02em; line-height: 1.1;"
+                )
+                ui.label("Validá o corregí la clasificación de la IA").classes(
+                    "text-xs mt-1"
+                ).style("color: var(--enola-charcoal-light); letter-spacing: 0.02em;")
             ui.button(
                 icon="close",
                 on_click=lambda: (body.refresh(), modal.close()),
@@ -1140,13 +1357,14 @@ def _build_review_modal(
             if not row:
                 ui.label("Sin análisis seleccionado.").classes("text-sm")
                 return
-            _render_modal_body(row, text_lookup, user, modal, on_after_save)
+            _render_modal_body(row, text_lookup, user, modal, on_after_save, reeval_open)
 
         body()
 
     # Expose open_for_row via a wrapper we attach to the dialog object
     # so callers don't need to know the inner closure name.
     modal._open_for_row = _open  # type: ignore[attr-defined]
+    modal._reeval_dialog = reeval_dialog  # type: ignore[attr-defined]
     return modal
 
 
@@ -1161,15 +1379,16 @@ def _render_modal_body(
     user: dict,
     modal: Any,
     on_after_save: Callable[[], None] | None,
+    reeval_open: Callable[[str, str], None] | None = None,
 ) -> None:
     """Render the modal contents: header strip + form."""
     content_type = str(row.get("content_type") or "?").upper()
     content_id = str(row.get("content_id") or "?")
-    cat_label = label_for(row.get("categoria") or "—")
-    dim = row.get("dimension") or "—"
-    sev = row.get("severidad") or "—"
+    ai_labels = list(row.get("labels") or [])
+    primary_cat = row.get("categoria") or "—"
+    primary_dim = row.get("dimension") or "—"
+    primary_sev = row.get("severidad") or "—"
 
-    # Header strip — type + ID + AI summary
     with ui.element("div").style(
         "padding: 0.75rem 1rem; border-radius: 0.5rem; "
         "background: rgba(107, 78, 113, 0.06); "
@@ -1183,14 +1402,141 @@ def _render_modal_body(
             ui.label(content_id).classes("text-xs").style(
                 "color: var(--enola-charcoal-light); font-family: monospace;"
             )
-        ui.label(f"IA: {cat_label} / {dim} · severidad {sev}").classes("text-sm mt-1").style(
-            "color: var(--enola-charcoal);"
+        if ai_labels:
+            for i, lbl in enumerate(ai_labels, start=1):
+                lbl_cat = label_for(lbl.get("categoria") or "—")
+                lbl_dim = lbl.get("dimension") or "—"
+                lbl_sev = (lbl.get("severidad") or "ninguna").capitalize()
+                ui.label(f"#{i} IA: {lbl_cat} / {lbl_dim} · {lbl_sev}").classes(
+                    "text-sm mt-1"
+                ).style("color: var(--enola-charcoal);")
+        else:
+            cat_label = label_for(primary_cat)
+            ui.label(f"IA: {cat_label} / {primary_dim} · severidad {primary_sev}").classes(
+                "text-sm mt-1"
+            ).style("color: var(--enola-charcoal);")
+
+        text_for_analysis = (
+            row.get("text_snapshot")
+            or text_lookup.get(content_id)
+            or get_database().get_original_text(content_type, content_id)
+            or ""
         )
 
-    # Form — same widget tree as the legacy expansion view, but framed
-    # inside a clean column instead of an expansion. We pass an
-    # ``on_save_success`` hook so the save buttons can dismiss the
-    # modal and refresh the listing once the row is persisted.
+        reanalysis_state: dict[str, Any] = {
+            "loading": False,
+            "result": None,
+            "error": None,
+        }
+
+        @ui.refreshable
+        def reanalysis_panel() -> None:
+            if reanalysis_state["loading"]:
+                ui.label("🔄 Reanalizando con la IA…").classes("text-sm mt-2")
+                with ui.element("div").style("text-align: center; padding: 0.5rem;"):
+                    ui.spinner(size="sm")
+                return
+
+            if reanalysis_state["error"]:
+                ui.label(f"❌ Error: {reanalysis_state['error']}").classes("text-sm mt-2").style(
+                    "color: var(--enola-accent);"
+                )
+                ui.button("Reintentar", icon="refresh", on_click=_do_reanalysis).props(
+                    "outline size=sm mt-1"
+                )
+                return
+
+            if reanalysis_state["result"]:
+                result = reanalysis_state["result"]
+                new_labels = result.clasificaciones or []
+                if new_labels:
+                    with ui.element("div").style(
+                        "margin-top: 0.75rem; padding: 0.75rem; "
+                        "border-radius: 0.5rem; "
+                        "background: rgba(78, 163, 107, 0.08); "
+                        "border: 1px solid rgba(78, 163, 107, 0.25);"
+                    ):
+                        ui.label("🆕 Nueva clasificación de la IA").classes(
+                            "text-xs uppercase tracking-widest font-semibold"
+                        ).style("color: #4ea36b;")
+                        for i, lbl in enumerate(new_labels, start=1):
+                            lbl_cat = label_for(lbl.categoria or "—")
+                            lbl_dim = lbl.dimension or "—"
+                            lbl_sev = (
+                                lbl.severidad.value if lbl.severidad else "ninguna"
+                            ).capitalize()
+                            ui.label(f"#{i} {lbl_cat} / {lbl_dim} · {lbl_sev}").classes(
+                                "text-sm mt-1"
+                            )
+                            if lbl.justificacion:
+                                ui.label(f"   Justificación: {lbl.justificacion[:200]}").classes(
+                                    "text-xs"
+                                ).style("color: var(--enola-charcoal-light);")
+                        with ui.row().classes("gap-2 mt-2"):
+
+                            def _accept_reanalysis() -> None:
+                                row["labels"] = [lbl.to_dict() for lbl in new_labels]
+                                if new_labels:
+                                    primary = new_labels[0]
+                                    row["categoria"] = primary.categoria
+                                    row["dimension"] = primary.dimension or ""
+                                    row["severidad"] = (
+                                        primary.severidad.value if primary.severidad else "ninguna"
+                                    )
+                                reanalysis_state["result"] = None
+                                reanalysis_panel.refresh()
+                                ui.notify("✅ Nueva clasificación aplicada", type="positive")
+
+                            ui.button(
+                                "✅ Aplicar nueva clasificación",
+                                icon="check",
+                                on_click=_accept_reanalysis,
+                            ).props("color=positive size=sm")
+                            ui.button(
+                                "Descartar",
+                                icon="close",
+                                on_click=lambda: (
+                                    reanalysis_state.__setitem__("result", None),
+                                    reanalysis_panel.refresh(),
+                                ),
+                            ).props("outline size=sm")
+                else:
+                    ui.label("La IA no detectó violencia en este contenido.").classes(
+                        "text-sm mt-2"
+                    )
+
+        def _do_reanalysis() -> None:
+            reanalysis_state["loading"] = True
+            reanalysis_state["result"] = None
+            reanalysis_state["error"] = None
+            reanalysis_panel.refresh()
+
+            def _run() -> None:
+                try:
+                    classifier = RAGClassifier()
+                    result = classifier.classify_sync(text_for_analysis)
+                    reanalysis_state["result"] = result
+                except Exception as exc:
+                    logger.exception("Reanalysis failed")
+                    reanalysis_state["error"] = str(exc)
+                finally:
+                    reanalysis_state["loading"] = False
+                    reanalysis_panel.refresh()
+
+            ui.notify("Reanalizando…", type="info", duration=1)
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, _run)
+
+        ui.button(
+            "🔄 Reanalizar con IA",
+            icon="psychology",
+            on_click=_do_reanalysis,
+        ).props("outline size=sm color=primary").classes("mt-2")
+
+        reanalysis_panel()
+
     with ui.column().classes("w-full"):
 
         def _on_save_done() -> None:
@@ -1204,6 +1550,7 @@ def _render_modal_body(
             user=user,
             on_change=lambda: None,
             on_save_success=_on_save_done,
+            reeval_open=reeval_open,
         )
 
 

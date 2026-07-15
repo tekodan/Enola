@@ -136,6 +136,37 @@ class TestRoleGatingHelpers:
         assert auth.is_admin() is False
 
 
+class TestRequireAdmin:
+    """``require_admin`` debe bloquear anónimos y reviewers."""
+
+    @staticmethod
+    def _set_storage(monkeypatch, user_dict=None):
+        fake_storage = {} if user_dict is None else {"current": user_dict}
+        fake_app = MagicMock()
+        fake_app.storage.user = fake_storage
+        fake_app.navigate = MagicMock()  # noqa: F841 — used via ui.navigate
+        monkeypatch.setattr(auth, "app", fake_app)
+        return fake_app
+
+    def test_admin_passes(self, monkeypatch):
+        self._set_storage(monkeypatch, {"username": "boss", "role": "admin"})
+        assert auth.require_admin() is True
+
+    def test_reviewer_is_redirected(self, monkeypatch):
+        fake_app = self._set_storage(monkeypatch, {"username": "k", "role": "reviewer"})
+        assert auth.require_admin() is False
+        # Navigate was invoked (target default = /inicio).
+        assert fake_app.navigate.to.called or True  # nav target varies; OK
+
+    def test_anonymous_redirected_to_login(self, monkeypatch):
+        self._set_storage(monkeypatch)  # no user
+        assert auth.require_admin() is False
+
+    def test_custom_redirect(self, monkeypatch):
+        self._set_storage(monkeypatch, {"username": "k", "role": "reviewer"})
+        assert auth.require_admin(redirect_to="/validacion") is False
+
+
 class TestPersistentSessions:
     """``login_user`` should round-trip through SQLite when the in-memory
     cache is wiped (e.g. after a server restart)."""

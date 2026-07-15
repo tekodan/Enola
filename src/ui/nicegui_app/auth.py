@@ -16,9 +16,12 @@ Public surface:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from nicegui import app
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -203,6 +206,44 @@ def require_auth(redirect_to: str = "/login") -> bool:
     return False
 
 
+def require_admin(redirect_to: str = "/inicio") -> bool:
+    """Return True if the current user has ``admin`` role.
+
+    Three outcomes:
+
+    * Logged in **and** admin → ``True`` (page renders normally).
+    * Logged in **but not** admin → navigates to ``redirect_to`` and
+      returns ``False`` (caller should ``return`` immediately).
+    * Not logged in → navigates to ``/login`` and returns ``False``.
+
+    Use inside page functions for destructive features (subir a
+    ChromaDB, editar ``knowledge/*.md``, etc.)::
+
+        @ui.page('/conocimiento/editor')
+        def editor():
+            if not require_admin():
+                return
+            ...
+    """
+    user = current_user()
+    if user is None:
+        from nicegui import ui
+
+        ui.navigate.to("/login")
+        return False
+    if user.get("role") != "admin":
+        logger.warning(
+            "Acceso denegado a feature admin para user=%s (role=%s)",
+            user.get("username"),
+            user.get("role"),
+        )
+        from nicegui import ui
+
+        ui.navigate.to(redirect_to)
+        return False
+    return True
+
+
 def is_admin() -> bool:
     """Return True if the current user is an admin (convenience wrapper)."""
     return _service().is_admin(current_user())
@@ -286,6 +327,7 @@ __all__ = [
     "list_users",
     "login_user",
     "logout_user",
+    "require_admin",
     "require_auth",
     "set_user_active",
     "set_user_password",

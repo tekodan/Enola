@@ -8,6 +8,8 @@ los análisis para navegar.
 
 from __future__ import annotations
 
+import csv
+import io
 import logging
 from typing import Any
 
@@ -16,7 +18,7 @@ from nicegui import ui
 from src.storage import get_database
 from src.ui.adjusted_report import build_adjusted_analysis
 from src.ui.nicegui_app import theme
-from src.ui.nicegui_app.components.kpi_card import kpi_grid
+from src.ui.nicegui_app.components.kpi_card import empty_state, kpi_grid
 from src.ui.nicegui_app.components.section import section_header
 from src.ui.nicegui_app.layout import page_scaffold
 
@@ -78,6 +80,8 @@ def _load():
 def _build_table_rows(items: list[dict], filter_type: str) -> list[dict]:
     rows = []
     for r in items:
+        if r.get("exclusion_label"):
+            continue
         if filter_type != "all" and r.get("content_type") != filter_type:
             continue
         sev = r.get("severidad") or "ninguna"
@@ -106,14 +110,11 @@ def _render_detail(
 ) -> None:
     """Render the detail panel for the selected analysis row."""
     if selected_id is None:
-        with ui.element("div").style(
-            "padding: 2rem; border-radius: 0.875rem; "
-            "background: rgba(191, 161, 129, 0.06); "
-            "border: 1px dashed rgba(191, 161, 129, 0.35); "
-            "color: var(--enola-charcoal-light); text-align: center;"
-        ):
-            ui.icon("arrow_upward", size="32px").style("margin-bottom: 0.5rem;")
-            ui.label("Seleccioná un análisis arriba para ver el detalle.").classes("text-sm")
+        empty_state(
+            "arrow_upward",
+            "Seleccioná un análisis arriba",
+            hint="Hacé click en una fila de la tabla para ver el detalle completo.",
+        )
         return
 
     row = next((r for r in analysis if r.get("id") == selected_id), None)
@@ -335,6 +336,38 @@ def _render_detail(
                         ).style("color: var(--enola-charcoal);")
 
 
+# --- CSV Export ----------------------------------------------------------
+
+
+def _build_csv(analysis: list[dict], text_by_id: dict) -> bytes:
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";", quoting=csv.QUOTE_ALL)
+    writer.writerow(["id", "tipo", "id_contenido", "texto", "clasificaciones"])
+    for r in analysis:
+        content_id = r.get("content_id") or r.get("post_id") or r.get("comment_id")
+        texto = (
+            text_by_id.get(content_id, "") or r.get("evidencia") or ""
+            if content_id
+            else r.get("evidencia") or ""
+        )
+        labels = r.get("labels") or []
+        if labels:
+            parts = [
+                f"{label.get('categoria') or '—'}|{label.get('dimension') or '—'}|{label.get('severidad') or 'ninguna'}"
+                for label in labels
+            ]
+            clasificaciones = "||".join(parts)
+        else:
+            cat = r.get("categoria") or "—"
+            dim = r.get("dimension") or "—"
+            sev = r.get("severidad") or "ninguna"
+            clasificaciones = f"{cat}|{dim}|{sev}"
+        writer.writerow(
+            [r.get("id"), r.get("content_type") or "—", content_id or "", texto, clasificaciones]
+        )
+    return output.getvalue().encode("utf-8")
+
+
 # --- Page entry ----------------------------------------------------------
 
 
@@ -367,6 +400,7 @@ def page_inspector() -> None:
         subtitle="Drill-down de contenido analizado",
         current_path="/inspector",
         body=_render_body,
+        requires_auth=False,
     )
 
 
@@ -384,24 +418,25 @@ def _render_body() -> None:
     _INSPECTOR_STATE["selected_id"] = None
 
     if not analysis:
-        with ui.element("div").style(
-            "padding: 2rem; border-radius: 0.875rem; "
-            "background: rgba(191, 161, 129, 0.08); "
-            "border: 1px dashed rgba(191, 161, 129, 0.35); "
-            "color: var(--enola-charcoal); text-align: center;"
-        ):
-            ui.icon("inbox", size="48px").style("color: var(--enola-brass);")
-            ui.label("No hay análisis todavía").classes("text-lg font-semibold mt-2").style(
-                "color: var(--enola-plum);"
-            )
-            ui.label(
-                "Corré el scraper + clasificador (`streamlit run src/ui/app.py`) "
-                "para generar análisis."
-            ).classes("text-sm leading-relaxed")
+        empty_state(
+            "inbox",
+            "No hay análisis todavía",
+            hint=(
+                "Corré el análisis + clasificador "
+                "(`streamlit run src/ui/app.py`) para generar análisis."
+            ),
+        )
         return
 
     total = len(analysis)
-    violent = sum(1 for r in analysis if str(r.get("tiene_violencia") or "") == "true")
+    basura_count = sum(1 for r in analysis if str(r.get("exclusion_label") or "") == "CODIGO_99")
+    net_total = max(total - basura_count, 0)
+    violent = sum(
+        1
+        for r in analysis
+        if str(r.get("tiene_violencia") or "") == "true"
+        and str(r.get("exclusion_label") or "") != "CODIGO_99"
+    )
     excluded = sum(
         1 for r in analysis if (r.get("exclusion_label") or "") in {"CODIGO_99", "VIOLENCIA_COMUN"}
     )
@@ -412,16 +447,20 @@ def _render_body() -> None:
         [
             {
                 "label": "Análisis disponibles",
-                "value": str(total),
+                "value": str(net_total),
                 "icon": "inventory_2",
-                "sub": "Filas en analysis_results",
+                "sub": (
+                    f"De {total} filas · {basura_count} basura digital"
+                    if basura_count
+                    else "Filas en analysis_results"
+                ),
             },
             {
                 "label": "Con violencia",
                 "value": str(violent),
                 "icon": "warning",
                 "accent": theme.RELIABILITY_CRITICA,
-                "sub": f"{violent / total * 100:.1f}% del total" if total else "—",
+                "sub": (f"{violent / net_total * 100:.1f}% del neto" if net_total else "—"),
             },
             {
                 "label": "Excluidos (CÓDIGO 99 / común)",
@@ -435,7 +474,7 @@ def _render_body() -> None:
                 "value": str(feedback_count),
                 "icon": "person",
                 "accent": theme.PLUM,
-                "sub": f"{feedback_count / total * 100:.1f}% revisado" if total else "—",
+                "sub": (f"{feedback_count / net_total * 100:.1f}% revisado" if net_total else "—"),
             },
         ],
     )
@@ -473,6 +512,18 @@ def _render_body() -> None:
             value="all",
             on_change=lambda e: _on_filter_change(e.value),
         ).props("spread no-caps")
+
+        def _download_csv() -> None:
+            ui.download(
+                _build_csv(analysis, text_by_id),
+                filename="inspector_analisis.csv",
+            )
+
+        ui.button(
+            "⬇ CSV",
+            on_click=_download_csv,
+            icon="download",
+        ).props("flat size=sm color=primary").style(f"color: {theme.PLUM}; font-weight: 500;")
 
     def _on_select(event) -> None:
         sel = event.selection

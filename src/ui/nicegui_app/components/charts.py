@@ -15,6 +15,7 @@ from collections.abc import Sequence
 
 import plotly.graph_objects as go
 
+from src.analyzer.exclusion_filter import EXCLUSION_BASURA_DIGITAL
 from src.ui.nicegui_app import theme
 from src.ui.utils import CATEGORIAS_ORDENADAS
 
@@ -123,24 +124,44 @@ def build_pie_violent_vs_nonviolent(
     *,
     dark: bool = False,
 ) -> go.Figure:
-    """Donut chart: violentos vs. no violentos vs. clasificados.
+    """Donut chart: violentos vs. no violentos vs. basura digital.
 
-    Basura digital and violencia-común rows count as "Sin violencia"
-    (their ``tiene_violencia`` flag is ``false`` because the pre-filter
-    short-circuited them).
+    ``tiene_violencia == "true"`` → *Con violencia*.
+    Filas con ``exclusion_label == "CODIGO_99"`` (basura digital) se
+    separan en una tercera tajada — no se mezclan con "Sin violencia"
+    porque metodológicamente no son clasificables. ``VIOLENCIA_COMUN``
+    sigue contando como "Sin violencia" (su flag
+    ``tiene_violencia == "false"``). El resto (``"unknown"``) cae en
+    "Sin clasificar".
     """
-    counts = Counter(a.get("tiene_violencia") for a in results)
-    violent = counts.get("true", 0)
-    non_violent = counts.get("false", 0)
-    other = len(results) - violent - non_violent
+    violent = 0
+    non_violent = 0
+    basura = 0
+    unknown = 0
+    for a in results:
+        if a.get("exclusion_label") == EXCLUSION_BASURA_DIGITAL:
+            basura += 1
+            continue
+        flag = a.get("tiene_violencia")
+        if flag == "true":
+            violent += 1
+        elif flag == "false":
+            non_violent += 1
+        else:
+            unknown += 1
 
-    labels = ["Con violencia", "Sin violencia"]
-    values = [violent, non_violent]
-    colors = [theme.RELIABILITY_CRITICA, theme.RELIABILITY_OK]
-    if other:
-        labels.append("Sin clasificar")
-        values.append(other)
-        colors.append(theme.CHARCOAL_LIGHT)
+    slices: list[tuple[str, int, str]] = [
+        ("Con violencia", violent, theme.RELIABILITY_CRITICA),
+        ("Sin violencia", non_violent, theme.RELIABILITY_OK),
+    ]
+    if basura:
+        slices.append(("Basura digital (CÓDIGO 99)", basura, theme.BRASS))
+    if unknown:
+        slices.append(("Sin clasificar", unknown, theme.CHARCOAL_LIGHT))
+
+    labels = [s[0] for s in slices]
+    values = [s[1] for s in slices]
+    colors = [s[2] for s in slices]
 
     fig = go.Figure(
         data=[
@@ -153,7 +174,7 @@ def build_pie_violent_vs_nonviolent(
                 textposition="outside",
                 textfont=dict(family=theme.FONT_DISPLAY, size=14),
                 hovertemplate="<b>%{label}</b><br>%{value} (%{percent})<extra></extra>",
-                pull=[0.02, 0, 0],
+                pull=[0.02, 0, 0, 0],
             )
         ]
     )
@@ -170,7 +191,11 @@ def build_pie_violent_vs_nonviolent(
             )
         ]
     )
-    return _apply_common_layout(fig, title="Violentos vs. No violentos", dark=dark)
+    return _apply_common_layout(
+        fig,
+        title="Con violencia · Sin violencia · Basura digital",
+        dark=dark,
+    )
 
 
 def _count_categories(results: Sequence[dict]) -> Counter[str]:

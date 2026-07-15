@@ -69,16 +69,12 @@ def _latest_feedback_per_analysis(
 
 
 def _primary_override(labels: list[dict]) -> dict[str, object]:
-    """Pick the primary override label (highest severity, ties → first)."""
-    sev_order = {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}
-
-    def _rank(lbl: dict) -> int:
-        sev = str(lbl.get("severidad") or "ninguna")
-        return sev_order.get(sev, 0)
+    """Pick the primary override label (highest severity, ties broken by ``orden``)."""
+    from src.analyzer.category_mapping import primary_label
 
     if not labels:
         return {}
-    return max(labels, key=lambda lbl: (_rank(lbl), 1))
+    return primary_label(labels)
 
 
 def _is_violent_category(cat: str) -> bool:
@@ -136,6 +132,13 @@ def build_adjusted_analysis(
         out["has_feedback"] = True
         if str(fb.get("agrees") or "").lower() != "false":
             # Reviewer agreed — keep original analysis untouched.
+            out["adjusted_by_human"] = False
+            adjusted.append(out)
+            continue
+
+        # CODIGO_99 / VIOLENCIA_COMUN rows are immutable — the reviewer
+        # cannot "correct" trash digital or violence without gender bias.
+        if row.get("exclusion_label"):
             out["adjusted_by_human"] = False
             adjusted.append(out)
             continue
