@@ -9,7 +9,7 @@ write path used by the scraper.
 from collections.abc import Generator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.storage.base import Base
@@ -205,6 +205,8 @@ class Database:
                 feedback_additions.append(("reviewer_user_id", "INTEGER"))
             if "reviewer_username" not in feedback_cols:
                 feedback_additions.append(("reviewer_username", "VARCHAR"))
+            if "regla_disparada_sistema" not in feedback_cols:
+                feedback_additions.append(("regla_disparada_sistema", "VARCHAR"))
 
         existing_cols = {c["name"] for c in inspector.get_columns("analysis_results")}
 
@@ -1021,9 +1023,7 @@ class Database:
                 marcadores_detectados=marcadores_json,
                 confianza=_to_str_or_none(lbl.get("confianza")),
                 score_ajuste=_to_str_or_none(lbl.get("score_ajuste")),
-                es_falso_positivo_probable=(
-                    "true" if lbl.get("es_falso_positivo_probable") else "false"
-                ),
+                es_falso_positivo_probable=_to_bool_str(lbl.get("es_falso_positivo_probable")),
             )
             session.add(row)
 
@@ -1222,6 +1222,17 @@ class Database:
                 .first()
             )
 
+            # Auto-populate regla_disparada_sistema from analysis_results
+            # if the caller did not pass it explicitly. Lets the validation
+            # UI show "what rule did the AI fire?" without an extra JOIN.
+            # ``agrees`` (yes/no) is the human's verdict on the rule.
+            if "regla_disparada_sistema" not in feedback_data and analysis_result_id is not None:
+                ar_rule = session.execute(
+                    text("SELECT regla_disparada FROM analysis_results WHERE id = :arid"),
+                    {"arid": analysis_result_id},
+                ).scalar()
+                feedback_data["regla_disparada_sistema"] = ar_rule
+
             if existing:
                 for key, value in feedback_data.items():
                     if hasattr(existing, key):
@@ -1281,9 +1292,7 @@ class Database:
                 marcadores_detectados=marcadores_json,
                 confianza=_to_str_or_none(lbl.get("confianza")),
                 score_ajuste=_to_str_or_none(lbl.get("score_ajuste")),
-                es_falso_positivo_probable=(
-                    "true" if lbl.get("es_falso_positivo_probable") else "false"
-                ),
+                es_falso_positivo_probable=_to_bool_str(lbl.get("es_falso_positivo_probable")),
             )
             session.add(row)
 
@@ -1742,6 +1751,24 @@ def _to_str_or_none(value: object) -> str | None:
     if isinstance(value, str):
         s = value.strip()
         return s if s else None
+
+
+def _to_bool_str(value: object) -> str:
+    """Coerce ``value`` to the ``"true"`` / ``"false"`` storage string.
+
+    Important: do NOT use ``bool(value)`` directly because Python's truthiness
+    treats the *string* ``"false"`` as truthy — this is the bug that flipped
+    every false-positive flag to ``true`` across the data pipeline. Accept
+    bools, ints/floats (0 → False), and string literals (``"true"`` /
+    ``"false"`` / ``"yes"`` / ``"si"`` / ``"sí"`` / ``"1"``).
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return "true" if value != 0 else "false"
+    if isinstance(value, str):
+        return "true" if value.strip().lower() in {"true", "1", "yes", "si", "sí"} else "false"
+    return "false"
     return None
 
 

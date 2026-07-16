@@ -101,7 +101,7 @@ class TestAnalyzerConfig:
         assert config.similarity_threshold == 0.7
         assert config.context_chunks == 5
         assert config.temperature == 0
-        assert config.max_tokens == 2048
+        assert config.max_tokens == 4096
         assert config.few_shot_examples == 5
 
     def test_threshold_validation(self):

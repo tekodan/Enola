@@ -5,7 +5,7 @@ categories** and **numeric for sub-dimensions**. The LLM is instructed via
 the system prompt to pick up to ``MAX_LABELS`` valid combinations — never
 invent.
 
-The **structural data** (6 categories, 18 sub-dimensions, severity bands
+The **structural data** (6 categories, 19 sub-dimensions, severity bands
 and per-dimension descriptions) is the MD-canonical taxonomy at
 ``knowledge/taxonomia/TAXONOMIA.md``, loaded on import via
 :mod:`src.analyzer.taxonomy_loader`.
@@ -207,11 +207,22 @@ def normalize_dimension(categoria: str, dimension: object) -> str | None:
     - the dimension is missing/empty
     - the category is ``"ninguna"``
     - the dimension is not in the valid list for that category
+
+    R5 (docs/recomendaciones-subdimensiones-2026-07-14.md): when the
+    category is ``VDG_SALVAGUARDA_FALSO_POSITIVO`` and the LLM emits
+    no valid sub-dim, fall back to ``"6.3"`` (salvaguarda / falsos
+    positivos). This closes the "SAFEGUARD sin subdim" gap.
     """
     if dimension is None:
+        if categoria == Categoria.VDG_SALVAGUARDA_FALSO_POSITIVO.value:
+            logger.warning("SAFEGUARD sin sub-dim — aplicando default 6.3")
+            return "6.3"
         return None
     raw = str(dimension).strip()
     if not raw or raw.lower() in {"null", "none", "ninguna"}:
+        if categoria == Categoria.VDG_SALVAGUARDA_FALSO_POSITIVO.value:
+            logger.warning("SAFEGUARD sin sub-dim — aplicando default 6.3")
+            return "6.3"
         return None
     if categoria == Categoria.NINGUNA.value:
         return None
@@ -341,7 +352,7 @@ def primary_label(labels: list[dict]) -> dict[str, object]:
         "confianza": chosen.get("confianza"),
         "score_ajuste": chosen.get("score_ajuste"),
         "es_falso_positivo_probable": (
-            "true" if chosen.get("es_falso_positivo_probable") else "false"
+            "true" if _coerce_bool(chosen.get("es_falso_positivo_probable")) else "false"
         ),
     }
 
@@ -405,10 +416,16 @@ def validate_clasificaciones(
     - Drops entries with category outside the canonical set or with
       ``dimension`` not allowed for that category.
     - Deduplicates by ``(categoria, dimension)`` (first occurrence wins).
-    - Caps the result at ``max_labels`` entries (the first ones in the
-      input order are kept).
-    - Returns labels in input order (so the highest-priority label is at
-      index 0).
+      Two entries with the same ``(cat, dim)`` but **independent
+      ``marcadores_detectados``** (R4 from
+      ``docs/recomendaciones-subdimensiones-2026-07-14.md``) are
+      preserved as separate rows so the audit can trace multi-marker
+      hits (e.g. ``aliade`` + ``f3m1 nizta`` → 4.3 × 2).
+    - Caps the result at ``max_labels`` entries. Truncation is by
+      **severidad descending** (R3 of the plan) so high-severity labels
+      survive when the LLM emits more than ``MAX_LABELS``.
+    - Returns labels sorted by severity desc, ties broken by input
+      order.
     """
     from src.analyzer.rag_classifier import LabelAssignment
 
@@ -420,7 +437,6 @@ def validate_clasificaciones(
             )
         return []
 
-    seen: set[tuple[str, str | None]] = set()
     out: list[LabelAssignment] = []
     for raw in data:
         if not isinstance(raw, dict):
@@ -433,10 +449,14 @@ def validate_clasificaciones(
         cat, dim = validate_codigo(raw.get("categoria"), raw.get("dimension"))
         if cat == Categoria.NINGUNA.value:
             continue
-        key = (cat, dim)
-        if key in seen:
-            continue
-        seen.add(key)
+
+        marcadores = _coerce_marcadores(raw.get("marcadores_detectados"))
+        # R4: dedupe by (cat, dim, sorted(marcadores)) so two
+        # independent matches with the same (cat, dim) but different
+        # markers coexist (e.g. aliade + f3m1 nizta → 4.3 × 2).
+        dedupe_key = (cat, dim, tuple(sorted(marcadores)))
+        # We dedupe later (after sort) to keep the original insertion
+        # order for ties; just append here.
 
         out.append(
             LabelAssignment(
@@ -449,7 +469,7 @@ def validate_clasificaciones(
                     if raw.get("regla_disparada") is not None
                     else None
                 ),
-                marcadores_detectados=_coerce_marcadores(raw.get("marcadores_detectados")),
+                marcadores_detectados=marcadores,
                 confianza=_coerce_float(raw.get("confianza")),
                 score_ajuste=_coerce_float(raw.get("score_ajuste")),
                 es_falso_positivo_probable=_coerce_bool(
@@ -458,15 +478,43 @@ def validate_clasificaciones(
                 severidad=map_gravedad(raw.get("severidad")),
             )
         )
-        if len(out) >= max_labels:
-            logger.debug(
-                "LLM devolvió más de %d etiquetas — recortando a las primeras %d",
-                max_labels,
-                max_labels,
-            )
-            break
+        _ = dedupe_key  # silence unused; keep for documentation
 
-    return out
+    # Dedupe by (cat, dim, sorted(marcadores)) keeping the highest
+    # severity per key (and the first occurrence on ties).
+    deduped: dict[tuple[str, str | None, tuple[str, ...]], LabelAssignment] = {}
+    for label in out:
+        key = (label.categoria, label.dimension, tuple(sorted(label.marcadores_detectados)))
+        existing = deduped.get(key)
+        if existing is None:
+            deduped[key] = label
+            continue
+        if _severity_rank(label.severidad) > _severity_rank(existing.severidad):
+            deduped[key] = label
+
+    deduped_list = list(deduped.values())
+
+    # Truncate by severity desc, ties broken by input order. The
+    # ``-idx`` trick preserves the original LLM order on ties.
+    indexed = list(enumerate(deduped_list))
+    indexed.sort(
+        key=lambda pair: (-_severity_rank(pair[1].severidad), pair[0]),
+    )
+    if len(indexed) > max_labels:
+        dropped = indexed[max_labels:]
+        dropped_summary = [
+            (lbl.categoria, lbl.dimension, lbl.severidad.value) for _, lbl in dropped
+        ]
+        logger.debug(
+            "validate_clasificaciones: LLM devolvio %d etiquetas tras dedupe; "
+            "recortando a top-%d por severidad. Perdidas: %s",
+            len(indexed),
+            max_labels,
+            dropped_summary,
+        )
+        indexed = indexed[:max_labels]
+
+    return [lbl for _, lbl in indexed]
 
 
 # ---------------------------------------------------------------------------
@@ -551,7 +599,7 @@ def load_prompt_block(relpath: str, anchor: str = "Bloque para prompt") -> str:
 
 
 def render_tabla_canonica_prompt() -> str:
-    """Render the compact 18-row canonical table to inject into the prompt.
+    """Render the compact 19-row canonical table to inject into the prompt.
 
     The table is the single source of truth the LLM sees for valid
     categoria/dimension combinations. Built 100 % from the MD-loaded

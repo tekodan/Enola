@@ -40,8 +40,8 @@ CATEGORIA_LABELS: dict[str, str] = {
     "VDG_COSIFICACION_SLUTSHAMING": "Cosificación / Slut-shaming",
     "VDG_HOSTILIDAD_FEMINICIDIO": "Hostilidad / Feminicidio",
     "VDG_MANOSFERA_ANTIFEMINISMO": "Manosfera / Antifeminismo",
-    "VDG_SALVAGUARDA_FALSO_POSITIVO": "Salvaguarda (Falso Positivo)",
-    "VDG_DESACREDITACION_ACTIVISTAS": "Desacreditación de Activistas",
+    "VDG_SALVAGUARDA_FALSO_POSITIVO": "Control de resistencia / Salvaguarda",
+    "VDG_DESACREDITACION_ACTIVISTAS": "Castigo del Empoderamiento Femenino",
 }
 
 CATEGORIA_COLORS: dict[str, str] = {

@@ -6,12 +6,12 @@ proposito: Cerrar el set de pronombres/sustantivos/nombres propios
 fecha_origen: 2026-07-12 (refactor reglas-codigo → reglas-markdown)
 excepciones:
   - Cat. 4 (manosfera): puede dispararse sin referente femenino explícito
-  - Cat. 5 (sarcasmo / reapropiación): puede dispararse sin referente femenino explícito
+  - Cat. 6 (control de resistencia): puede dispararse sin referente femenino explícito cuando se evalúa humor o micromachismo
 ---
 
 # Referentes femeninos (lista cerrada)
 
-Antes de asignar cualquier categoría salvo Cat. 4 / Cat. 5, el LLM debe
+Antes de asignar cualquier categoría salvo Cat. 4 / Cat. 6, el LLM debe
 verificar que el texto contiene al menos **uno** de estos tokens
 (o un nombre propio femenino que no figure en la lista pero pertenezca
 al colectivo femenino). Si no hay ninguno, devolver
@@ -21,7 +21,7 @@ al colectivo femenino). Si no hay ninguno, devolver
 
 ```
 REGLA DE COOCURRENCIA SEMÁNTICA (OBLIGATORIA):
-Salvo en Cat. 4 (manosfera) y Cat. 5 (sarcasmo/reapropiación), toda
+Salvo en Cat. 4 (manosfera) y Cat. 6 (control de resistencia), toda
 asignación de categoría REQUIERE un referente femenino EXPLÍCITO en el
 mismo texto. Lista cerrada de referentes válidos:
 
@@ -49,12 +49,12 @@ propio femenino (Eva, María, etc.), devolvé `clasificaciones: []` con
 
 | Categoría | ¿Requiere referente femenino? |
 |-----------|-------------------------------|
-| Cat. 1 (violencia simbólica) | **Sí**, salvo Cat. 5.x. |
+| Cat. 1 (violencia simbólica) | **Sí**. |
 | Cat. 2 (cosificación / slut-shaming) | **Sí**. |
 | Cat. 3 (hostilidad letal) | **Sí** — el referente puede ser implícito ("a las", "las mujeres"). |
 | Cat. 4 (manosfera) | **No** — la jerga puede no nombrar un referente directo. |
-| Cat. 5 (sarcasmo / reapropiación) | **No** — el sarcasmo puede dirigirse a hombres. |
-| Cat. 6 (desacreditación de activistas) | **Sí** salvo que el referente esté implícito en el colectivo. |
+| Cat. 5 (castigo del empoderamiento) | **Sí** — requiere una activista, figura pública o colectivo identificable. |
+| Cat. 6 (control de resistencia) | **No siempre** — 6.1 y 6.2 pueden evaluarse por contexto pragmático. |
 
 ## Trazabilidad
 

@@ -20,9 +20,9 @@ Design notes
 - The MD is the **single source of truth**: editing the MD and
   reloading the process is enough to change the closed taxonomy used
   throughout.
-- The Pydantic model enforces the invariants (exactly 6 operational
-  categories, 3 sub-dimensions per category, severity in the closed
-  set, codes unique and ordered).
+- The Pydantic model enforces the invariants (exactly 6 operational categories,
+  3 sub-dimensions for categories 1, 2, 3, 5 and 6, 4 for category 4,
+  severity in the closed set, codes unique and ordered).
 - Display-only data (UI labels, color hexes) lives in code and is
   *not* governed by the MD (see ``src/ui/utils.py`` and
   ``src/ui/nicegui_app/theme.py``).
@@ -67,18 +67,40 @@ class TaxonomyFormatError(ValueError):
     """Raised when TAXONOMIA.md has an unparseable structure."""
 
 
+class MarcadorOverlapMD(BaseModel):
+    marker: str
+    subdim_secundaria: str
+    regla: str
+
+
+class ReglaDesempateMD(BaseModel):
+    id: str
+    frontera: str
+    subdim_ganadora: str
+    disparador_primario: list[str] = Field(default_factory=list)
+    disparador_obligatorio: list[str] = Field(default_factory=list)
+    fallback: str = ""
+
+
+class BasuraDigitalPatternMD(BaseModel):
+    id: str
+    pattern: str
+
+
 class SubdimensionMD(BaseModel):
     """One numbered sub-dimension (e.g., ``1.1``) inside a category."""
 
     code: str
     descripcion: str
+    marcadores_canonicos: list[str] = Field(default_factory=list)
+    marcadores_overlap: list[MarcadorOverlapMD] = Field(default_factory=list)
 
     @field_validator("code")
     @classmethod
     def _check_code(cls, v: str) -> str:
         s = str(v).strip()
-        if not re.fullmatch(r"[1-6]\.[1-3]", s):
-            raise ValueError(f"subdimension code must match [1-6].[1-3], got {v!r}")
+        if not re.fullmatch(r"[1-6]\.[1-4]", s):
+            raise ValueError(f"subdimension code must match [1-6].[1-4], got {v!r}")
         return s
 
     @field_validator("descripcion")
@@ -114,12 +136,22 @@ class CategoriaMD(BaseModel):
             raise ValueError(f"gravedad must be one of {sorted(GRAVEDAD_TOKENS)}, got {v!r}")
         return s
 
-    @field_validator("subdimensiones")
-    @classmethod
-    def _check_three_dims(cls, v: list[SubdimensionMD]) -> list[SubdimensionMD]:
-        if len(v) != 3:
-            raise ValueError(f"each category must have exactly 3 sub-dimensions, got {len(v)}")
-        return v
+    @model_validator(mode="after")
+    def _check_subdimensions(self) -> CategoriaMD:
+        expected_count = 4 if self.orden == 4 else 3
+        if len(self.subdimensiones) != expected_count:
+            raise ValueError(
+                f"category {self.code} must have exactly {expected_count} sub-dimensions, "
+                f"got {len(self.subdimensiones)}"
+            )
+        expected_codes = [f"{self.orden}.{i}" for i in range(1, expected_count + 1)]
+        got_codes = [d.code for d in self.subdimensiones]
+        if got_codes != expected_codes:
+            raise ValueError(
+                f"Category {self.code} (orden={self.orden}) has dims {got_codes}, "
+                f"expected {expected_codes}"
+            )
+        return self
 
 
 class ExclusionCategoriaMD(BaseModel):
@@ -168,6 +200,12 @@ class Taxonomy(BaseModel):
     descripcion: str = ""
     categorias: list[CategoriaMD] = Field(default_factory=list)
     categorias_exclusion: list[ExclusionCategoriaMD] = Field(default_factory=list)
+    reglas_desempate: list[ReglaDesempateMD] = Field(default_factory=list)
+    leetspeak_global: dict[str, str] = Field(default_factory=dict)
+    referentes_femeninos: list[str] = Field(default_factory=list)
+    marcadores_de_genero: list[str] = Field(default_factory=list)
+    patrones_violencia_comun: list[str] = Field(default_factory=list)
+    multi_etiqueta_instruccion: str = ""
 
     @model_validator(mode="after")
     def _validate_invariants(self) -> Taxonomy:
@@ -182,10 +220,11 @@ class Taxonomy(BaseModel):
         if ordens != [1, 2, 3, 4, 5, 6]:
             raise ValueError(f"Category orden must be [1..6] in order, got {ordens}")
         dim_codes = [d.code for c in self.categorias for d in c.subdimensiones]
-        if len(set(dim_codes)) != 18:
-            raise ValueError(f"Sub-dimension codes must be unique (got {len(set(dim_codes))}/18)")
+        if len(set(dim_codes)) != 19:
+            raise ValueError(f"Sub-dimension codes must be unique (got {len(set(dim_codes))}/19)")
         for c in self.categorias:
-            expected = [f"{c.orden}.1", f"{c.orden}.2", f"{c.orden}.3"]
+            expected_count = 4 if c.orden == 4 else 3
+            expected = [f"{c.orden}.{i}" for i in range(1, expected_count + 1)]
             got = [d.code for d in c.subdimensiones]
             if got != expected:
                 raise ValueError(
@@ -220,6 +259,78 @@ class Taxonomy(BaseModel):
 
     def categoria_por_subdimension(self) -> dict[str, str]:
         return {d.code: c.code for c in self.categorias for d in c.subdimensiones}
+
+    def markers_by_subdimension(self) -> dict[str, list[str]]:
+        return {
+            d.code: list(d.marcadores_canonicos) for c in self.categorias for d in c.subdimensiones
+        }
+
+    def all_canonical_markers(self) -> frozenset[str]:
+        return frozenset(
+            marker for markers in self.markers_by_subdimension().values() for marker in markers
+        )
+
+    def leetspeak_map(self) -> dict[str, str]:
+        return dict(self.leetspeak_global)
+
+    def referentes_femeninos_set(self) -> frozenset[str]:
+        return frozenset(self.referentes_femeninos)
+
+    def marcadores_de_genero_set(self) -> frozenset[str]:
+        return frozenset(self.marcadores_de_genero)
+
+    def patrones_violencia_comun_set(self) -> frozenset[str]:
+        return frozenset(self.patrones_violencia_comun)
+
+    def mitigadores_set(self) -> frozenset[str]:
+        return frozenset(
+            {
+                "arcaica",
+                "retrógrada",
+                "patriarcal",
+                "machista",
+                "denunciar",
+                "repudiar",
+                "visibilizar",
+                "criticar",
+                "no es verdad que",
+                "en realidad",
+                "sin embargo",
+                "#NiUnaMenos",
+                "#8M",
+                "#VivasNosQueremos",
+            }
+        )
+
+    def patrones_basura_digital_dict(self) -> dict[str, BasuraDigitalPatternMD]:
+        path = (
+            _PROJECT_ROOT
+            / "knowledge"
+            / "categorias-violencia-genero-digital"
+            / "glosario"
+            / "patrones-basura-digital.md"
+        )
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            return {}
+        match = re.search(r"```plain\n(.*?)```", text, re.DOTALL)
+        if not match:
+            return {}
+        out: dict[str, BasuraDigitalPatternMD] = {}
+        for index, line in enumerate(match.group(1).splitlines(), start=1):
+            raw = line.strip()
+            if not raw or raw.startswith("#"):
+                continue
+            pattern, _, annotation = raw.partition(" #")
+            pattern = pattern.strip()
+            condition = annotation.strip().split()[0] if annotation.strip() else "PATTERN"
+            pattern_id = f"{condition}_{index}"
+            out[pattern_id] = BasuraDigitalPatternMD(id=pattern_id, pattern=pattern)
+        return out
+
+    def desempate_rules(self) -> list[ReglaDesempateMD]:
+        return list(self.reglas_desempate)
 
     def exclusion_codes(self) -> dict[str, str]:
         """Return the ``{EXC_*: CODIGO_*}`` mapping from the MD.

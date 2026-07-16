@@ -6,6 +6,11 @@ actualiza las columnas ``exclusion_label``, ``exclusion_codigo`` y
 ``exclusion_justificacion`` de ``analysis_results``. No requiere
 Ollama — sólo el filtro (Regla N6 del pre-filtro de exclusión).
 
+Cubre las seis condiciones algorítmicas implementadas en
+``detectar_basura_digital``: COND_1 (vacío/NaN), COND_2 (URL huérfana),
+COND_3 (ruido tipográfico), COND_4 (risas puras), COND_5 (reacciones
+cortas) y COND_6 (mención a persona sola, agregado 2026-07-15).
+
 Por defecto corre en modo ``--dry-run``. Usar ``--apply`` para
 escribir cambios a la base.
 

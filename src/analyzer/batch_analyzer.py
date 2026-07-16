@@ -11,9 +11,10 @@ dynamic few-shot examples.
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
+from src.analyzer.few_shot_loader import load_few_shot_examples
 from src.analyzer.llm_client import OllamaClient
 from src.analyzer.rag_classifier import RAGClassifier
 from src.config.settings import get_settings
@@ -35,6 +36,11 @@ class BatchAnalysisStats:
     violence_detected_posts: int = 0
     violence_detected_comments: int = 0
     errors: int = 0
+    errors_ollama: int = 0
+    errors_parse: int = 0
+    errors_validation: int = 0
+    errors_db: int = 0
+    error_samples: list[str] = field(default_factory=list)
     execution_time_seconds: float = 0.0
 
 
@@ -58,6 +64,7 @@ class BatchAnalyzer:
         analyze_posts: bool = True,
         analyze_comments: bool = True,
         reanalyze_existing: bool = False,
+        few_shot_examples: list[dict] | None = None,
     ):
         self.database = database
         self.analyze_posts = analyze_posts
@@ -80,12 +87,19 @@ class BatchAnalyzer:
                 base_url=settings.ollama.base_url,
                 model=settings.ollama.llm_model,
                 temperature=settings.analyzer.temperature,
+                max_tokens=settings.analyzer.max_tokens,
+            )
+            few_shots = (
+                few_shot_examples
+                if few_shot_examples is not None
+                else list(load_few_shot_examples())
             )
             self.classifier = RAGClassifier(
                 llm_client=llm,
                 vector_store=vs,
                 feedback_store=fb_store,
                 context_chunks=settings.analyzer.context_chunks,
+                few_shot_examples=few_shots,
             )
             logger.info(
                 "RAGClassifier initialized: vector_store=%s, feedback_store=%s, llm=%s",
@@ -196,8 +210,7 @@ class BatchAnalyzer:
                     stats.violence_detected_posts += 1
 
             except Exception as e:
-                logger.warning("Error analyzing post %s: %s", item.get("id", ""), e)
-                stats.errors += 1
+                _record_error(stats, item, "post", e)
 
     def _analyze_comments(self, stats: BatchAnalysisStats) -> None:
         """Classify all (unanalyzed) comments."""
@@ -263,8 +276,46 @@ class BatchAnalyzer:
                     stats.violence_detected_comments += 1
 
             except Exception as e:
-                logger.warning("Error analyzing comment %s: %s", item.get("id", ""), e)
-                stats.errors += 1
+                _record_error(stats, item, "comment", e)
+
+
+def _record_error(stats: BatchAnalysisStats, item: dict, content_type: str, exc: Exception) -> None:
+    """Categorize one exception into the right error bucket.
+
+    Distinguishes between:
+    - Ollama connection / HTTP errors → ``errors_ollama``
+    - JSON parsing errors (when surfaced by the classifier) → ``errors_parse``
+    - Pydantic validation errors → ``errors_validation``
+    - Anything else (DB errors, unexpected) → ``errors_db``
+
+    Keeps a small sample of the last few errors for debugging without
+    blowing up the logs.
+    """
+    content_id = str(item.get("id", ""))
+    exc_name = type(exc).__name__
+    msg = f"{content_type}={content_id} ({exc_name}: {exc})"
+
+    if "JSONDecodeError" in exc_name:
+        bucket = "errors_parse"
+    elif "ValidationError" in exc_name:
+        bucket = "errors_validation"
+    elif (
+        any(
+            token in exc_name
+            for token in ("ClientError", "ClientResponse", "Timeout", "Connection")
+        )
+        or "ollama" in str(exc).lower()
+    ):
+        bucket = "errors_ollama"
+    else:
+        bucket = "errors_db"
+
+    setattr(stats, bucket, getattr(stats, bucket) + 1)
+    stats.errors += 1
+    stats.error_samples.append(msg)
+    if len(stats.error_samples) > 5:
+        stats.error_samples.pop(0)
+    logger.warning("Error analyzing %s %s: %s", content_type, content_id, exc)
 
 
 def run_batch_analysis(

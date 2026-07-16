@@ -8,6 +8,15 @@ proposito: Lista cerrada de expresiones regulares que el pre-filtro de
 fecha_origen: 2026-07-14 (incorporación como glosario del pre-filtro,
   en paralelo al resto de glosarios canónicos bajo
   ``knowledge/categorias-violencia-genero-digital/glosario/``).
+actualizaciones:
+  - 2026-07-15: documenta COND_6_TAG_PERSONA (helper Python, no
+    regex del glosario) — el detector de menciones vive en
+    ``_is_only_mention_payload`` porque no es un patrón fullmatch
+    sino una validación compuesta (presencia de ``@user`` Y ausencia
+    de lexical word). El spec metodológico lo numera como COND_4; el
+    código lo emite como COND_6 para preservar la numeración de las
+    filas ya persistidas en ``analysis_results.exclusion_codigo``.
+    Ver ``docs/informe-ambiguedades-subdimensiones-2026-07-14.md``.
 ---
 
 # Glosario de patrones de basura digital
@@ -127,6 +136,7 @@ con `re.fullmatch` después de normalizar:
 | Muletillas | `ok`, `dale`, `va`, `ya`, `si`, `no`, `je`, `ah`, `oh`, `eh`, `uf`, `uy`, `sep` | Reacciones de uno o dos caracteres que no codifican un acto violento. |
 | Confirmaciones | `obvio`, `claro`, `exacto`, `vale`, `venga` | Asentimientos lexicalmente pobres que el LLM tiende a sobre-interpretar. |
 | Monosílabos / partículas (2026-07-14) | `pues`, `se`, `que/qué`, `tal`, `cual/cuál`, `quien/quién`, `como/cómo`, `donde/dónde`, `cuando/cuándo`, `también`, `tampoco`, `ahí`, `aqui/aquí`, `allá`, `acá`, `a ver`, `q`, `k` | Conectores y partículas sueltas que, usados como único payload, no aportan contenido clasificable. El ``fullmatch`` exige que TODO el mensaje sea el token, por lo que ``"el café se fue"`` NO matchea. |
+| Menciones a persona (2026-07-15) — COND_6 | `@usuario`, `@user.name`, `@user_123`, `@user1 @user2` | Implementado en ``_is_only_mention_payload`` (helper Python, no regex de este glosario). El mensaje debe consistir exclusivamente en uno o más tokens ``@user`` sin ninguna otra palabra legible. ``"hola @user cómo estás"`` NO matchea (hay lexical word fuera de las menciones). Spec lo numera COND_4; el código lo emite como COND_6 para preservar la numeración existente. |
 
 ## Trazabilidad
 
@@ -159,3 +169,12 @@ con `re.fullmatch` después de normalizar:
   detección de basura digital para entradas muy cortas (comentarios
   tipo risa, muletillas, monosílabos como `no`/`si`/`se`/`pues`/
   `que`, GIF con caption vacío, etc.).
+- **2026-07-15.** Documenta COND_6_TAG_PERSONA. La nueva condición
+  (mención a persona sola, sin comentario adicional) NO vive como
+  regex en este glosario porque no es un patrón ``fullmatch`` sino
+  una validación compuesta: presencia de al menos un token ``@user``
+  Y ausencia de lexical word fuera de las menciones. El helper
+  ``_is_only_mention_payload`` en ``src/analyzer/exclusion_filter.py``
+  encapsula esa lógica. Numerado como COND_6 para no colisionar con
+  COND_4_SOLO_RISA / COND_5_REACCION_CORTA ya persistidos en
+  ``analysis_results.exclusion_codigo``.

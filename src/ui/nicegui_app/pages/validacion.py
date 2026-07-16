@@ -34,6 +34,7 @@ from src.analyzer.category_mapping import (
     SUBDIMENSIONES_POR_CATEGORIA,
     Severity,
 )
+from src.analyzer.exclusion_filter import EXCLUSION_BASURA_DIGITAL, EXCLUSION_VIOLENCIA_COMUN
 from src.analyzer.rag_classifier import RAGClassifier
 from src.config.settings import get_settings
 from src.knowledge_base.feedback_store import get_feedback_store
@@ -115,7 +116,11 @@ def _render_kpis(analysis: list[dict]) -> None:
         for a in analysis
         if a.get("tiene_violencia") in ("true", "false")
         and not a.get("has_feedback")
-        and (a.get("exclusion_label") or "") != "CODIGO_99"
+        and a.get("exclusion_label")
+        not in {
+            EXCLUSION_BASURA_DIGITAL,
+            EXCLUSION_VIOLENCIA_COMUN,
+        }
     )
 
     try:

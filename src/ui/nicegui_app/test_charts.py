@@ -26,6 +26,29 @@ def _slice_for(fig, label: str) -> float:
     return float(values[labels.index(label)])
 
 
+class TestThemePalette:
+    """Guardrail: the UI palette must cover **all** 19 canonical
+    sub-dimensions (1.1 … 6.3, including 4.4 «Arquetipos femeninos
+    deshumanizantes»). Previously 4.4 was missing — the bar chart
+    silently fell back to a neutral gray, breaking the visual coherence
+    of the cat-4 drill-down."""
+
+    def test_all_nineteen_subdims_have_colors(self):
+        from src.ui.nicegui_app import theme
+
+        assert len(theme.SUBDIMENSIONES_ORDENADAS) == 19
+        for code in theme.SUBDIMENSIONES_ORDENADAS:
+            assert code in theme.SUBDIMENSION_COLORS, f"missing color for {code}"
+            # Sanity: hex string
+            assert theme.SUBDIMENSION_COLORS[code].startswith("#")
+
+    def test_subdim_44_has_its_own_color(self):
+        from src.ui.nicegui_app import theme
+
+        assert "4.4" in theme.SUBDIMENSION_COLORS
+        assert "4.4" in theme.SUBDIMENSION_LABELS
+
+
 class TestBuildPieViolentVsNonviolent:
     def test_splits_basura_digital_into_own_slice(self):
         rows = [

@@ -106,7 +106,7 @@ class TestComputeFrequencyDistribution:
         # Two votes from one row
         assert ft.total_validos == 2
 
-    def test_subdimension_level_returns_up_to_eighteen_rows(self):
+    def test_subdimension_level_returns_up_to_nineteen_rows(self):
         from src.analyzer.category_mapping import SUBDIMENSIONES_ORDENADAS
 
         rows = [
@@ -131,8 +131,9 @@ class TestComputeFrequencyDistribution:
         by_dim = {r.categoria: r for r in ft.rows}
         assert by_dim["1.1"].frecuencia_absoluta == 2
         assert by_dim["3.1"].frecuencia_absoluta == 1
-        # Subdimensiones no usadas conservan 0
+        # Subdimensiones no usadas conservan 0 (incluida 4.4)
         assert by_dim["1.2"].frecuencia_absoluta == 0
+        assert by_dim["4.4"].frecuencia_absoluta == 0
 
     def test_subdimension_level_excluye_basura_del_denominador(self):
         rows = [
@@ -443,7 +444,7 @@ class TestComputeCrosstabs:
     # --- Layout canónico 6×18 (Regla 4 · cat × subdim) -----------------
 
     def test_subdimension_canonical_layout_with_empty_input(self):
-        """Sin filas violentas, devuelve 6×18 canónico con ceros."""
+        """Sin filas violentas, devuelve 6×19 canónico con ceros."""
         from src.analyzer.category_mapping import (
             CATEGORIAS_ORDENADAS,
             SUBDIMENSIONES_ORDENADAS,
@@ -453,7 +454,7 @@ class TestComputeCrosstabs:
         assert ct.filas == CATEGORIAS_ORDENADAS
         assert ct.columnas == SUBDIMENSIONES_ORDENADAS
         assert len(ct.frecuencias) == 6
-        assert all(len(fila) == 18 for fila in ct.frecuencias)
+        assert all(len(fila) == 19 for fila in ct.frecuencias)
         assert all(v == 0 for fila in ct.frecuencias for v in fila)
         assert all(v == 0.0 for fila in ct.porcentajes_marginales_columna for v in fila)
         assert ct.alerta_patron is None

@@ -1,11 +1,12 @@
 """RAG classifier for violence detection.
 
 The classification taxonomy is **homogeneous**: alphabetic codes for
-categories (``VDG_*``) and numeric codes for sub-dimensions
-(``1.1``..``6.3``). The LLM is forced to pick from a closed set of 18
+categories (``VDG_*``) and numeric codes for sub-dimensions (``1.1``..``6.3``,
+including ``4.4``). The LLM is forced to pick from a closed set of 19
 valid combinations defined in :mod:`src.analyzer.category_mapping`; any
-output outside the set is rejected and normalized to ``"ninguna"`` with
-a warning.
+output outside the set is rejected and normalized to ``"ninguna"`` with a
+warning.
+
 
 The classifier supports **multi-label** classification: a single
 analyzed post/comment can carry up to ``MAX_LABELS`` (5) labels, each
@@ -27,6 +28,7 @@ treats them with higher weight than static examples.
 
 import json
 import logging
+import re
 import unicodedata
 from typing import TYPE_CHECKING, Any
 
@@ -45,13 +47,24 @@ from src.analyzer.category_mapping import (
 from src.analyzer.exclusion_filter import evaluar_exclusiones
 from src.analyzer.violence_types import Severity
 
+# Compiled regexes for stripping LLM reasoning / system wrappers.
+# Defined at module import so repeated calls during a batch run are
+# O(1). Order matters: each pattern is run with re.sub which replaces
+# non-overlapping matches left-to-right.
+_THINK_TAG_RE = re.compile(r"<think>[\s\S]*?</think>", re.IGNORECASE)
+_TOOL_CALLS_RE = re.compile(r"<tool_calls>[\s\S]*?</tool_calls>", re.IGNORECASE)
+_SYS_REMINDER_RE = re.compile(r"<system-reminder>[\s\S]*?</system-reminder>", re.IGNORECASE)
+_ANY_TAG_RE = re.compile(r"</?[^>]+>")
+
 # Constantes que apuntan a los markdowns bajo glosario/. Las reglas
 # viven en documentación — este código solo las carga.
 _PROMPT_BLOCK_MARCADORES = load_prompt_block("glosario/marcadores-por-subdimension.md")
 _PROMPT_BLOCK_LEETSPEAK = load_prompt_block("glosario/leetspeak-decoder.md")
 _PROMPT_BLOCK_MITIGADORES = load_prompt_block("glosario/marcadores-mitigadores.md")
 _PROMPT_BLOCK_COOCURRENCIA = load_prompt_block("glosario/referentes-femeninos.md")
-_PROMPT_BLOCK_CAT5 = load_prompt_block("05-categoria-5-sarcasmo-falsos-positivos.md")
+_PROMPT_BLOCK_CAT5 = load_prompt_block("05-categoria-5-desacreditacion-activistas.md")
+_PROMPT_BLOCK_CAT6 = load_prompt_block("06-categoria-6-sarcasmo-falsos-positivos.md")
+_PROMPT_BLOCK_DESEMPATE = load_prompt_block("glosario/reglas-desempate.md")
 
 if TYPE_CHECKING:
     from src.knowledge_base.feedback_store import FeedbackStore
@@ -125,6 +138,7 @@ class ClassificationResult(BaseModel):
     exclusion_label: str | None = None
     exclusion_codigo: str | None = None
     exclusion_justificacion: str | None = None
+    error_parsing: str | None = None
 
     @property
     def excluded(self) -> bool:
@@ -259,6 +273,7 @@ class ClassificationResult(BaseModel):
             "exclusion_label": self.exclusion_label,
             "exclusion_codigo": self.exclusion_codigo,
             "exclusion_justificacion": self.exclusion_justificacion,
+            "error_parsing": self.error_parsing,
         }
 
     @classmethod
@@ -281,28 +296,28 @@ class ClassificationResult(BaseModel):
                 if response.endswith("```"):
                     response = response[:-3]
 
-                # Extract JSON block first to handle LLM output interleaving
-                import re
+                # Strip reasoning / chain-of-thought wrappers FIRST so the
+                # subsequent ``{...}`` search doesn't grab a JSON fragment
+                # embedded inside a ``<think>`` block.
+                response = _THINK_TAG_RE.sub("", response)
+                response = _TOOL_CALLS_RE.sub("", response)
+                response = _SYS_REMINDER_RE.sub("", response)
+                response = _ANY_TAG_RE.sub("", response)
 
+                # Extract JSON block to handle LLM output interleaving.
                 json_start = response.find("{")
                 json_end = response.rfind("}") + 1
                 if json_start != -1 and json_end > json_start:
                     response = response[json_start:json_end]
-
-                # Strip LLM thinking tags (模型输出思考过程)
-
-                response = re.sub(r"<think>[\s\S]*?</think>", "", response)
-                response = re.sub(r"<tool_calls>[\s\S]*?</tool_calls>", "", response)
-                response = re.sub(r"<system-reminder>[\s\S]*?</system-reminder>", "", response)
-                response = re.sub(r"</?[^>]+>", "", response)
                 response = response.strip()
 
                 if not response:
-                    logger.warning("LLM returned empty response")
+                    logger.warning("LLM returned empty response after stripping tags")
                     return cls(
                         tiene_violencia=False,
                         severidad_global=Severity.NINGUNA,
                         clasificaciones=[],
+                        error_parsing="empty_response_after_strip",
                     )
 
                 data = json.loads(response)
@@ -406,18 +421,15 @@ class ClassificationResult(BaseModel):
                 str(e),
                 truncated_response,
             )
+            # Distinguish "couldn't parse" from "really no violence":
+            # set ``error_parsing`` so downstream callers can flag the
+            # row for review instead of silently classifying as
+            # ``ninguna``.
             return cls(
                 tiene_violencia=False,
                 severidad_global=Severity.NINGUNA,
-                clasificaciones=[
-                    LabelAssignment(
-                        categoria="ninguna",
-                        dimension=None,
-                        severidad=Severity.NINGUNA,
-                        justificacion=f"Error parsing response: {str(e)}",
-                        evidencia="",
-                    )
-                ],
+                clasificaciones=[],
+                error_parsing=f"{type(e).__name__}: {e}",
             )
 
 
@@ -495,7 +507,7 @@ class RAGClassifier:
     """RAG-based classifier for gender violence detection.
 
     Categories and sub-dimensions are NOT hardcoded. The classifier
-    injects a **closed set of 18 valid combinations** (from
+    injects a **closed set of 19 valid combinations** (from
     :mod:`src.analyzer.category_mapping`) into the system prompt and
     forces the LLM to pick up to ``MAX_LABELS`` of them per text. The
     output is validated and normalized on parse.
@@ -616,8 +628,22 @@ class RAGClassifier:
         mitigadores_bloque = _PROMPT_BLOCK_MITIGADORES
         coocurrencia_bloque = _PROMPT_BLOCK_COOCURRENCIA
         cat5_bloque = _PROMPT_BLOCK_CAT5
+        cat6_bloque = _PROMPT_BLOCK_CAT6
+        desempate_bloque = _PROMPT_BLOCK_DESEMPATE
 
         prompt = f"""Analizá el siguiente texto y determiná si contiene violencia de género digital según el marco teórico almacenado en la base vectorial ChromaDB (colección "violencia_genero").
+
+INSTRUCCIÓN MULTI-ETIQUETA (CRÍTICO — LEER ANTES DE RESPONDER):
+- Un mismo texto puede disparar MÚLTIPLES categorías simultáneamente (p.ej. violencia simbólica + slut-shaming + manosfera). Si el texto contiene marcadores de categorías DISTINTAS, devolvé TODAS las que apliquen — hasta {self.max_labels} en total.
+- NO te detengas en la primera categoría que detectes. Escaneá el texto contra las 6 categorías operativas antes de decidir.
+- Si dos marcadores apuntan a la misma (categoria, dimension), emití dos entradas separadas en `clasificaciones` para preservar la trazabilidad del doble match.
+
+PROCEDIMIENTO paso-a-paso:
+  PASO 1: Escaneá el texto completo. Listá internamente todos los marcadores que reconozcas.
+  PASO 2: Para cada marcador, determiná categoria + dimension contra la tabla canónica.
+  PASO 3: Si el texto tiene marcadores de categorías DISTINTAS, emití cada uno como elemento separado del array.
+  PASO 4: Deduplicá por (categoria, dimension) salvo cuando haya dos matches INDEPENDIENTES del mismo par (ej. "Para el aliade y la f3m1 nizta" → 4.3 × 2).
+  PASO 5: Ordená las etiquetas por severidad descendente (alta → media → baja → ninguna) para que las críticas queden primeras.
 
 FILTRO DE EXCLUSIÓN PRÉVIO (INTENCIÓN PRAGMÁTICA, OBLIGATORIO):
 - Antes de clasificar el texto en las seis dimensiones de ciberviolencia, evaluá la motivación central del ataque. Para que un mensaje agresivo, insultante o amenazante NO sea descartado como "Violencia Común", debés confirmar que la agresión ocurre estrictamente por la condición de ser mujer de la víctima.
@@ -645,8 +671,12 @@ FILTRO DE EXCLUSIÓN PRÉVIO (INTENCIÓN PRAGMÁTICA, OBLIGATORIO):
 
 {cat5_bloque}
 
-INSTRUCCIONES TAXONÓMICAS (IMPORTANTES):
-- Devolvé una LISTA `clasificaciones` con 1..{self.max_labels} elementos (uno por cada categoría y subdimensión que aplique). NO repitas el mismo par (categoria, dimension).
+{cat6_bloque}
+
+{desempate_bloque}
+
+INSTRUCCIONES TAXONÓMICAS (DETALLE DE CADA CAMPO):
+- Devolvé una LISTA `clasificaciones` con 1..{self.max_labels} elementos (uno por cada categoría y subdimensión que aplique). NO repitas el mismo par (categoria, dimension) salvo en el caso de doble marcador independiente (ver PASO 4).
 - categoria: elegí EXCLUSIVAMENTE un código VDG_* de la tabla de arriba. No inventes.
 - dimension: elegí EXCLUSIVAMENTE un código 'X.Y' de la tabla que corresponda a la categoria elegida. Si la categoria no tiene subdimensión útil, podés devolver null.
 - Cada elemento de `clasificaciones` debe llevar su PROPIA `justificacion` (1-2 frases) explicando por qué ESA categoría/subdimensión aplica al texto. La justificación de cada etiqueta es OBLIGATORIA y debe ser específica de esa etiqueta.
@@ -659,7 +689,6 @@ INSTRUCCIONES TAXONÓMICAS (IMPORTANTES):
 - `severidad_global`: la mayor severidad entre todas las etiquetas (p.ej. si hay 'baja' y 'alta' → "alta").
 - `tiene_violencia`: true si la lista NO está vacía.
 - Si el texto no encaja en ninguna categoría: `clasificaciones: []`, `tiene_violencia: false`, `severidad_global: "ninguna"`.
-- Un mismo texto puede disparar múltiples categorías a la vez (p.ej. violencia simbólica + amenaza). Devolvé todas las que apliquen.
 
 FRAGMENTOS RECUPERADOS DE ChromaDB (k={self.context_chunks}):
 {context_text}
@@ -802,12 +831,12 @@ SOLO JSON, SIN TEXTO ADICIONAL."""
         """
         builtin_indicators: dict[str, dict] = {
             "amenaza_muerte": {
-                "keywords": ["matar", "mu3rt", "pvtos", "hdlp", "morir", "muere"],
+                "keywords": ["matar", "mu3rt", "m4tar", "asesinar", "asesin4r", "morir", "muere"],
                 "severidad": Severity.ALTA,
                 "score": 3,
                 "categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
-                "dimension": "3.1",
-                "regla": "Cat 3 / Regla 3.1 — amenaza letal",
+                "dimension": "3.2",
+                "regla": "Cat 3 / Regla 3.2 — deseo de violencia letal",
             },
             "agresion_fisica": {
                 "keywords": [
@@ -828,12 +857,12 @@ SOLO JSON, SIN TEXTO ADICIONAL."""
                 "regla": "Cat 3 / Regla 3.1 — amenaza de agresión",
             },
             "insulto_sexual": {
-                "keywords": ["zorra", "puta", "perra", "guarra"],
+                "keywords": ["zorra", "puta", "perra", "guarra", "cualquiera", "promiscua"],
                 "severidad": Severity.MEDIA,
                 "score": 2,
                 "categoria": "VDG_COSIFICACION_SLUTSHAMING",
-                "dimension": "2.2",
-                "regla": "Cat 2 / Regla 2.2 — insulto sexual",
+                "dimension": "2.3",
+                "regla": "Cat 2 / Regla 2.3 — doble estándar sexual y slut-shaming",
             },
             "amenaza_general": {
                 "keywords": ["amenaza", "amenazar", "te voy a"],
@@ -928,43 +957,159 @@ SOLO JSON, SIN TEXTO ADICIONAL."""
                 "dimension": "3.1",
                 "regla": "Cat 3 / Regla 3.1 — violencia vicaria",
             },
-            "manosfera": {
+            "manosfera_subculturas": {
                 "keywords": [
-                    "feminazi",
-                    "foid",
-                    "femoid",
-                    "mangina",
-                    "incel",
+                    "mra",
                     "mgtow",
-                    "redpill",
+                    "pua",
+                    "incel",
                     "red pill",
-                    "pastilla roja",
-                    "hembrista",
-                    "ideologia de genero",
-                    "ideología de género",
+                    "redpill",
+                    "black pill",
+                    "beta",
                 ],
                 "severidad": Severity.MEDIA,
                 "score": 2,
                 "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
                 "dimension": "4.1",
-                "regla": "Cat 4 / Regla 4.1 — jerga antifeminista",
+                "regla": "Cat 4 / Regla 4.1 — subculturas masculinistas y jerarquías de dominación",
+            },
+            "manosfera_victimismo": {
+                "keywords": [
+                    "hipergamia",
+                    "geneticamente programada",
+                    "genéticamente programada",
+                    "interesadas",
+                    "gold digger",
+                    "interés material",
+                ],
+                "severidad": Severity.MEDIA,
+                "score": 2,
+                "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+                "dimension": "4.1",
+                "regla": "Cat 4 / Regla 4.1 — hipergamia y determinismo biológico",
+            },
+            "manosfera_antifeminista": {
+                "keywords": [
+                    "feminazi",
+                    "hembrista",
+                    "misandria",
+                    "ideologia de genero",
+                    "ideología de género",
+                    "criminalizan al hombre",
+                    "criminalizan a los hombres",
+                ],
+                "severidad": Severity.MEDIA,
+                "score": 2,
+                "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+                "dimension": "4.2",
+                "regla": "Cat 4 / Regla 4.2 — oposición antifeminista y victimismo hegemónico",
+            },
+            "manosfera_emasculacion": {
+                "keywords": [
+                    "aliade",
+                    "mangina",
+                    "pagafantas",
+                    "huelebragas",
+                    "calzonazos",
+                    "blandengue",
+                    "parguelón",
+                ],
+                "severidad": Severity.MEDIA,
+                "score": 2,
+                "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+                "dimension": "4.3",
+                "regla": "Cat 4 / Regla 4.3 — trolleo, castigo y emasculación",
+            },
+            "manosfera_arquetipos": {
+                "keywords": [
+                    "foid",
+                    "femoid",
+                    "stacy",
+                    "tradwives",
+                    "teamalienadas",
+                    "team alienadas",
+                ],
+                "severidad": Severity.MEDIA,
+                "score": 2,
+                "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+                "dimension": "4.4",
+                "regla": "Cat 4 / Regla 4.4 — arquetipos femeninos deshumanizantes",
             },
             "desacreditacion_activistas": {
                 "keywords": [
                     "feminista radical",
                     "feministas radicales",
-                    "feminazis",
                     "feminismo radical",
-                    "viejas webonas",
-                    "feministas de mierda",
-                    "feministas son toxicas",
-                    "feministas radicales son",
+                    "traumada",
+                    "ardida",
+                    "histéricas",
+                    "histericas",
+                    "exageradas",
+                    "buscan atención",
+                    "buscan atencion",
+                    "tóxicas",
+                    "toxicas",
                 ],
                 "severidad": Severity.MEDIA,
                 "score": 2,
                 "categoria": "VDG_DESACREDITACION_ACTIVISTAS",
+                "dimension": "5.1",
+                "regla": "Cat 5 / Regla 5.1 — deslegitimación del empoderamiento",
+            },
+            "ridiculizacion_activistas": {
+                "keywords": [
+                    "váyanse a lavar",
+                    "vayanse a lavar",
+                    "a la cocina",
+                    "limpien sus casas",
+                    "cuiden a sus hijos",
+                    "váyanse a dormir",
+                    "vayanse a dormir",
+                    "viejas webonas",
+                    "ridículas",
+                    "ridiculas",
+                    "pónganse a trabajar",
+                    "ponganse a trabajar",
+                ],
+                "contexto_publico": [
+                    "activista",
+                    "feminista",
+                    "manifestante",
+                    "marcha",
+                    "protesta",
+                    "periodista",
+                    "política",
+                    "politica",
+                    "8m",
+                    "colectivo",
+                ],
+                "severidad": Severity.MEDIA,
+                "score": 2,
+                "categoria": "VDG_DESACREDITACION_ACTIVISTAS",
+                "dimension": "5.2",
+                "regla": "Cat 5 / Regla 5.2 — ridiculización tradicional del empoderamiento",
+            },
+            "micromachismo": {
+                "keywords": [
+                    "calladita te ves más bonita",
+                    "calladita te ves mas bonita",
+                    "tenías que ser mujer",
+                    "tenias que ser mujer",
+                ],
+                "severidad": Severity.BAJA,
+                "score": 1,
+                "categoria": "VDG_SALVAGUARDA_FALSO_POSITIVO",
                 "dimension": "6.1",
-                "regla": "Cat 6 / Regla 6.1 — deslegitimación de feministas",
+                "regla": "Cat 6 / Regla 6.1 — micromachismos y mansplaining",
+            },
+            "humor_hostil": {
+                "keywords": ["jajaja", "jajaja", "jaja", "es solo humor", "era una broma"],
+                "severidad": Severity.MEDIA,
+                "score": 2,
+                "categoria": "VDG_SALVAGUARDA_FALSO_POSITIVO",
+                "dimension": "6.2",
+                "regla": "Cat 6 / Regla 6.2 — humor hostil",
             },
         }
 
@@ -973,6 +1118,9 @@ SOLO JSON, SIN TEXTO ADICIONAL."""
         # bucket that hit the same key (useful for evidence).
         merged: dict[tuple[str, str | None], dict] = {}
         for label_name, info in builtin_indicators.items():
+            contexto_publico = info.get("contexto_publico")
+            if contexto_publico and not _has_any_marker(text, contexto_publico):
+                continue
             found_markers = _has_any_marker(text, info["keywords"])
             if not found_markers:
                 continue

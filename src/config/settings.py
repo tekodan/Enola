@@ -46,7 +46,10 @@ class AnalyzerConfig(BaseModel):
     similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     context_chunks: int = Field(default=5, ge=1, le=20)
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=2048, ge=100, le=8192)
+    # Non-thinking model (gemma4:26b-a4b-it-qat-asst-nothink-64k): no
+    # tokens wasted on internal reasoning, so 4096 is comfortable for
+    # the multi-label JSON (5 labels × ~150 tokens each).
+    max_tokens: int = Field(default=4096, ge=100, le=8192)
     few_shot_examples: int = Field(default=5, ge=1, le=20)
 
 

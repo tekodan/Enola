@@ -185,6 +185,15 @@ class TestFilterAnalysis:
         out = filter_analysis_for_validation(rows, [], only_violent=True)
         assert [r["id"] for r in out] == [1]
 
+    def test_excludes_preclassified_rows(self):
+        rows = [
+            _analysis(1),
+            {**_analysis(2), "exclusion_label": "CODIGO_99"},
+            {**_analysis(3), "exclusion_label": "VIOLENCIA_COMUN"},
+        ]
+        out = filter_analysis_for_validation(rows, [])
+        assert [r["id"] for r in out] == [1]
+
 
 class TestFeedbackStatusLabel:
     def test_agreement_label(self):

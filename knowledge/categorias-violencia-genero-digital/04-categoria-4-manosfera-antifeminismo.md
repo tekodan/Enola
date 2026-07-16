@@ -2,77 +2,63 @@
 id: cat-4
 numero: 4
 titulo: Discurso ideológico antifeminista y manosfera
-subdimensiones: 3
-reglas: 3
+subdimensiones: 4
+reglas: 4
 gravedad: media-alta
 glosario_interno: ../glosario/jerga-manosfera.md
 ---
 
 # Categoría 4: Discurso ideológico antifeminista y manosfera
 
-## 1. Definición Conceptual
+## Definición
 
-El discurso ideológico antifeminista y la manosfera (o machosfera) conforman un ecosistema digital integrado por un conglomerado heterogéneo de comunidades, foros y plataformas virtuales donde los varones se articulan en torno a la supuesta crisis de la masculinidad y su férrea oposición a los movimientos por la igualdad de género (Özkula y Prieto-Blanco, 2025; Ribeiro et al., 2020, citados en García y Díaz, 2022). En la contemporaneidad, este entramado opera como uno de los nuevos "aparatos ideológicos del patriarcado", cuyo propósito biopolítico es frenar los avances de la cuarta ola feminista mediante la propagación de desinformación de género, narrativas de victimismo masculino y discursos que niegan dogmáticamente la existencia de la violencia estructural contra las mujeres (Gómez Suárez, 2024, p. 9).
+Identifica el discurso ideológico antifeminista y las comunidades de la manosfera: MRA, MGTOW, PUA e Incels. Este ecosistema articula resentimiento por los privilegios perdidos, determinismo biológico y sexual, oposición al feminismo, jerarquías de dominación y castigo a los varones que no cumplen la masculinidad hegemónica.
 
-A través de estas tecnoculturas tóxicas y reaccionarias, los usuarios construyen un marco de camaradería homosocial basado en el resentimiento y la nostalgia por los privilegios perdidos, instrumentalizando el ciberespacio para caricaturizar, estigmatizar y silenciar a las activistas, con el fin último de legitimar la misoginia y restaurar el orden jerárquico de la masculinidad hegemónica tradicional (García-Mingo y Díaz Fernández, 2023; Lacalle et al., 2023).
+## 4.1. Subculturas masculinistas y jerarquías de dominación
 
-## 2. Subdimensiones Analíticas
+Identifica los nichos identitarios de la manosfera y las narrativas que comparten el concepto de hipergamia. El sistema debe detectar acrónimos de autoidentificación y etiquetas usadas para justificar el rechazo hacia las mujeres mediante determinismo biológico, sexual o económico.
 
-### 4.1. Subculturas masculinistas y taxonomías de dominación
+Incluye mensajes que retratan a las mujeres como organismos calculadores que seleccionan hombres por interés material o genético, especialmente cuando usan la jerga de la manosfera. **Marcadores:** `MRA`, `MGTOW`, `PUA`, `Incel`, `Red Pill`, `Black Pill`, `beta`, `hipergamia`.
 
-Agrupa a los distintos nichos identitarios que conforman la manosfera (Activistas por los Derechos de los Hombres o MRA, Men Going Their Own Way o MGTOW, Pick-Up Artists o PUA, y Célibes Involuntarios o Incels). En esta subdimensión, los usuarios articulan una "arquitectura discursiva" fuertemente jerarquizada mediante etiquetas y arquetipos (ej. *Chad, Stacy, Red Pill, Black Pill*) diseñadas para imponer un determinismo biológico y sexual que justifica el odio hacia las mujeres al considerarlas seres hipergámicos, superficiales e irracionales (Lacalle et al., 2023; Özkula y Prieto-Blanco, 2025).
+Aunque no se identifique una subcultura concreta, un mensaje que use esa jerga o el determinismo manosférico debe clasificarse aquí.
 
-### 4.2. Desinformación de género y victimismo hegemónico
+**Exclusión:** no usar 4.1 para arquetipos femeninos como `Stacy`, `foid` o `tradwives`; corresponden a 4.4. Si `interesada` aparece desde un reclamo tradicional de fidelidad sin jerga determinista, corresponde a 1.1 o 1.3.
 
-Comprende la estrategia narrativa que invierte los roles de poder, presentando al feminismo no como un movimiento de igualdad, sino como una estructura de "misandria" y supremacismo femenino. Los agresores generan y viralizan desinformación para propagar el mito de que los hombres occidentales son víctimas de persecución legal y social, atacando ferozmente las legislaciones sobre violencia de género y etiquetándolas como mecanismos que "criminalizan al hombre" (García-Mingo y Díaz Fernández, 2023).
+**Ejemplo:** `Una chica está genéticamente programada para buscar el mejor macho posible y cuando está contigo no deja de buscarlo`.
 
-### 4.3. Troleo de género y castigo a la disidencia masculina
+## 4.2. Oposición antifeminista y victimismo hegemónico
 
-Identifica el uso de ataques en manada, tácticas de burla memética y violencia verbal dirigidos específicamente contra las activistas feministas en el ciberespacio para silenciarlas e invalidar sus argumentos (Esteban-Ramiro y Moreno-López, 2024). Asimismo, esta subdimensión abarca el señalamiento y castigo hacia los propios hombres que apoyan el feminismo ("aliados"), a quienes se les somete a una castración discursiva (emasculación) a través de neologismos humillantes por traicionar el pacto patriarcal (Lacalle et al., 2023).
+Identifica la estrategia narrativa que invierte los roles de poder y presenta al feminismo como una estructura de misandria o supremacismo femenino. El agresor presenta a los varones como víctimas de la ideología de género, de las leyes de protección o de un sistema que supuestamente criminaliza a los hombres.
 
-## 3. Reglas de Inclusión Algorítmica
+El sistema debe detectar comentarios que representan al feminismo como movimiento totalitario, que niegan la desigualdad estructural, atacan las leyes de género o expresan desprecio, hostilidad o burla directa hacia el feminismo como movimiento político y social. **Marcadores:** `feminazi`, `hembrista`, `misandria`, `ideología de género`, `leyes que criminalizan a los hombres`, `criminalizan al hombre`, `supremacismo femenino`.
 
-> **Nota previa:** Las reglas de esta categoría se alimentan del [Glosario de jerga de la manosfera](./glosario/jerga-manosfera.md), donde se desarrollan las definiciones, etimologías y funciones pragmáticas de cada marcador. Se recomienda cargar ese glosario como diccionario auxiliar del modelo.
+**Regla estricta:** el núcleo debe contener victimismo masculino, inversión de roles, negación de la desigualdad estructural u oposición política al feminismo. Un insulto misógino genérico no activa 4.2. Si el ataque se limita a llamar `loca`, `histérica` o `doble moral` a una activista concreta, corresponde a 5.1 o 5.3.
 
-### Regla 1: Taxonomías deshumanizantes y arquetipos femeninos
+**Ejemplo:** `Las mujeres se benefician de las leyes que criminalizan a los hombres y de la llamada ideología de género`.
 
-**Descripción algorítmica:** El algoritmo debe identificar acrónimos, neologismos y etiquetas que la manosfera utiliza para despojar a las mujeres de su individualidad y humanidad. Esto incluye tratarlas como organismos biológicos carentes de empatía o clasificarlas en arquetipos rígidos basados en un determinismo sexual y económico (Özkula y Prieto-Blanco, 2025).
+## 4.3. Trolleo, castigo y emasculación
 
-**Marcadores para el algoritmo (argot y taxonomías):** *foid, femoid, stacy, hipergamia, mujer objeto*.
+Identifica la violencia verbal dirigida específicamente contra varones que respetan a las mujeres, apoyan el feminismo o son considerados débiles por no ejercer el dominio machista. La manosfera castiga esta disidencia masculina mediante neologismos que les quitan la hombría y los presentan como traidores al pacto patriarcal.
 
-**Unidades de análisis (ejemplos descriptivos y empíricos):**
+**Marcadores:** `aliade`, `mangina`, `pagafantas`, `huelebragas`, `calzonazos`, `blandengue`, `parguelón`, `beta` cuando se usa como insulto a un varón.
 
-- "Stacy es connotada como la mujer hipersexual y superficial que rechaza a los hombres 'medios', mientras que Chad es el macho atractivo y dominante que saca ventaja de la hipergamia femenina" [Nota de contexto: Descripción empírica de cómo la subcultura clasifica a la mujer asumiendo que su valor es meramente sexual y calculador] (Özkula y Prieto-Blanco, 2025, p. 198).
-- "@jisclose Las lesbianas no son mujeres" [Nota de contexto: Ejemplo de mensaje que niega y reconfigura la categoría de "mujer" cuando esta transgrede la taxonomía y el rol esperado por la manosfera] (Úbeda Cuspinera, 2025, p. 193).
+**Regla estricta:** el blanco debe ser un hombre. Si el ataque se dirige exclusivamente a una mujer o a una activista, no aplicar 4.3. Si un mismo mensaje ataca a un hombre `aliade` y llama `feminazi` al movimiento, multicategorizar 4.3 y 4.2.
 
----
+## 4.4. Arquetipos femeninos deshumanizantes
 
-### Regla 2: Jerga de emasculación y subculturas masculinistas
+Identifica neologismos y taxonomías de la manosfera que despojan a las mujeres de humanidad y las clasifican en arquetipos rígidos basados en determinismo biológico, sexual o económico.
 
-**Descripción algorítmica:** La máquina debe localizar el vocabulario sectario utilizado para autoidentificarse dentro de los foros de odio y, paralelamente, para emascular, castigar y humillar a los hombres que apoyan el feminismo ("aliados"), tratándolos como traidores al pacto patriarcal.
+- `Femoid` o `foid`: fusionan femenino con humanoide y reducen a la mujer a un organismo biológico sin empatía o alma.
+- `Stacy`: arquetipo de mujer hipersexual y superficial que, según la manosfera, elige a los hombres por interés material o genético.
+- Animalización: `perras`, `monos`, `gallinas`, `focas` y otros animales usados para negar conciencia y justificar domesticación o control.
+- `Tradwives` y `#TeamAlienadas`: etiquetas para mujeres antifeministas que defienden sumisión, roles tradicionales y vida exclusivamente doméstica; la manosfera las valida por oponerse al feminismo.
 
-**Marcadores para el algoritmo (argot):** *pagafantas, mangina, pastilla roja, red pill, mgtow, incel*.
+**Marcadores:** `foid`, `femoid`, `Stacy`, `tradwives`, `#TeamAlienadas`, `monos`, `perras`, `gallinas`, `focas`.
 
-**Unidades de análisis (ejemplos empíricos):**
+**Regla estricta:** no clasificar aquí arquetipos masculinos como `MRA`, `Incel`, `beta` o `Chad`; corresponden a 4.1. Un insulto cosificador sin argot manosférico propio corresponde a la categoría 2.
 
-- "lenguaje propio (pastilla roja, pagafantas, feminazis, feminismo es cáncer…)" [Nota de contexto: Marcadores léxicos identificados en etnografías digitales españolas como el núcleo del lenguaje misógino utilizado en plataformas como Forocoches o Hispachan para cohesionar a la comunidad] (García y Díaz, 2022, p. 99).
+## Reglas de contexto y multicategorización
 
----
-
-### Regla 3: Troleo de género, desinformación y el mito "Feminazi"
-
-**Descripción algorítmica:** El sistema debe detectar neologismos políticos y narrativas victimistas creadas para caricaturizar a las activistas y deslegitimar el movimiento feminista, presentándolo falsamente como un sistema opresor o totalitario que ataca al varón.
-
-**Marcadores para el algoritmo (argot):** *feminazi, ideología de género, leyes que criminalizan, misandria, hembrismo*.
-
-**Unidades de análisis (ejemplos empíricos):**
-
-- "Se percibe que las mujeres se benefician de las leyes que los criminalizan a los hombres, así como del feminismo y la llamada «ideología de género»" (Gómez Suárez, 2024, p. 11).
-- El uso de términos para englobar al feminismo en una "caricatura absurda con características rígidas y estereotipadas: una mujer de carácter fuerte, histérica, soberbia, violenta, que odia a los hombres" (Digirolamo, 2020).
-
-## 4. Reglas Generales de Inclusión Algorítmica
-
-- **Criterio de coocurrencia semántica** (ver [Protocolo algorítmico general](./00-protocolo-algoritmico.md), sección 1).
-- **Criterio de contexto pragmático** (ver [Protocolo algorítmico general](./00-protocolo-algoritmico.md), sección 3): la jerga de la manosfera se reapropia frecuentemente en contextos críticos, académicos o de denuncia (ej. *"la cultura de la pastilla roja"* en un ensayo feminista). El algoritmo debe distinguir uso endogrupal (ataque) de uso metadiscursivo (crítica, cita académica, parodia).
-
-> **Documento auxiliar obligatorio:** para el entrenamiento efectivo del modelo en esta categoría, consultar el [Glosario de jerga de la manosfera](./glosario/jerga-manosfera.md), que documenta la genealogía, los sinónimos, las traducciones al español y los contextos de uso de cada término (red/blue/black pill, foid, femoid, stacy, feminazi, mangina, MRA, MGTOW, PUA, Incel, etc.).
+- La jerga puede aparecer en una cita académica, denuncia o parodia. La salvaguarda 6.3 debe anular la alerta si el uso no es agresivo.
+- La hipergamia como concepto manosférico y determinista corresponde a 4.1; la oposición política al feminismo y el victimismo masculino corresponden a 4.2.
+- Los marcadores de 4.3 requieren un varón como blanco; los de 4.4 requieren una mujer o grupo de mujeres como blanco.

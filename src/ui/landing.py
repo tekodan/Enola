@@ -20,6 +20,7 @@ if str(_project_root) not in sys.path:
 from src.ui.adjusted_report import (  # noqa: E402
     build_adjusted_analysis,
     compute_adjustment_breakdown,
+    compute_validation_breakdown,
 )
 from src.ui.utils import (  # noqa: E402
     CATEGORIA_LABELS,
@@ -148,12 +149,19 @@ def render_hero() -> None:
 def render_kpis(
     kpis: dict[str, object],
     adjustment: dict[str, object] | None = None,
+    validation: dict[str, object] | None = None,
 ) -> None:
-    """Render the six headline KPI cards.
+    """Render the headline KPI cards.
 
     Row 1: Análisis totales, % con violencia, % ajustado por humanos,
-    % autónomo.
-    Row 2: Categorías canónicas, Páginas scrapeadas (kept for compat).
+    % validado por humanos.
+    Row 2: Categorías canónicas, Páginas scrapeadas.
+
+    ``adjustment`` (from :func:`compute_adjustment_breakdown`) only
+    counts rows where the reviewer *disagreed* — it answers "¿cuánto
+    corrigió la humana?". ``validation`` (from
+    :func:`compute_validation_breakdown`) counts rows with ANY human
+    feedback — it answers "¿cuánto se revisó?". Both are surfaced.
     """
     if adjustment is None:
         adjustment = {
@@ -162,21 +170,33 @@ def render_kpis(
             "adjusted_count": 0,
             "total": 0,
         }
+    if validation is None:
+        validation = {
+            "validated_pct": 0.0,
+            "pending_pct": 100.0,
+            "validated_count": 0,
+            "agreed_count": 0,
+            "disagreed_count": 0,
+            "pending_count": adjustment.get("total", 0),
+            "total": adjustment.get("total", 0),
+        }
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("📄 Análisis totales", kpis["total"])
     col2.metric("🚨 % con violencia", f"{kpis['violent_pct']}%", help="Del total analizado")
     col3.metric(
-        "🧑 % Ajustado por humanos",
-        f"{adjustment['adjusted_pct']}%",
+        "🧑 % Validado por humanos",
+        f"{validation['validated_pct']}%",
         help=(
-            f"{adjustment.get('adjusted_count', 0)} de {adjustment.get('total', 0)} "
-            "análisis revisados y corregidos por humanos"
+            f"{validation.get('validated_count', 0)} de {validation.get('total', 0)} "
+            f"análisis revisados (acuerdo + corrección). "
+            f"Sobre ellos: {validation.get('agreed_count', 0)} de acuerdo, "
+            f"{validation.get('disagreed_count', 0)} corregidos."
         ),
     )
     col4.metric(
         "🤖 % Autónomo",
-        f"{adjustment['autonomous_pct']}%",
+        f"{validation['pending_pct']}%",
         help="Sin revisión humana — clasificación sólo de la IA",
     )
 
@@ -260,11 +280,12 @@ def render_reliability_metrics_section(analysis: list[dict]) -> None:
 
     db = get_database()
     feedback_rows = db.list_feedback()
+    raw_analysis = db.get_analysis_results()
 
-    # Build a lookup of analysis_results by id so the metrics module can
-    # recover the AI prediction for each feedback row.
+    # Las métricas deben comparar la predicción original de la IA con el feedback;
+    # no usar ``analysis`` porque puede contener overrides humanos.
     analysis_lookup: dict = {}
-    for a in analysis:
+    for a in raw_analysis:
         aid = a.get("id") or a.get("analysis_id")
         if aid is not None:
             analysis_lookup[aid] = a
@@ -567,7 +588,7 @@ def render_inspector(analysis: list[dict], posts: list[dict], comments: list[dic
         fpp = selected.get("es_falso_positivo_probable", "false")
         if fpp == "true":
             st.warning(
-                "⚠️ Marcado como **falso positivo probable** por la categoría 5 (Salvaguarda)."
+                "⚠️ Marcado como **falso positivo probable** por la categoría 6 (Salvaguarda)."
             )
         with st.expander("📋 Detalle completo del análisis", expanded=False):
             st.markdown(f"**Regla disparada:** `{selected.get('regla_disparada') or '—'}`")
@@ -660,8 +681,9 @@ def render_about_section() -> None:
         5. **Persistencia** en SQLite para análisis posterior
 
         La taxonomía se inyecta en el prompt del LLM para garantizar
-        homogeneidad: las 6 categorías `VDG_*` son las únicas válidas y cada
-        una tiene 3 subdimensiones numeradas (1.1–6.3).
+         homogeneidad: las 6 categorías `VDG_*` son las únicas válidas y el
+         catálogo contiene 19 subdimensiones numeradas (1.1–6.3, incluida 4.4).
+
         """
     )
 
@@ -734,20 +756,22 @@ def main() -> None:
     feedback_rows = db.list_feedback()
     analysis = build_adjusted_analysis(raw_analysis, feedback_rows)
     adjustment = compute_adjustment_breakdown(analysis)
+    validation = compute_validation_breakdown(analysis)
 
     kpis = compute_kpis(stats, analysis, knowledge_summary())
-    render_kpis(kpis, adjustment)
+    render_kpis(kpis, adjustment, validation)
 
     render_reliability_banner(analysis)
 
     st.divider()
     st.header("📈 Resultados del análisis (ajustados)")
     adj_pct = adjustment.get("adjusted_pct", 0.0)
-    aut_pct = adjustment.get("autonomous_pct", 0.0)
+    val_pct = validation.get("validated_pct", 0.0)
+    aut_pct = validation.get("pending_pct", 100.0)
     st.caption(
         f"Mostrando: **{ {'all': 'todos', 'post': 'posts', 'comment': 'comentarios'}[content_type] }** · "
         f"Categoría más frecuente con violencia: **{kpis['top_category']}** · "
-        f"Ajustado por humanos: **{adj_pct}%** · "
+        f"Validado por humanos: **{val_pct}%** ({adj_pct}% corregido) · "
         f"Autónomo: **{aut_pct}%**"
     )
     render_chart_tabs(analysis)

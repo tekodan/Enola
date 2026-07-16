@@ -111,9 +111,7 @@ class TestProgressState:
     def test_samples_bounded_to_window(self):
         ps = ProgressState()
         for i in range(20):
-            ps.record_review(
-                now=datetime(2026, 7, 15, 12, 0, 0, tzinfo=UTC) + timedelta(seconds=i)
-            )
+            ps.record_review(now=datetime(2026, 7, 15, 12, 0, 0, tzinfo=UTC) + timedelta(seconds=i))
         assert len(ps.samples) == 10
 
     def test_zero_pending_returns_none(self):

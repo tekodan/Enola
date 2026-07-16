@@ -74,38 +74,38 @@ def render_taxonomy_section() -> None:
         {
             "Código": "VDG_VIOLENCIA_SIMBOLICA",
             "Nombre": CATEGORIA_LABELS["VDG_VIOLENCIA_SIMBOLICA"],
-            "Subdims": "1.1 Roles y estereotipos · 1.2 Mandatos de sumisión · 1.3 Adjetivación despectiva",
+            "Subdims": "1.1 Roles tradicionales y sumisión · 1.2 Incompetencia e inferioridad · 1.3 Castigo moral y patologización",
             "Gravedad": "baja-media",
         },
         {
             "Código": "VDG_COSIFICACION_SLUTSHAMING",
             "Nombre": CATEGORIA_LABELS["VDG_COSIFICACION_SLUTSHAMING"],
-            "Subdims": "2.1 Cosificación corporal · 2.2 Slut-shaming · 2.3 Packs / no consentida",
+            "Subdims": "2.1 Cosificación e hipersexualización · 2.2 Body-shaming · 2.3 Doble estándar sexual y slut-shaming",
             "Gravedad": "media",
         },
         {
             "Código": "VDG_HOSTILIDAD_FEMINICIDIO",
             "Nombre": CATEGORIA_LABELS["VDG_HOSTILIDAD_FEMINICIDIO"],
-            "Subdims": "3.1 Amenazas de agresión · 3.2 Justificación de violencia · 3.3 Apología del feminicidio",
+            "Subdims": "3.1 Castigos disciplinantes · 3.2 Deseos de violencia letal · 3.3 Apología al feminicidio",
             "Gravedad": "alta-extrema",
         },
         {
             "Código": "VDG_MANOSFERA_ANTIFEMINISMO",
             "Nombre": CATEGORIA_LABELS["VDG_MANOSFERA_ANTIFEMINISMO"],
-            "Subdims": "4.1 Ideología antifeminista · 4.2 Jerga Incel/MGTOW/PUA · 4.3 Deshumanización",
+            "Subdims": "4.1 Subculturas y jerarquías · 4.2 Oposición antifeminista y victimismo hegemónico · 4.3 Trolleo y emasculación · 4.4 Arquetipos deshumanizantes",
+            "Gravedad": "media-alta",
+        },
+        {
+            "Código": "VDG_DESACREDITACION_ACTIVISTAS",
+            "Nombre": CATEGORIA_LABELS["VDG_DESACREDITACION_ACTIVISTAS"],
+            "Subdims": "5.1 Deslegitimación · 5.2 Ridiculización tradicional · 5.3 Superioridad moral",
             "Gravedad": "media-alta",
         },
         {
             "Código": "VDG_SALVAGUARDA_FALSO_POSITIVO",
             "Nombre": CATEGORIA_LABELS["VDG_SALVAGUARDA_FALSO_POSITIVO"],
-            "Subdims": "5.1 Sarcasmo / ironía · 5.2 Reapropiación endogrupal · 5.3 Marcadores mitigadores",
+            "Subdims": "6.1 Micromachismos y mansplaining · 6.2 Humor hostil · 6.3 Salvaguarda y falsos positivos",
             "Gravedad": "ortogonal (flag de salvaguarda)",
-        },
-        {
-            "Código": "VDG_DESACREDITACION_ACTIVISTAS",
-            "Nombre": CATEGORIA_LABELS["VDG_DESACREDITACION_ACTIVISTAS"],
-            "Subdims": "6.1 Deslegitimación abstracta · 6.2 Ataques a activistas · 6.3 Desinformación",
-            "Gravedad": "media-alta",
         },
     ]
 
@@ -151,8 +151,9 @@ def render_contribute_section() -> None:
         - 🔬 **Rigor académico**: cada categoría cita fuentes teóricas
           (ley 26.485, Butler, Bourdieu, conexiones con el protocolo
           algorítmico).
-        - 🛡️ **Salvaguarda contra falsos positivos**: categoría 5 ortogonal
-          para sarcasmo, reapropiación endogrupal y cita/denuncia.
+         - 🛡️ **Salvaguarda contra falsos positivos**: categoría 6 ortogonal
+           para micromachismos, humor hostil y cita/denuncia.
+
         - 🧩 **Homogeneidad**: la taxonomía es cerrada, no abierta. El LLM
           nunca "inventa" categorías.
         """
@@ -185,7 +186,8 @@ def main() -> None:
             Como su homónima, la detective **Enola Holmes**, esta herramienta
             investiga con rigor y en pro de la justicia social: analiza
             conversaciones en redes sociales y las clasifica con una taxonomía
-            cerrada de 6 categorías y 18 subdimensiones, asistida por un LLM
+             cerrada de 6 categorías y 19 subdimensiones, asistida por un LLM
+
             local (Ollama) y una base vectorial de conocimiento teórico
             (ChromaDB).
 

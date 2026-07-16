@@ -530,7 +530,9 @@ def page_scaffold(
     """
     # Apply theme INSIDE the page function so ui.add_head_html() is not
     # executed at the script's global scope (NiceGUI rejects that).
-    theme.apply_theme()
+    from src.ui.nicegui_app.theme import apply_theme
+
+    apply_theme()
 
     if requires_auth and auth.current_user() is None:
         from nicegui import ui as _ui

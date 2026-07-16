@@ -83,26 +83,28 @@ def _valid_md() -> str:
                 descripcion: "Desinformación de género"
               - code: "4.3"
                 descripcion: "Troleo de género"
-          - code: VDG_SALVAGUARDA_FALSO_POSITIVO
-            orden: 5
-            gravedad: "ortogonal"
-            subdimensiones:
-              - code: "5.1"
-                descripcion: "Sarcasmo agresivo"
-              - code: "5.2"
-                descripcion: "Humor hostil"
-              - code: "5.3"
-                descripcion: "Reapropiación"
+              - code: "4.4"
+                descripcion: "Arquetipos deshumanizantes"
           - code: VDG_DESACREDITACION_ACTIVISTAS
-            orden: 6
+            orden: 5
             gravedad: "media-alta"
             subdimensiones:
+              - code: "5.1"
+                descripcion: "Deslegitimación"
+              - code: "5.2"
+                descripcion: "Ridiculización"
+              - code: "5.3"
+                descripcion: "Superioridad moral"
+          - code: VDG_SALVAGUARDA_FALSO_POSITIVO
+            orden: 6
+            gravedad: "ortogonal"
+            subdimensiones:
               - code: "6.1"
-                descripcion: "Deslegitimación ideológica"
+                descripcion: "Micromachismos"
               - code: "6.2"
-                descripcion: "Ataque a activista"
+                descripcion: "Humor hostil"
               - code: "6.3"
-                descripcion: "Tergiversación"
+                descripcion: "Salvaguarda"
         ---
         """
     )
@@ -178,26 +180,29 @@ def _md_with_exclusions(exclusions_block: str = "") -> str:
                 descripcion: "Desinformacion"
               - code: "4.3"
                 descripcion: "Troleo"
-          - code: VDG_SALVAGUARDA_FALSO_POSITIVO
-            orden: 5
-            gravedad: "ortogonal"
-            subdimensiones:
-              - code: "5.1"
-                descripcion: "Sarcasmo"
-              - code: "5.2"
-                descripcion: "Humor hostil"
-              - code: "5.3"
-                descripcion: "Reapropiacion"
+              - code: "4.4"
+                descripcion: "Arquetipos deshumanizantes"
           - code: VDG_DESACREDITACION_ACTIVISTAS
-            orden: 6
+            orden: 5
             gravedad: "media-alta"
             subdimensiones:
-              - code: "6.1"
+              - code: "5.1"
                 descripcion: "Deslegitimacion"
+              - code: "5.2"
+                descripcion: "Ridiculizacion"
+              - code: "5.3"
+                descripcion: "Superioridad moral"
+          - code: VDG_SALVAGUARDA_FALSO_POSITIVO
+            orden: 6
+            gravedad: "ortogonal"
+            subdimensiones:
+              - code: "6.1"
+                descripcion: "Micromachismos"
               - code: "6.2"
-                descripcion: "Ataque a activista"
+                descripcion: "Humor hostil"
               - code: "6.3"
-                descripcion: "Tergiversacion"
+                descripcion: "Salvaguarda"
+
         """
     )
     return base + exclusions_block + "\n---\n"
@@ -230,10 +235,11 @@ class TestLoadValidTaxonomy:
         assert tx.version == "1.0.0"
         assert tx.schema_version == "taxonomia-v1"
 
-    def test_each_category_has_three_subdimensions(self, valid_md_text: str) -> None:
+    def test_each_category_has_expected_subdimensions(self, valid_md_text: str) -> None:
         tx = load_taxonomy_from_string(valid_md_text)
         for cat in tx.categorias:
-            assert len(cat.subdimensiones) == 3, cat.code
+            expected = 4 if cat.orden == 4 else 3
+            assert len(cat.subdimensiones) == expected, cat.code
 
     def test_ordered_codes_match_input_order(self, valid_md_text: str) -> None:
         tx = load_taxonomy_from_string(valid_md_text)
@@ -242,8 +248,8 @@ class TestLoadValidTaxonomy:
             "VDG_COSIFICACION_SLUTSHAMING",
             "VDG_HOSTILIDAD_FEMINICIDIO",
             "VDG_MANOSFERA_ANTIFEMINISMO",
-            "VDG_SALVAGUARDA_FALSO_POSITIVO",
             "VDG_DESACREDITACION_ACTIVISTAS",
+            "VDG_SALVAGUARDA_FALSO_POSITIVO",
         ]
 
     def test_subdims_by_category_keys(self, valid_md_text: str) -> None:
@@ -251,7 +257,8 @@ class TestLoadValidTaxonomy:
         subdims = tx.subdims_by_category()
         assert set(subdims.keys()) == set(tx.ordered_codes())
         for cat, dims in subdims.items():
-            assert len(dims) == 3
+            expected = 4 if cat == "VDG_MANOSFERA_ANTIFEMINISMO" else 3
+            assert len(dims) == expected
 
     def test_gravedad_por_categoria(self, valid_md_text: str) -> None:
         tx = load_taxonomy_from_string(valid_md_text)
@@ -259,10 +266,10 @@ class TestLoadValidTaxonomy:
         assert gp["VDG_VIOLENCIA_SIMBOLICA"] == "baja-media"
         assert gp["VDG_SALVAGUARDA_FALSO_POSITIVO"] == "ortogonal"
 
-    def test_ordered_subdimensions_has_18_items(self, valid_md_text: str) -> None:
+    def test_ordered_subdimensions_has_19_items(self, valid_md_text: str) -> None:
         tx = load_taxonomy_from_string(valid_md_text)
         out = tx.ordered_subdimensions()
-        assert len(out) == 18
+        assert len(out) == 19
         assert out[0] == "1.1"
         assert out[-1] == "6.3"
 
@@ -270,8 +277,8 @@ class TestLoadValidTaxonomy:
         tx = load_taxonomy_from_string(valid_md_text)
         inv = tx.categoria_por_subdimension()
         assert inv["1.1"] == "VDG_VIOLENCIA_SIMBOLICA"
-        assert inv["6.3"] == "VDG_DESACREDITACION_ACTIVISTAS"
-        assert len(inv) == 18
+        assert inv["6.3"] == "VDG_SALVAGUARDA_FALSO_POSITIVO"
+        assert len(inv) == 19
 
     def test_descripcion_subdim(self, valid_md_text: str) -> None:
         tx = load_taxonomy_from_string(valid_md_text)
@@ -292,7 +299,7 @@ class TestLoaderFromDisk:
             pytest.skip(f"Real TAXONOMIA.md not found at {DEFAULT_TAXONOMY_PATH}")
         tx = load_taxonomy()
         assert len(tx.categorias) == 6
-        assert len(tx.ordered_subdimensions()) == 18
+        assert len(tx.ordered_subdimensions()) == 19
 
     def test_default_path_resolves(self) -> None:
         """DEFAULT_TAXONOMY_PATH must point inside the project tree."""
@@ -534,7 +541,7 @@ class TestInvariants:
         with pytest.raises(ValidationError):
             SubdimensionMD.model_validate({"code": "7.1", "descripcion": "x"})
         with pytest.raises(ValidationError):
-            SubdimensionMD.model_validate({"code": "1.4", "descripcion": "x"})
+            SubdimensionMD.model_validate({"code": "1.5", "descripcion": "x"})
         with pytest.raises(ValidationError):
             SubdimensionMD.model_validate({"code": "x.y", "descripcion": "x"})
 
@@ -591,6 +598,7 @@ class TestTaxonomyModel:
                             {"code": f"{i + 1}.1", "descripcion": "x"},
                             {"code": f"{i + 1}.2", "descripcion": "x"},
                             {"code": f"{i + 1}.3", "descripcion": "x"},
+                            *([{"code": "4.4", "descripcion": "x"}] if i == 3 else []),
                         ],
                     }
                     for i in range(6)

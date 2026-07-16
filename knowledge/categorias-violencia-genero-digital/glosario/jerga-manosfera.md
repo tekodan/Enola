@@ -86,9 +86,9 @@ Arquetipo despectivo utilizado para describir a la *"mujer hipersexual y superfi
 
 Neologismos creados con el propósito de silenciar a las activistas. Engloban a la mujer en una caricatura absurda y estereotipada: una mujer descrita como *"histérica, soberbia, violenta y que odia a los hombres"*, comparando la agenda igualitaria con un régimen totalitario para deslegitimar sus denuncias (Digirolamo, 2020, citado en Los memes dentro de las luchas, s.f.; Revista Punto Género, 2024).
 
-**Función pragmática:** deslegitimación. Cierra el debate mediante la comparación totalitaria. Cruza con la [Categoría 6](../06-categoria-6-desacreditacion-activistas.md).
+**Función pragmática:** oposición antifeminista y victimismo hegemónico. Puede cruzar con la categoría 5 cuando la patologización se dirige a una activista concreta.
 
-**Marcadores algorítmicos equivalentes:** `feminazi`, `feminazis`, `hembrista`, `feminazis feministas`, `femi-nazi`, `feminismo radical` (uso despectivo, ver Cat. 6 Regla 1).
+**Marcadores algorítmicos equivalentes:** `feminazi`, `feminazis`, `hembrista`, `femi-nazi`, `feminismo radical` (uso despectivo, ver Cat. 4.2).
 
 ### 3.4. Animalización (Perras, monos, gallinas, focas)
 
@@ -131,11 +131,11 @@ El algoritmo debe buscar estos acrónimos en inglés, ya que se usan globalmente
 | `bluepill`, `cabeza lavada` | 4.1 | Media | Alto |
 | `blackpill`, `pastilla negra` | 4.1 | Alta | Medio |
 | `mangina`, `pagafantas` | 4.3 | Media | Bajo |
-| `foid`, `femoid` | 4.1 | Alta | Bajo |
-| `stacy`, `karen` | 4.1 | Media | Medio (puede ser nombre propio) |
-| `feminazi`, `hembrista` | 4.2 / 4.3 | Media | Alto (uso crítico legítimo) |
-| `perra`, `zorra`, `gata` | 4.1 | Media-Alta | Alto (reapropiación coloquial) |
-| `tradwife`, `team alienadas` | 4.2 | Baja | Muy alto (depende del contexto) |
+| `foid`, `femoid` | 4.4 | Alta | Bajo |
+| `stacy`, `karen` | 4.4 | Media | Medio (puede ser nombre propio) |
+| `feminazi`, `hembrista` | 4.2 | Media | Alto (uso crítico legítimo) |
+| `perra`, `zorra`, `gata` | 4.4 / 2.3 | Media-Alta | Alto (reapropiación coloquial) |
+| `tradwife`, `team alienadas` | 4.4 | Baja | Muy alto (depende del contexto) |
 | `MRA`, `MGTOW`, `PUA`, `Incel` | 4.1 | Alta | Bajo (anglicismos, baja reapropiación) |
 | `beta`, `white knight`, `simpa` | 4.3 | Baja-Media | Alto |
 

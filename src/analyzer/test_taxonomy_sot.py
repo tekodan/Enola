@@ -68,12 +68,34 @@ def test_all_canonical_categories_have_4_or_3_subdims() -> None:
             assert counts[cat.code] == 3, f"{cat.code} should have 3 subdims"
 
 
-def test_basura_digital_has_all_5_conditions() -> None:
-    """COND_1, COND_2, COND_3, COND_4, COND_5 are all declared."""
-    tx = _tx()
-    bd = tx.patrones_basura_digital_dict()
-    cond_ids = {p.id.split("_")[0] + "_" + p.id.split("_")[1] for p in bd.values()}
-    assert {"COND_1", "COND_2", "COND_3", "COND_4", "COND_5"} <= cond_ids
+def test_basura_digital_has_all_6_conditions() -> None:
+    """The six algorithmic conditions of basura digital are all reachable.
+
+    COND_1 (empty/NaN), COND_2 (orphan URL) and COND_3 (typographic
+    noise) are hardcoded in :func:`detectar_basura_digital`. COND_4
+    (pure laughter) and COND_5 (short reactions) are regex patterns in
+    ``patrones-basura-digital.md``. COND_6_TAG_PERSONA (added
+    2026-07-15) is a composite check in
+    :func:`_is_only_mention_payload` — see
+    ``test_exclusion_filter.TestBasuraDigitalCond6TagPersona``.
+
+    The single-source-of-truth check is: each condition is *reachable*
+    via :func:`detectar_basura_digital` with the right input.
+    """
+    from src.analyzer.exclusion_filter import detectar_basura_digital
+
+    cases: list[tuple[str, str]] = [
+        ("", "COND_1_VACIO"),
+        ("https://example.com", "COND_2_ENLACE_HUERFANO"),
+        ("🎉🎉🎉", "COND_3_RUIDO_TIPOGRAFICO"),
+        ("jajaja", "COND_4_SOLO_RISA"),
+        ("ok", "COND_5_REACCION_CORTA"),
+        ("@user", "COND_6_TAG_PERSONA"),
+    ]
+    for text, expected_codigo in cases:
+        r = detectar_basura_digital(text)
+        assert r.excluded, f"{text!r} should be excluded"
+        assert r.codigo == expected_codigo, f"{text!r}: expected {expected_codigo}, got {r.codigo}"
 
 
 def test_desempate_rules_have_disparador() -> None:

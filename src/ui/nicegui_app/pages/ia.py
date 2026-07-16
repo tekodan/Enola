@@ -15,7 +15,6 @@ from nicegui import ui
 
 from src.report.metrics import render_metrics_report
 from src.storage import get_database
-from src.ui.adjusted_report import build_adjusted_analysis
 from src.ui.nicegui_app import theme
 from src.ui.nicegui_app.components.charts import build_confusion_matrix_heatmap
 from src.ui.nicegui_app.components.kpi_card import kpi_grid
@@ -29,8 +28,7 @@ def _load():
     db = get_database()
     raw = db.get_analysis_results()
     feedback = db.list_feedback()
-    analysis = build_adjusted_analysis(raw, feedback)
-    return analysis, feedback
+    return raw, feedback
 
 
 def _render_body() -> None:
@@ -40,7 +38,7 @@ def _render_body() -> None:
         subtitle=(
             "Matriz de confusión y métricas de rendimiento (Precisión, "
             "Sensibilidad, F1-Score) calculadas con sklearn sobre la "
-            "verdad terreno provista por el revisor humano."
+            "predicción original de la IA y las correcciones del revisor humano."
         ),
     )
 

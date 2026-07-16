@@ -1,56 +1,47 @@
 ---
 proyecto: Sistema de Categorización de Violencia de Género Digital
 tipo: Documento maestro
-estado: Borrador estructurado
+estado: Taxonomía canónica v2
 ---
 
 # Sistema de Categorización de Violencia de Género Digital
 
-Este sistema de categorías tiene como objetivo operacionalizar la detección algorítmica de la ciberviolencia contra las mujeres a partir de un marco teórico sustentado en estudios de violencia de género digital, lingüística computacional y análisis del discurso.
+El sistema operacionaliza la detección algorítmica de ciberviolencia contra las mujeres mediante análisis del discurso, recuperación de conocimiento y clasificación multi-etiqueta.
 
 ## Arquitectura del sistema
 
-El sistema se organiza en **6 categorías operativas**, cada una con:
+El sistema se organiza en **6 categorías operativas y 19 subdimensiones**:
 
-- **Definición conceptual** anclada en literatura académica.
-- **3 subdimensiones analíticas** que delimitan el fenómeno.
-- **3 reglas de inclusión algorítmica** con marcadores léxicos y unidades de análisis empíricas.
-- Reglas generales de inclusión específicas de la categoría (cuando aplica).
+- Las categorías 1, 2, 3, 5 y 6 tienen tres subdimensiones.
+- La categoría 4 tiene cuatro subdimensiones e incorpora los arquetipos femeninos deshumanizantes como 4.4.
+- La categoría 5 se reserva para castigos dirigidos a activistas y mujeres con perfil público.
+- La categoría 6 es transversal: micromachismos, humor hostil y salvaguarda contra falsos positivos.
+- `MAX_LABELS` permite conservar varias capas independientes de un mismo mensaje.
 
 ## Índice de categorías
 
 | # | Categoría | Subdimensiones | Reglas | Gravedad |
-|---|-----------|---------------|--------|----------|
+|---|-----------|---------------:|------:|----------|
 | 1 | [Violencia simbólica y estereotipos de dominación](./01-categoria-1-violencia-simbolica.md) | 3 | 3 | Baja-Media |
-| 2 | [Cosificación corporal y slut-shaming](./02-categoria-2-cosificacion-slutshaming.md) | 3 | 3 | Media |
+| 2 | [Mercantilización corporal](./02-categoria-2-cosificacion-slutshaming.md) | 3 | 3 | Media |
 | 3 | [Hostilidad explícita y apología al feminicidio](./03-categoria-3-hostilidad-feminicidio.md) | 3 | 3 | Alta-Extrema |
-| 4 | [Discurso ideológico antifeminista y manosfera](./04-categoria-4-manosfera-antifeminismo.md) | 3 | 3 | Media-Alta |
-| 5 | [Control de resistencia, sarcasmos y falsos positivos](./05-categoria-5-sarcasmo-falsos-positivos.md) | 3 | 3 | Baja (alta complejidad técnica) |
-| 6 | [Desacreditación de activistas y mujeres con perfil público](./06-categoria-6-desacreditacion-activistas.md) | 3 | 3 | Media-Alta |
+| 4 | [Discurso ideológico antifeminista y manosfera](./04-categoria-4-manosfera-antifeminismo.md) | 4 | 4 | Media-Alta |
+| 5 | [Castigo del empoderamiento femenino](./05-categoria-5-desacreditacion-activistas.md) | 3 | 3 | Media-Alta |
+| 6 | [Control de resistencia, sarcasmos y falsos positivos](./06-categoria-6-sarcasmo-falsos-positivos.md) | 3 | 3 | Ortogonal |
 
 ## Documentos transversales
 
-- [Protocolo algorítmico general](./00-protocolo-algoritmico.md) — criterios técnicos que aplican a todas las categorías (leetspeak, coocurrencia semántica, etc.).
-- [Glosario de jerga de la manosfera](./glosario/jerga-manosfera.md) — diccionario de neologismos, acrónimos y taxonomías deshumanizantes.
-- [Glosario de argot misógino general](./glosario/argot-misogino-general.md) — marcadores léxicos organizados por categoría.
+- [Protocolo algorítmico general](./00-protocolo-algoritmico.md)
+- [Glosario de jerga de la manosfera](./glosario/jerga-manosfera.md)
+- [Glosario de argot misógino general](./glosario/argot-misogino-general.md)
+- [Marcadores por subdimensión](./glosario/marcadores-por-subdimension.md)
+- [Reglas de desempate](./glosario/reglas-desempate.md)
+- [Tabla canónica del prompt](./07-tabla-canonica-prompt.md)
 
-## Estructura de cada categoría
+## Fronteras principales
 
-Cada archivo de categoría sigue el siguiente esquema unificado:
-
-1. **Definición Conceptual** — delimitación teórica con citas académicas.
-2. **Subdimensiones Analíticas** — desglose del fenómeno en 3 dimensiones operativas.
-3. **Reglas de Inclusión Algorítmica** — 3 reglas con la estructura:
-   - Descripción algorítmica
-   - Marcadores léxicos (argot)
-   - Unidades de análisis (ejemplos empíricos)
-4. **Reglas Generales de Inclusión Algorítmica** — criterios técnicos específicos de la categoría (cuando aplica).
-
-## Referencias marco
-
-- Bourdieu, P. (1991). *El sentido práctico*.
-- Cobo, R. (2020). *Cosificación y vulnerabilidad*.
-- García-Díaz et al. (2021). Detección de discurso de odio mediante PLN.
-- Lizaralo-Ojeda, Y. y Yanez-Peñúñuri (2021). Ciberviolencia y dominación masculina.
-- Özkula, S. y Prieto-Blanco, P. (2025). Manosfera y tecnoculturas reaccionarias.
-- Úbeda Cuspinera, M. (2025). Detección algorítmica de discurso sexista.
+- 2.2 es body-shaming por físico, edad, peso o anatomía; 2.3 es slut-shaming por sexualidad, intimidad o vestimenta sancionada.
+- 3.1 es castigo físico no letal; 3.2 es deseo directo de muerte; 3.3 es apología o justificación sin amenaza directa.
+- 4.1 es jerga y jerarquías manosféricas; 4.2 es oposición antifeminista y victimismo hegemónico; 4.3 castiga a varones aliados; 4.4 deshumaniza a mujeres.
+- 1.1 se aplica a mujeres en general; 5.2 exige un ataque público contra activistas, manifestantes, periodistas o políticas.
+- 6.3 anula las alertas cuando el marcador ofensivo aparece en denuncia, cita, refutación o reapropiación no agresiva.

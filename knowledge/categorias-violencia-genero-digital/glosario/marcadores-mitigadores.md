@@ -68,10 +68,11 @@ este glosario debe devolver `clasificaciones: []` con
    tiene efecto si el texto también contiene al menos UN marcador
    agresivo de los listados en `marcadores-por-subdimension.md`.
    Sin marcador agresivo, no hay nada que mitigar.
-3. **Caso mixto (denuncia + insulto).** Si el texto tiene
-   segmentos denunciantes y segmentos insultantes, devolver la
-   categoría sustantiva con `es_falso_positivo_probable: true`
-   (en lugar de descartar todo).
+3. **Sobreescritura protectora.** Si el marcador agresivo aparece dentro
+   de una denuncia, refutación o crítica feminista coherente, activar 6.3 y
+   devolver la lista vacía. Solo mantener una categoría sustantiva cuando
+   exista un segmento agresivo independiente que no dependa del marcador
+   citado o refutado.
 
 ## Cambios recientes
 

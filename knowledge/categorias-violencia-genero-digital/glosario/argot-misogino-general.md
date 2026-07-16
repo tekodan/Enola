@@ -5,7 +5,7 @@ proposito: Diccionario léxico transversal de entrenamiento algorítmico
 
 # Glosario de argot misógino general
 
-Diccionario consolidado de **marcadores léxicos (argot)** utilizado en las cinco categorías de violencia sustantiva (1, 2, 3, 4, 6). Cada marcador está vinculado a su categoría, regla y subdimensión de origen para permitir el entrenamiento supervisado del modelo de detección.
+Diccionario consolidado de marcadores léxicos utilizado en las seis categorías. La categoría 6 es transversal y sus marcadores requieren análisis pragmático; cada marcador está vinculado a su subdimensión para permitir el entrenamiento multi-etiqueta.
 
 > **Nota:** los marcadores exclusivos de la **manosfera** (redpill, foid, mangina, etc.) están en el [Glosario de jerga de la manosfera](./jerga-manosfera.md). Este glosario se enfoca en el argot misógino de uso general (insultos, imperativos, hipersexualización, amenazas, etc.).
 
@@ -69,38 +69,36 @@ Diccionario consolidado de **marcadores léxicos (argot)** utilizado en las cinc
 | `justicia de miércoles` | 3 | 3.3 | Deslegitimación judicial. |
 | `se lo buscaron` | 3 | 3.3 | Inversión de culpabilidad víctima-victimario. |
 
-### 1.4. Marcadores de la Categoría 6 — Desacreditación de activistas
+### 1.4. Marcadores de la Categoría 5 — Castigo del empoderamiento femenino
 
 | Marcador | Regla | Subdimensión | Notas |
 |----------|-------|--------------|-------|
-| `traumada` | 1 | 6.1 | Patologización emocional. |
-| `ardida` | 1 | 6.1 | Atribución de rencor. |
-| `tóxicos` | 1 | 6.1 | Descalificación. |
-| `feminismo radical` | 1 | 6.1 | Caricatura ideológica. |
-| `váyanse a lavar` | 2 | 6.2 | Imperativo de reclusión. |
-| `viejas webonas` | 2 | 6.2 | Insulto etario (overlap Cat. 1). |
-| `ridículas` | 2 | 6.2 / 5.2 | Descalificación. |
-| `doble moral` | 3 | 6.3 | Tergiversación. |
-| `falta de respeto` | 3 | 6.3 | Victimización invertida. |
-| `igualdad de género` | 3 | 6.3 | ⚠ Término legítimo reapropiado. |
-| `lucha por la igualdad` | 3 | 6.3 | ⚠ Término legítimo reapropiado. |
+| `traumada` | 1 | 5.1 | Patologización dirigida a activista o figura pública. |
+| `ardida` | 1 | 5.1 | Atribución de rencor a una mujer pública. |
+| `tóxicas` | 1 | 5.1 | Descalificación de activistas. |
+| `feminismo radical` | 1 | 5.1 | Caricatura del discurso de una activista. |
+| `váyanse a lavar` | 2 | 5.2 | Imperativo doméstico contra protesta o activismo. |
+| `viejas webonas` | 2 | 5.2 | Insulto en contexto de movilización. |
+| `ridículas` | 2 | 5.2 | Burla de manifestantes o figuras públicas. |
+| `doble moral` | 3 | 5.3 | Acusación de hipocresía política. |
+| `falta de respeto` | 3 | 5.3 | Tergiversación de una reivindicación igualitaria. |
+| `igualdad de género` | 3 | 5.3 | Marcador político que requiere contexto acusatorio. |
+| `lucha por la igualdad` | 3 | 5.3 | Marcador político que requiere contexto acusatorio. |
 
-### 1.5. Marcadores de la Categoría 5 — Sarcasmo y micromachismos
+### 1.5. Marcadores de la Categoría 6 — Control de resistencia
 
 | Marcador | Regla | Subdimensión | Notas |
 |----------|-------|--------------|-------|
-| `calladita te ves más bonita` | 1 | 5.1 | Micromachismo prototípico. |
-| `te ves más bonita` | 1 | 5.1 | Prescripción estética + silenciamiento. |
-| `las mujeres no saben` | 1 | 5.1 | Presunción de incompetencia genérica. |
-| `tenías que ser mujer` | 1 | 5.1 | Atribución de esencialismo negativo. |
-| `jajaja` | 2 | 5.2 | Marcador risa irónica. |
-| `es solo humor` | 2 | 5.2 | Minimización post-broma. |
-| `era una broma` | 2 | 5.2 | Negación de agresión. |
-| `generación de cristal` | 2 | 5.2 | Patologización de la víctima. |
-| `visión arcaica` | 3 | 5.3 | Marcador mitigador (DENUNCIA). |
-| `denuncia` | 3 | 5.3 | Marcador mitigador (DENUNCIA). |
-| `no es verdad que` | 3 | 5.3 | Marcador mitigador (CRÍTICA). |
-| `eres un crack` | 3 | 5.3 | Marcador mitigador (HALAGO COLOQUIAL). |
+| `calladita te ves más bonita` | 1 | 6.1 | Micromachismo y silenciamiento con falsa cortesía. |
+| `las mujeres no saben` | 1 | 6.1 | Mansplaining o incompetencia implícita. |
+| `tenías que ser mujer` | 1 | 6.1 | Esencialismo negativo sin insulto frontal. |
+| `jajaja` | 2 | 6.2 | Humor hostil solo si acompaña un ataque. |
+| `es solo humor` | 2 | 6.2 | Minimización posterior a una agresión. |
+| `era una broma` | 2 | 6.2 | Enmascaramiento de la agresión. |
+| `arcaica` | 3 | 6.3 | Marcador mitigador de denuncia o crítica. |
+| `denuncia` | 3 | 6.3 | Uso no agresivo del marcador citado. |
+| `no es verdad que` | 3 | 6.3 | Refutación. |
+| `eres un crack` | 3 | 6.3 | Reapropiación coloquial no agresiva. |
 
 ---
 
@@ -164,14 +162,14 @@ ja ja, lol
 
 ## 4. Tabla resumen: cobertura de marcadores por categoría
 
-| Marcadores únicos | Cat. 1 | Cat. 2 | Cat. 3 | Cat. 4 | Cat. 6 | Total |
-|------------------|--------|--------|--------|--------|--------|-------|
-| Violencia simbólica (Cat. 1) | 14 | 1 (overlap) | 0 | 0 | 1 (overlap) | 16 |
-| Cosificación (Cat. 2) | 0 | 14 | 0 | 0 | 0 | 14 |
-| Hostilidad (Cat. 3) | 0 | 0 | 13 | 0 | 0 | 13 |
-| Manosfera (Cat. 4) | 0 | 0 | 0 | 11 | 0 | 11 |
-| Desacreditación (Cat. 6) | 0 | 0 | 0 | 0 | 11 | 11 |
-| Sarcasmo (Cat. 5) | 1 (overlap) | 0 | 0 | 0 | 1 (overlap) | 12 |
+| Marcadores únicos | Cat. 1 | Cat. 2 | Cat. 3 | Cat. 4 | Cat. 5 | Cat. 6 | Total |
+|------------------|--------|--------|--------|--------|--------|--------|-------|
+| Violencia simbólica (Cat. 1) | 14 | 1 (overlap) | 0 | 0 | 1 (overlap) | 1 (overlap) | 17 |
+| Cosificación (Cat. 2) | 0 | 14 | 0 | 0 | 0 | 0 | 14 |
+| Hostilidad (Cat. 3) | 0 | 0 | 13 | 0 | 0 | 0 | 13 |
+| Manosfera (Cat. 4) | 0 | 0 | 0 | 19 | 0 | 0 | 19 |
+| Castigo del empoderamiento (Cat. 5) | 1 (overlap) | 0 | 0 | 1 (overlap) | 11 | 1 (overlap) | 13 |
+| Control de resistencia (Cat. 6) | 1 (overlap) | 0 | 0 | 1 (overlap) | 1 (overlap) | 10 | 13 |
 
 > **Total de marcadores catalogados:** ~77 (sin contar duplicados). **Overlaps críticos** (marcadores compartidos entre categorías) están documentados explícitamente: el algoritmo debe usar el **contexto sintáctico y el referente** (género abstracto vs. persona específica) para desambiguar.
 

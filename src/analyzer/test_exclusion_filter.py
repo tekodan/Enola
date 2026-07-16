@@ -1,13 +1,16 @@
 """Unit tests for the exclusion filter (CÓDIGO 99 + Violencia Común).
 
-Mirrors the spec's five algorithmic conditions for basura digital
+Mirrors the spec's algorithmic conditions for basura digital
 (Cond 1 — vacío; Cond 2 — enlace huérfano; Cond 3 — ruido
-tipográfico; Cond 4 — risas puras; Cond 5 — reacciones cortas) plus
-the pragmatic-discrimination rule for violencia común.
+tipográfico; Cond 4 — risas puras; Cond 5 — reacciones cortas;
+Cond 6 — mención a persona sin comentario) plus the
+pragmatic-discrimination rule for violencia común.
 """
 
 import math
 from pathlib import Path
+
+import pytest
 
 from src.analyzer.exclusion_filter import (
     _GENDER_MARKERS,
@@ -404,6 +407,171 @@ class TestBasuraDigitalCondiciones4y5:
     def test_glosario_ruta_existe(self):
         """The canonical glosario markdown must be on disk."""
         assert PATRONES_BASURA_DIGITAL_MARKDOWN.is_file()
+
+
+class TestBasuraDigitalCond6TagPersona:
+    """COND_6_TAG_PERSONA — added 2026-07-15.
+
+    Implements the spec rule: ``Cuando se etiqueta a una persona
+    @elnombredelapersona sin estar acompañado de ningún otro
+    comentario`` → ``CODIGO_99``. Detected by
+    :func:`_is_only_mention_payload` in ``exclusion_filter.py``.
+
+    Not a ``re.fullmatch`` pattern (lives in the helper, not in
+    ``patrones-basura-digital.md``) because the rule is a composite
+    check: presence of at least one ``@user`` token AND absence of any
+    other legible word. The spec numbers this as COND_4; the code
+    emits it as COND_6 to preserve the numbering of
+    COND_4_SOLO_RISA / COND_5_REACCION_CORTA already persisted in
+    ``analysis_results.exclusion_codigo``.
+    """
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "@juan",
+            "@juan.perez",
+            "@user_123",
+            "@user-name",
+            "@a",
+            "@user1 @user2",
+            "@user1,@user2",
+            "@user1.",
+            "@USUARIO",
+            "@user1 @user2 @user3",
+            "@user\n",
+            "  @user  ",
+        ],
+    )
+    def test_only_mention_is_basura(self, text: str):
+        """Pure-mention payloads → COND_6_TAG_PERSONA."""
+        from src.analyzer.exclusion_filter import (
+            detectar_basura_digital,
+        )
+
+        r = detectar_basura_digital(text)
+        assert r.excluded, f"expected {text!r} to be excluded"
+        assert r.codigo == "COND_6_TAG_PERSONA", f"unexpected codigo for {text!r}: {r.codigo}"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "@user mirá esto",
+            "Hola @user cómo estás",
+            "mirá @user",
+            "@user! qué onda",
+            "respondeme @user",
+        ],
+    )
+    def test_mention_with_extra_word_is_not_basura(self, text: str):
+        """A lexical word outside the mentions defeats COND_6.
+
+        The important invariant is that real sentences (with at least
+        one extra word) pass through. Punctuation-only additions
+        (``@user.``, ``@user 🔥``) remain COND_6 because no lexical
+        word is added.
+        """
+        from src.analyzer.exclusion_filter import (
+            detectar_basura_digital,
+        )
+
+        r = detectar_basura_digital(text)
+        assert not r.excluded, f"expected {text!r} to reach the LLM"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "@user 🔥",
+            "@user.",
+            "@user!",
+            "@user?",
+            "@user 😀",
+        ],
+    )
+    def test_mention_with_only_noise_is_still_cond6(self, text: str):
+        """Punctuation / emoji additions are not "other comments"."""
+        r = detectar_basura_digital(text)
+        assert r.excluded, f"expected {text!r} to be excluded"
+        assert r.codigo == "COND_6_TAG_PERSONA"
+
+    def test_email_is_not_basura(self):
+        """``juan@gmail.com`` is NOT a mention — the ``@`` is mid-token."""
+        r = detectar_basura_digital("juan@gmail.com")
+        assert not r.excluded
+
+    def test_at_solo_no_es_cond6(self):
+        """A bare ``@`` (no username) does not match COND_6.
+
+        It is still excluded via COND_3_RUIDO_TIPOGRAFICO (single
+        non-letter), but the codigo is NOT COND_6.
+        """
+        r = detectar_basura_digital("@")
+        assert r.excluded
+        assert r.codigo == "COND_3_RUIDO_TIPOGRAFICO"
+
+    def test_at_con_espacio_no_matchea(self):
+        """``@ user`` (space between @ and username) does NOT match
+        COND_6 — the regex requires the ``@`` to be glued to the
+        username.
+
+        After stripping emojis/punctuation, ``user`` is a valid
+        4-letter lexical word, so COND_3_RUIDO_TIPOGRAFICO does NOT
+        fire either. The message reaches the LLM (it carries the
+        word ``user``). The important invariant for this test is
+        that the codigo is NOT COND_6.
+        """
+        r = detectar_basura_digital("@ user")
+        assert not r.excluded
+        assert r.codigo != "COND_6_TAG_PERSONA"
+
+    def test_mention_plus_url_sigue_siendo_cond6(self):
+        """Per the spec, a URL does not count as a "comment", so
+        ``@user https://example.com`` is still COND_6_TAG_PERSONA.
+
+        Order in ``detectar_basura_digital``:
+        COND_1 → COND_3 (repeated chars) → COND_2 (URL) → COND_6 (mention).
+        COND_2 does NOT fire here because ``user`` is a lexical word
+        outside the URL, so the URL is not orphan. COND_6 fires
+        because URLs are stripped before checking lexical content.
+        """
+        r = detectar_basura_digital("@user https://example.com")
+        assert r.excluded
+        assert r.codigo == "COND_6_TAG_PERSONA"
+
+    def test_only_mention_multi_line(self):
+        """Multi-line mention-only payloads → COND_6."""
+        r = detectar_basura_digital("@user1\n@user2")
+        assert r.excluded
+        assert r.codigo == "COND_6_TAG_PERSONA"
+
+    def test_classify_short_circuits_llm_for_tag_only(self):
+        """RAGClassifier.classify on a mention-only payload must NOT
+        call the LLM — same behavior as the other basura conditions.
+        """
+        import asyncio
+        from unittest.mock import MagicMock
+
+        from src.analyzer.rag_classifier import RAGClassifier
+
+        llm = MagicMock()
+        cls = RAGClassifier(llm_client=llm)
+
+        result = asyncio.run(cls.classify("@juan.perez"))
+        assert result.exclusion_label == EXCLUSION_BASURA_DIGITAL
+        assert result.exclusion_codigo == "COND_6_TAG_PERSONA"
+        assert result.tiene_violencia is False
+        llm.generate.assert_not_called()
+
+    def test_glosario_documenta_cond6(self):
+        """The glosario markdown mentions COND_6_TAG_PERSONA so the
+        rule stays documented alongside the regex patterns."""
+        from src.analyzer.exclusion_filter import (
+            PATRONES_BASURA_DIGITAL_MARKDOWN,
+        )
+
+        text = PATRONES_BASURA_DIGITAL_MARKDOWN.read_text(encoding="utf-8")
+        assert "COND_6" in text
+        assert "Menciones a persona" in text or "mención" in text.lower()
 
 
 class TestDetectarViolenciaComun:

@@ -83,6 +83,14 @@ _URL_HOST_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# A person-mention token (``@usuario``). Used by COND_6 (tag a persona
+# sin comentario adicional). Accepts latin letters (incl. accents),
+# digits, dot, underscore and dash — the same character class Facebook
+# uses for usernames. We do NOT match e-mails (``juan@gmail.com``) or
+# decorative ``@`` mid-token because the regex anchors on a leading
+# ``@`` and requires at least one valid username character after it.
+_MENTION_PATTERN = re.compile(r"@[A-Za-zÁÉÍÓÚáéíóúÑñÜü0-9._-]+")
+
 # A "word" is a run of 2+ letters (latin/Spanish incl. accents). Used
 # to decide whether an entry has lexical structure.
 _LEXICAL_WORD = re.compile(r"\b[A-Za-zÁÉÍÓÚáéíóúÑñÜü]{2,}\b")
@@ -326,6 +334,31 @@ def _has_only_url_payload(text: str) -> bool:
     return not _LEXICAL_WORD.search(no_url)
 
 
+def _is_only_mention_payload(text: str) -> bool:
+    """COND_6 — return ``True`` when ``text`` is exclusively one or more
+    ``@user`` mentions with no other legible word.
+
+    Matches the spec rule "Cuando se etiqueta a una persona
+    @elnombredelapersona sin estar acompañado de ningún otro comentario".
+    A comment like ``"@user"`` or ``"@user1 @user2,@user3."`` is basura;
+    ``"hola @user cómo estás"`` is NOT (it carries lexical content
+    outside the mentions and must reach the LLM).
+
+    URLs are stripped FIRST because, per the spec, a URL does not count
+    as "comment" content — so ``"@user https://example.com"`` is
+    mention-only (the URL is non-content for this rule). ``example``
+    inside the URL is the URL hostname, not a user comment.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if not _MENTION_PATTERN.search(stripped):
+        return False
+    sin_url = _FULL_URL.sub(" ", stripped)
+    sin_menciones = _MENTION_PATTERN.sub(" ", sin_url)
+    return not _LEXICAL_WORD.search(sin_menciones)
+
+
 def _has_lexical_structure(text: str) -> bool:
     """Return ``True`` when ``text`` contains at least one legible word.
 
@@ -437,7 +470,7 @@ def detectar_basura_digital(text: object) -> ExclusionResult:
     """Return an ``ExclusionResult`` with ``CODIGO_99`` if ``text`` is
     digital garbage, otherwise an empty result.
 
-    Implements the five algorithmic conditions from the spec:
+    Implements the algorithmic conditions from the spec:
 
     * **Condición 1**: missing/empty/NaN payload.
     * **Condición 2**: orphan hyperlink (only a URL, no other word).
@@ -446,6 +479,17 @@ def detectar_basura_digital(text: object) -> ExclusionResult:
     * **Condición 4**: pure laughter (jajaja/jeje/haha/rsrs/lol/xd).
     * **Condición 5**: short one-/two-char reactions or interjections
       (ok/si/no/ya/dale/je/ah).
+    * **Condición 6**: person mention without comment (one or more
+      ``@user`` tokens and no other legible word — matches the spec
+      rule "Cuando se etiqueta a una persona @elnombredelapersona sin
+      estar acompañado de ningún otro comentario").
+
+    The spec's COND_4 is "tag a persona sola"; we keep the existing
+    COND_4 (risa) / COND_5 (reacción corta) numbering for backward
+    compatibility with persisted ``analysis_results.exclusion_codigo``
+    values and tag the new rule as COND_6. See
+    ``docs/informe-ambiguedades-subdimensiones-2026-07-14.md`` for the
+    divergence note.
 
     Patterns for COND_4/COND_5 are loaded from
     ``glosario/patrones-basura-digital.md``; if the glosario is
@@ -497,6 +541,13 @@ def detectar_basura_digital(text: object) -> ExclusionResult:
             justificacion=(
                 "Basura digital: enlace huérfano (URL sin contenido textual adicional)."
             ),
+        )
+
+    if _is_only_mention_payload(text):
+        return ExclusionResult(
+            etiqueta=EXCLUSION_BASURA_DIGITAL,
+            codigo="COND_6_TAG_PERSONA",
+            justificacion=("Basura digital: mención a persona sin contenido textual adicional."),
         )
 
     text_skeleton = _strip_emojis_and_punctuation(text)

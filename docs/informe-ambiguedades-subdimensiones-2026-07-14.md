@@ -156,6 +156,18 @@ paralelas. `patrones-basura-digital.md` define 5 condiciones
 - `jaja` aislado → `CODIGO_99` por `COND_4_SOLO_RISA`.
 - `pendejo` aislado sin referente femenino → `VIOLENCIA_COMUN`.
 
+#### B8.1. `COND_4 del spec metodológico vs numeración vigente` (2026-07-15)
+
+La regla metodológica del pre-filtro (`INSTRUCCIÓN DE SISTEMA: FILTRO
+DE EXCLUSIÓN PREVIA`) numera la condición **"mención a persona sola"**
+como `COND_4`. El código vigente (post 2026-07-14) ya reservó
+`COND_4` para *risas puras* y `COND_5` para *reacciones cortas*, por
+lo que la nueva regla se implementa como `COND_6_TAG_PERSONA` para no
+renumerar filas ya persistidas en `analysis_results.exclusion_codigo`.
+La condición está cubierta por `_is_only_mention_payload` en
+`src/analyzer/exclusion_filter.py:347`; el reporte de Regla 1 la
+muestra en `detalle_basura_codigos["COND_6_TAG_PERSONA"]`.
+
 ### B9. `Reglas 4.bis y 4.ter del Protocolo — ausentes del prompt`
 
 Son las reglas de desempate críticas que distinguen 3.1 vs 3.3 y

@@ -21,6 +21,7 @@ from src.analyzer.category_mapping import (
     SUBDIMENSIONES_POR_CATEGORIA,
     Categoria,
 )
+from src.analyzer.exclusion_filter import EXCLUSION_BASURA_DIGITAL, EXCLUSION_VIOLENCIA_COMUN
 
 # Categories the reviewer can pick — "ninguna" is intentionally excluded
 # (the override only happens when disagrees=True with a real correction).
@@ -293,6 +294,11 @@ def filter_analysis_for_validation(
             continue
 
         if content_type and row.get("content_type") != content_type:
+            continue
+        if row.get("exclusion_label") in {
+            EXCLUSION_BASURA_DIGITAL,
+            EXCLUSION_VIOLENCIA_COMUN,
+        }:
             continue
         if only_violent and str(row.get("tiene_violencia")) != "true":
             continue
