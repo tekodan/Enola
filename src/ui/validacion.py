@@ -36,11 +36,11 @@ def categoria_choices() -> dict[str, str]:
     raises ``ValueError: Invalid value: ...`` and silently breaks the
     surrounding widget tree.
     """
-    from src.ui.utils import label_for
+    from src.ui.labels import get_category_label
 
     choices: dict[str, str] = {}
     for code in CATEGORIA_CHOICES:
-        choices[code] = label_for(code)
+        choices[code] = get_category_label(code)
     choices[""] = "(Sin categoría — borrar override)"
     return choices
 

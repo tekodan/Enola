@@ -1,10 +1,11 @@
 ---
-version: "2.0.0"
+version: "2.1.0"
 schema: "taxonomia-v2"
 descripcion: "Taxonomía canónica de violencia de género digital en seis categorías operativas y diecinueve subdimensiones. Catálogo alineado con finalfix.md. La categoría 4 incorpora cuatro subdimensiones; las categorías restantes tienen tres. La sección categorias_exclusion documenta las pseudo-categorías pre-clasificatorias CODIGO_99 y VIOLENCIA_COMUN."
 
 categorias:
   - code: VDG_VIOLENCIA_SIMBOLICA
+    label: "Violencia Simbólica"
     orden: 1
     gravedad: "baja-media"
     subdimensiones:
@@ -16,6 +17,7 @@ categorias:
         descripcion: "Castigo moral y patologización"
 
   - code: VDG_COSIFICACION_SLUTSHAMING
+    label: "Mercantilización Corporal"
     orden: 2
     gravedad: "media"
     subdimensiones:
@@ -27,6 +29,7 @@ categorias:
         descripcion: "Doble estándar sexual y slut-shaming"
 
   - code: VDG_HOSTILIDAD_FEMINICIDIO
+    label: "Hostilidad / Feminicidio"
     orden: 3
     gravedad: "alta-extrema"
     subdimensiones:
@@ -38,6 +41,7 @@ categorias:
         descripcion: "Apología al feminicidio"
 
   - code: VDG_MANOSFERA_ANTIFEMINISMO
+    label: "Manosfera / Antifeminismo"
     orden: 4
     gravedad: "media-alta"
     subdimensiones:
@@ -51,6 +55,7 @@ categorias:
         descripcion: "Arquetipos femeninos deshumanizantes"
 
   - code: VDG_DESACREDITACION_ACTIVISTAS
+    label: "Castigo Del Empoderamiento Femenino"
     orden: 5
     gravedad: "media-alta"
     subdimensiones:
@@ -62,6 +67,7 @@ categorias:
         descripcion: "Falacia de superioridad moral"
 
   - code: VDG_SALVAGUARDA_FALSO_POSITIVO
+    label: "Salvaguarda (Falso Positivo)"
     orden: 6
     gravedad: "ortogonal"
     subdimensiones:

@@ -268,9 +268,11 @@ def compute_validation_breakdown(
 
     Returns:
         Dictionary with keys ``validated_pct`` (rows with feedback,
-        agreed OR disagreed), ``pending_pct`` (rows awaiting human
-        review), ``validated_count``, ``agreed_count``,
-        ``disagreed_count``, ``pending_count`` and ``total``.
+        agreed OR disagreed, relative to the net analysisable total),
+        ``pending_pct`` (rows awaiting human review), ``validated_count``,
+        ``agreed_count``, ``disagreed_count``, ``pending_count`` and
+        ``total`` (original count) + ``net_total`` (excluding basura
+        digital and violencia común per Reglas 2-5).
 
     This is the right breakdown for KPIs that ask "¿qué porcentaje del
     dataset fue revisado por humanos?", as opposed to the narrower
@@ -288,13 +290,22 @@ def compute_validation_breakdown(
             "disagreed_count": 0,
             "pending_count": 0,
             "total": 0,
+            "net_total": 0,
         }
 
-    agreed = sum(1 for r in rows if r.get("has_feedback") and not r.get("adjusted_by_human"))
-    disagreed = sum(1 for r in rows if r.get("adjusted_by_human"))
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+
+    def _is_excluded(r: dict) -> bool:
+        return (r.get("exclusion_label") or "") in _exclusion
+
+    analysable = [r for r in rows if not _is_excluded(r)]
+    net_total = len(analysable)
+
+    agreed = sum(1 for r in analysable if r.get("has_feedback") and not r.get("adjusted_by_human"))
+    disagreed = sum(1 for r in analysable if r.get("adjusted_by_human"))
     validated = agreed + disagreed
-    pending = total - validated
-    validated_pct = round(validated / total * 100.0, 1)
+    pending = net_total - validated
+    validated_pct = round(validated / net_total * 100.0, 1) if net_total else 0.0
     return {
         "validated_pct": validated_pct,
         "pending_pct": round(100.0 - validated_pct, 1),
@@ -303,6 +314,7 @@ def compute_validation_breakdown(
         "disagreed_count": disagreed,
         "pending_count": pending,
         "total": total,
+        "net_total": net_total,
     }
 
 

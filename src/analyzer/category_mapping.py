@@ -34,8 +34,11 @@ This module is the **facade** of the taxonomy in the codebase:
 - :func:`load_prompt_block` — load rule blocks from the markdown
   glossary under :data:`KNOWLEDGE_ROOT`.
 
-Display-only data (UI labels, color hexes) lives in
-``src/ui/utils.py`` and ``src/ui/nicegui_app/theme.py``.
+Display-only data (UI labels, color hexes) was previously in
+``src/ui/utils.py`` and ``src/ui/nicegui_app/theme.py``, but is now
+centralized in ``src.ui.labels`` (which reads from the taxonomy's
+``label`` field and optionally from the ``category_display`` table in
+SQLite).
 """
 
 from __future__ import annotations

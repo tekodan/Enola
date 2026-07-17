@@ -103,6 +103,9 @@ in `app.py` is **deprecated** and now shows a redirect banner unless
 - **CLI**: `python -m src.cli users add|list|set-active|set-role|set-password`
   para gestión. Si no pasás `--password`, lo pide por stdin (oculto) o
   genera uno aleatorio y lo imprime una sola vez.
+- **CLI categorías**: `python -m src.cli categories list|edit|edit-subdim|refresh-cache`
+  para editar títulos y descripciones de categorías/subdimensiones sin reiniciar server.
+  Los títulos se resuelven desde SQLite (overrides) + `TAXONOMIA.md` (defaults).
 
 ### Reviews flow
 

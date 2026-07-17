@@ -128,9 +128,9 @@ class FrequencyTable:
 
 
 def _categoria_label(code: str) -> str:
-    from src.ui.utils import label_for
+    from src.ui.labels import get_category_label
 
-    return label_for(code)
+    return get_category_label(code)
 
 
 def compute_frequency_distribution(
@@ -457,7 +457,7 @@ def compute_crosstabs(
                 n_dropped_missing_dim,
             )
 
-        # Canonical layout: 6 categorías × 18 sub-dimensiones, siempre (el
+        # Canonical layout: 6 categorías × 19 sub-dimensiones, siempre (el
         # método "cat × subdim" se documenta como un cruce exógeno cuya
         # cobertura es completa). Si una celda no recibe votos aparece como
         # ``0``.

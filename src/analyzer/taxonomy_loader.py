@@ -116,6 +116,7 @@ class CategoriaMD(BaseModel):
     """One alphabetic category (e.g., ``VDG_VIOLENCIA_SIMBOLICA``)."""
 
     code: str
+    label: str = ""
     orden: int = Field(ge=1, le=6)
     gravedad: str
     subdimensiones: list[SubdimensionMD]
@@ -249,6 +250,12 @@ class Taxonomy(BaseModel):
 
     def gravedad_por_categoria(self) -> dict[str, str]:
         return {c.code: c.gravedad for c in self.categorias}
+
+    def category_labels(self) -> dict[str, str]:
+        return {c.code: c.label or c.code for c in self.categorias}
+
+    def subdimension_labels(self) -> dict[str, str]:
+        return {d.code: d.descripcion for c in self.categorias for d in c.subdimensiones}
 
     def ordered_subdimensions(self) -> list[str]:
         out: list[str] = []

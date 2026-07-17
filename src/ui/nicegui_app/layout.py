@@ -167,20 +167,24 @@ def page_header(title: str, *, subtitle: str | None = None) -> None:
                 ui.element("div")
                 .classes("enola-brand-mark")
                 .style(
-                    "width: 38px; height: 38px; border-radius: 10px; "
-                    f"background: linear-gradient(135deg, {theme.PLUM} 0%, {theme.ROSE} 100%); "
-                    "display: flex; align-items: center; justify-content: center; "
+                    "width: 40px; height: 40px; border-radius: 10px; overflow: hidden; "
                     "box-shadow: 0 4px 12px -4px rgba(107, 78, 113, 0.35);"
                 )
             ):
-                ui.icon("auto_stories", size="20px").style(f"color: {theme.CREAM};")
+                ui.html(
+                    '<img src="/static/logo-enola-new.png" '
+                    'alt="Enola Investigadora Digital" '
+                    'style="display: block; width: 100%; height: 100%; '
+                    'object-fit: cover; object-position: center 30%;" />',
+                    sanitize=False,
+                )
             with ui.column().classes("gap-0"):
                 ui.label(title).classes("text-lg font-semibold enola-display").style(
-                    "color: var(--enola-charcoal); line-height: 1.1; letter-spacing: -0.015em;"
+                    "color: var(--enola-cream); line-height: 1.1; letter-spacing: -0.015em;"
                 )
                 if subtitle:
                     ui.label(subtitle).classes("text-xs").style(
-                        "color: var(--enola-charcoal-light); letter-spacing: 0.02em;"
+                        "color: rgba(250, 246, 240, 0.78); letter-spacing: 0.02em;"
                     )
 
         with ui.row().classes("items-center gap-3"):
@@ -189,7 +193,7 @@ def page_header(title: str, *, subtitle: str | None = None) -> None:
                 GITHUB_REPO_URL,
                 new_tab=True,
             ).classes("text-sm enola-header__github").style(
-                "color: var(--enola-plum); font-weight: 500;"
+                "color: var(--enola-cream); font-weight: 500; opacity: 0.85;"
             )
 
             # Dark-mode toggle — NiceGUI persists the choice per-session.
@@ -197,7 +201,7 @@ def page_header(title: str, *, subtitle: str | None = None) -> None:
             with ui.row().classes("items-center gap-2 no-wrap enola-dark-toggle-row"):
                 ui.switch(value=False).props("dense color=primary").classes("enola-dark-toggle")
                 ui.label("Modo oscuro").classes("text-sm enola-dark-toggle-label").style(
-                    "color: var(--enola-charcoal); letter-spacing: 0.01em;"
+                    "color: var(--enola-cream); letter-spacing: 0.01em;"
                 )
 
             # User chip OR login link
@@ -205,7 +209,7 @@ def page_header(title: str, *, subtitle: str | None = None) -> None:
                 _render_user_chip(user)
             else:
                 ui.link("Iniciar sesión", "/login").classes("text-sm").style(
-                    f"color: {theme.PLUM}; font-weight: 600;"
+                    f"color: {theme.CREAM}; font-weight: 600;"
                 )
 
 
@@ -223,26 +227,26 @@ def _render_user_chip(user: dict) -> None:
     with (
         ui.row()
         .classes("items-center gap-2 no-wrap enola-user-chip")
-        .style("padding-left: 0.65rem; border-left: 1px solid rgba(191, 161, 129, 0.25);")
+        .style("padding-left: 0.65rem; border-left: 1px solid rgba(250, 246, 240, 0.20);")
     ):
         with ui.element("div").style(
             "width: 32px; height: 32px; border-radius: 10px; "
-            f"background: linear-gradient(135deg, {theme.PLUM} 0%, {theme.ROSE} 100%); "
+            f"background: linear-gradient(135deg, {theme.ROSE} 0%, {theme.BRASS} 100%); "
             "display: flex; align-items: center; justify-content: center; "
-            "box-shadow: 0 2px 8px -2px rgba(107, 78, 113, 0.35);"
+            "box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.30);"
         ):
             ui.icon("person", size="16px").style(f"color: {theme.CREAM};")
         with ui.column().classes("gap-0"):
             ui.label(f"@{username}").classes("text-sm font-medium").style(
-                "color: var(--enola-charcoal); line-height: 1.1; letter-spacing: -0.005em;"
+                "color: var(--enola-cream); line-height: 1.1; letter-spacing: -0.005em;"
             )
-            role_color = theme.RELIABILITY_CRITICA if role == "admin" else theme.BRASS_DEEP
+            role_color = theme.BRASS if role == "admin" else "rgba(250, 246, 240, 0.75)"
             ui.label(role).classes("text-xs").style(
                 f"color: {role_color}; letter-spacing: 0.14em; text-transform: uppercase; "
                 "font-weight: 600; line-height: 1.1;"
             )
         ui.button("Salir", on_click=_logout, icon="logout").props("flat dense size=sm").style(
-            f"color: {theme.CHARCOAL_LIGHT}; font-weight: 500;"
+            f"color: {theme.CREAM}; font-weight: 500; opacity: 0.85;"
         )
 
 
@@ -260,8 +264,7 @@ def _render_user_chip(user: dict) -> None:
 #   enola_logo_dark.png  — 1652x452 (ratio 3.66:1)
 #   ugr-light.png        — 4724x4724 (ratio 1:1)
 #   ugr_dark.png         — 4724x4724 (ratio 1:1)
-_LOGO_LIGHT_RATIO = 1616 / 528  # ~3.06
-_LOGO_DARK_RATIO = 1652 / 452  # ~3.66
+_LOGO_RATIO = 2048 / 1032  # ~1.984 — logo-enola-new.png
 _LOGO_MAX_WIDTH_PX = 220  # CSS px — sharp at 1x and 2x displays
 _UGR_SIZE_PX = 128  # square, matches the 4724x4724 source
 
@@ -300,8 +303,7 @@ def side_drawer(current_path: str) -> None:
     """
     # Logo + UGR URLs — served by `app.add_static_files('/static', ...)`
     # configured in :mod:`src.ui.nicegui_app.__main__`.
-    logo_light_url = "/static/enola_logo_light.png"
-    logo_dark_url = "/static/enola_logo_dark.png"
+    logo_url = "/static/logo-enola-new.png"
     ugr_light_url = "/static/ugr-light.png"
     ugr_dark_url = "/static/ugr_dark.png"
 
@@ -314,21 +316,17 @@ def side_drawer(current_path: str) -> None:
 
     with drawer:
         # Brand block — Enola logo via raw <img> (no q-img wrapper, no
-        # possible cropping). Dark-mode toggle swaps ``src`` and
-        # ``aspect-ratio`` via JS so the layout doesn't reflow.
+        # possible cropping). Single asset for both light and dark mode.
         with ui.column().classes("w-full items-center px-4 pt-6 pb-5 relative-position"):
             ui.html(
                 _logo_img_html(
                     "enola-logo",
-                    logo_light_url,
-                    _LOGO_LIGHT_RATIO,
+                    logo_url,
+                    _LOGO_RATIO,
                     _LOGO_MAX_WIDTH_PX,
                     "Enola Investigadora Digital",
                 ),
                 sanitize=False,
-            )
-            ui.label("Investigadora Digital").classes("text-xs uppercase mt-1").style(
-                "color: var(--enola-brass-deep); letter-spacing: 0.22em; font-weight: 600;"
             )
 
             # Close button — visible only on mobile so the user can
@@ -340,22 +338,11 @@ def side_drawer(current_path: str) -> None:
                 f"position: absolute; top: 6px; right: 6px; color: {theme.CHARCOAL_LIGHT};"
             )
 
-            def _toggle_enola_logo() -> None:
-                is_dark = bool(ui.dark_mode.value)
-                src = logo_dark_url if is_dark else logo_light_url
-                aspect = _LOGO_DARK_RATIO if is_dark else _LOGO_LIGHT_RATIO
-                ui.run_javascript(
-                    "const e = document.getElementById('enola-logo');"
-                    f"if (e) {{ e.src = '{src}'; e.style.aspectRatio = '{aspect:.4f}'; }}"
-                )
-
-            ui.dark_mode().on_value_change(lambda _: _toggle_enola_logo())
-
         ui.element("div").classes("enola-brass-divider").style("margin: 0 16px 4px 16px;")
 
         with ui.row().classes("w-full items-center justify-between px-4 mt-3 mb-1"):
             ui.label("NAVEGACIÓN").classes("text-xs uppercase font-semibold").style(
-                "color: var(--enola-brass-deep); letter-spacing: 0.22em; font-weight: 600;"
+                "color: #5C4530; letter-spacing: 0.22em; font-weight: 700;"
             )
             # Inline close on mobile — small × next to the section label.
             ui.button(

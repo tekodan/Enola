@@ -86,6 +86,36 @@ if _static_dir.exists():
     app.add_static_files("/static", str(_static_dir))
 
 
+# --- Initialize RAGChat singleton (shared OllamaClient + ChromaDB) ----------
+try:
+    from src.analyzer.llm_client import OllamaClient
+    from src.chat import RAGChat
+    from src.config.settings import get_settings
+    from src.knowledge_base import get_feedback_store, get_vector_store
+
+    _settings = get_settings()
+    _llm_client = OllamaClient(
+        base_url=_settings.ollama.base_url,
+        model=_settings.ollama.llm_model,
+        temperature=0.3,
+    )
+    _vector_store = get_vector_store()
+    _vector_store.create_collection()
+    _feedback_store = get_feedback_store()
+    _feedback_store.create_collection()
+
+    app.RAG_CHAT = RAGChat(  # type: ignore[attr-defined]
+        llm_client=_llm_client,
+        vector_store=_vector_store,
+        feedback_store=_feedback_store,
+    )
+    logger.info("RAGChat initialized successfully")
+except Exception:  # noqa: BLE001
+    logger.exception("RAGChat init failed — chat will not work")
+    # Fallback: create a minimal RAGChat with no backing stores
+    app.RAG_CHAT = RAGChat()  # type: ignore[attr-defined]
+
+
 ui.run(
     title="Enola Investigadora Digital",
     favicon="🔍",

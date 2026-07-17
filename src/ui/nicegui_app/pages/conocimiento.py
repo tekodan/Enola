@@ -3,7 +3,7 @@
 Página premium con:
 
 * Stats de la base de conocimiento (carpetas, archivos, tamaño).
-* Descarga ZIP de la taxonomía canónica (6 categorías, 18
+* Descarga ZIP de la taxonomía canónica (6 categorías, 19
   subdimensiones, glosario de manosfera, etc.).
 * Pipeline de la herramienta (scraping → embeddings → clasificación
   → persistencia).

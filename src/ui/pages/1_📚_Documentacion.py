@@ -11,8 +11,8 @@ _project_root = Path(__file__).resolve().parent.parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
+from src.ui.labels import CATEGORIA_LABELS  # noqa: E402
 from src.ui.utils import (  # noqa: E402
-    CATEGORIA_LABELS,
     GITHUB_FORK_URL,
     GITHUB_REPO_URL,
     LOGO_PATH,

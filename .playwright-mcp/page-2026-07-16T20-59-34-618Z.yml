@@ -1,0 +1,160 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e3]:
+    - banner [ref=f4e4]:
+      - generic [ref=f4e5]:
+        - img "Enola Investigadora Digital" [ref=f4e8]
+        - generic [ref=f4e9]:
+          - generic [ref=f4e10]: IA & Confiabilidad
+          - generic [ref=f4e11]: Regla 6 — matriz de confusión y métricas de la IA
+      - generic [ref=f4e12]:
+        - link "GitHub" [ref=f4e13] [cursor=pointer]:
+          - /url: https://github.com/investigador/tfm-violencia-genero
+        - generic [ref=f4e14]:
+          - switch [ref=f4e15] [cursor=pointer]
+          - generic [ref=f4e19]: Modo oscuro
+        - link "Iniciar sesión" [ref=f4e20] [cursor=pointer]:
+          - /url: /login
+    - complementary [ref=f4e21]:
+      - generic [ref=f4e22]:
+        - img "Enola Investigadora Digital" [ref=f4e25]
+        - generic [ref=f4e26]: NAVEGACIÓN
+        - generic [ref=f4e28]:
+          - listitem [ref=f4e29] [cursor=pointer]:
+            - generic [ref=f4e30]: home
+            - generic [ref=f4e32]: Inicio
+          - listitem [ref=f4e34] [cursor=pointer]:
+            - generic [ref=f4e35]: insights
+            - generic [ref=f4e37]: Estadística
+          - listitem [ref=f4e39] [cursor=pointer]:
+            - generic [ref=f4e40]: psychology
+            - generic [ref=f4e42]: IA & Confiabilidad
+          - listitem [ref=f4e44] [cursor=pointer]:
+            - generic [ref=f4e45]: search
+            - generic [ref=f4e47]: Inspector
+          - listitem [ref=f4e49] [cursor=pointer]:
+            - generic [ref=f4e50]: menu_book
+            - generic [ref=f4e52]: Conocimiento
+          - listitem [ref=f4e54] [cursor=pointer]:
+            - generic [ref=f4e55]: cloud_upload
+            - generic [ref=f4e57]: Cargar (admin)
+          - listitem [ref=f4e59] [cursor=pointer]:
+            - generic [ref=f4e60]: travel_explore
+            - generic [ref=f4e62]: Explorar (admin)
+          - listitem [ref=f4e64] [cursor=pointer]:
+            - generic [ref=f4e65]: edit_note
+            - generic [ref=f4e67]: Editor MD (admin)
+          - listitem [ref=f4e69] [cursor=pointer]:
+            - generic [ref=f4e70]: task_alt
+            - generic [ref=f4e72]: Validación
+        - separator [ref=f4e74]
+        - generic [ref=f4e75]:
+          - generic [ref=f4e76]: Universidad de Granada
+          - img "Universidad de Granada" [ref=f4e79]
+          - generic [ref=f4e80]: TFM 2026
+          - generic [ref=f4e81]: Detección de violencia de género digital
+          - separator
+          - generic [ref=f4e82]:
+            - generic [ref=f4e83]: auto_stories
+            - generic [ref=f4e84]: Investigadora
+          - generic [ref=f4e85]: Kimberly Michell Luna Eraso
+          - generic [ref=f4e86]:
+            - generic [ref=f4e87]: workspace_premium
+            - generic [ref=f4e88]: Tutora
+          - generic [ref=f4e89]: María del Mar García Vita
+          - separator
+          - generic [ref=f4e90]: Máster en Cultura de Paz · DDHH
+    - main [ref=f4e92]:
+      - generic [ref=f4e93]:
+        - main [ref=f4e94]:
+          - generic [ref=f4e95]:
+            - generic [ref=f4e96]: Regla 6
+            - generic [ref=f4e97]: Confiabilidad y validez del instrumento (IA)
+            - generic [ref=f4e98]: Matriz de confusión y métricas de rendimiento (Precisión, Sensibilidad, F1-Score) calculadas con sklearn sobre la predicción original de la IA y las correcciones del revisor humano.
+          - generic [ref=f4e100]:
+            - generic [ref=f4e101]:
+              - generic [ref=f4e102]:
+                - generic [ref=f4e103]: Soporte (n)
+                - generic [ref=f4e104]: inventory_2
+              - generic [ref=f4e106]: "58"
+              - generic [ref=f4e107]: Análisis con feedback humano
+            - generic [ref=f4e108]:
+              - generic [ref=f4e109]:
+                - generic [ref=f4e110]: Precisión
+                - generic [ref=f4e111]: target
+              - generic [ref=f4e113]: 69.2%
+              - generic [ref=f4e114]: VP / (VP + FP)
+            - generic [ref=f4e115]:
+              - generic [ref=f4e116]:
+                - generic [ref=f4e117]: Sensibilidad (Recall)
+                - generic [ref=f4e118]: radar
+              - generic [ref=f4e120]: 47.4%
+              - generic [ref=f4e121]: VP / (VP + FN)
+            - generic [ref=f4e122]:
+              - generic [ref=f4e123]:
+                - generic [ref=f4e124]: F1-Score
+                - generic [ref=f4e125]: balance
+              - generic [ref=f4e127]: 56.2%
+              - generic [ref=f4e128]: Media armónica P / S
+          - generic [ref=f4e129]:
+            - generic [ref=f4e130]: Paso 6.1
+            - generic [ref=f4e131]: Matriz de confusión
+            - generic [ref=f4e132]: Verdaderos/Falsos Positivos/Negativos a nivel binario (con vs sin violencia).
+          - generic [ref=f4e137]:
+            - generic [ref=f4e138]:
+              - generic [ref=f4e139]:
+                - generic [ref=f4e140]: Verdaderos Positivos
+                - generic [ref=f4e141]: check_circle
+              - generic [ref=f4e143]: "9"
+              - generic [ref=f4e144]: "IA y humano coinciden: violencia"
+            - generic [ref=f4e145]:
+              - generic [ref=f4e146]:
+                - generic [ref=f4e147]: Verdaderos Negativos
+                - generic [ref=f4e148]: check_circle_outline
+              - generic [ref=f4e150]: "35"
+              - generic [ref=f4e151]: "IA y humano coinciden: no violencia"
+            - generic [ref=f4e152]:
+              - generic [ref=f4e153]:
+                - generic [ref=f4e154]: Falsos Positivos
+                - generic [ref=f4e155]: error
+              - generic [ref=f4e157]: "4"
+              - generic [ref=f4e158]: IA marcó violencia, humano dijo que no
+            - generic [ref=f4e159]:
+              - generic [ref=f4e160]:
+                - generic [ref=f4e161]: Falsos Negativos
+                - generic [ref=f4e162]: warning
+              - generic [ref=f4e164]: "10"
+              - generic [ref=f4e165]: IA no marcó, humano dijo violencia
+          - generic [ref=f4e166]:
+            - generic [ref=f4e167]: Paso 6.3
+            - generic [ref=f4e168]: Reporte de validación del instrumento
+            - generic [ref=f4e169]: Estas métricas certifican que los resultados descriptivos provienen de un instrumento válido y confiable.
+          - generic [ref=f4e171]:
+            - generic [ref=f4e172]: Lectura interpretativa
+            - generic [ref=f4e173]: "**Rendimiento bajo.** F1-Score de 56.2% sobre 58 casos. Precisión 69.2%, Sensibilidad 47.4%. Se recomienda ampliar la muestra de feedback y revisar los falsos positivos/negativos para entender los sesgos del clasificador."
+          - generic [ref=f4e174]:
+            - generic [ref=f4e175]: Resumen
+            - generic [ref=f4e176]: Acuerdos y desacuerdos del feedback humano
+            - generic [ref=f4e177]: Distribución de acuerdos y desacuerdos con el clasificador.
+          - generic [ref=f4e179]:
+            - generic [ref=f4e180]:
+              - generic [ref=f4e181]:
+                - generic [ref=f4e182]: Acuerdos (agrees=true)
+                - generic [ref=f4e183]: thumb_up
+              - generic [ref=f4e185]: "35"
+              - generic [ref=f4e186]: 60.3% del total
+            - generic [ref=f4e187]:
+              - generic [ref=f4e188]:
+                - generic [ref=f4e189]: Desacuerdos (agrees=false)
+                - generic [ref=f4e190]: thumb_down
+              - generic [ref=f4e192]: "23"
+              - generic [ref=f4e193]: 39.7% del total
+        - generic [ref=f4e194]:
+          - generic [ref=f4e195]:
+            - generic [ref=f4e196]: auto_stories
+            - generic [ref=f4e197]: Inspirado en Enola Holmes, la detective en pro de la justicia.
+          - generic [ref=f4e198]: Stack · Python 3.12 · NiceGUI · Ollama · ChromaDB · LangChain · SQLite
+          - generic [ref=f4e199]:
+            - generic [ref=f4e200]: Powered by
+            - link "danialva.com" [ref=f4e201] [cursor=pointer]:
+              - /url: https://danialva.com
+  - progressbar [ref=f4e202]

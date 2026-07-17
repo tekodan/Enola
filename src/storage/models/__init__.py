@@ -9,6 +9,7 @@ from src.storage.models.analysis_feedback import AnalysisFeedbackModel
 from src.storage.models.analysis_feedback_label import AnalysisFeedbackLabelModel
 from src.storage.models.analysis_label import AnalysisLabelModel
 from src.storage.models.analysis_result import AnalysisResultModel
+from src.storage.models.category_display import CategoryDisplayModel, SubdimensionDisplayModel
 from src.storage.models.comment import CommentModel
 from src.storage.models.page import PageModel
 from src.storage.models.post import PostModel
@@ -21,6 +22,8 @@ __all__ = [
     "AnalysisFeedbackLabelModel",
     "AnalysisLabelModel",
     "AnalysisResultModel",
+    "CategoryDisplayModel",
+    "SubdimensionDisplayModel",
     "CommentModel",
     "PageModel",
     "PostModel",

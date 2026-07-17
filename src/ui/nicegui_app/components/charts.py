@@ -15,9 +15,10 @@ from collections.abc import Sequence
 
 import plotly.graph_objects as go
 
+from src.analyzer.category_mapping import CATEGORIAS_ORDENADAS
 from src.analyzer.exclusion_filter import EXCLUSION_BASURA_DIGITAL
+from src.ui.labels import CATEGORIA_LABELS
 from src.ui.nicegui_app import theme
-from src.ui.utils import CATEGORIAS_ORDENADAS
 
 # --- shared helpers ----------------------------------------------------------
 
@@ -124,23 +125,28 @@ def build_pie_violent_vs_nonviolent(
     *,
     dark: bool = False,
 ) -> go.Figure:
-    """Donut chart: violentos vs. no violentos vs. basura digital.
+    """Donut chart: violentos vs. no violentos vs. basura digital vs. violencia común.
 
     ``tiene_violencia == "true"`` → *Con violencia*.
     Filas con ``exclusion_label == "CODIGO_99"`` (basura digital) se
-    separan en una tercera tajada — no se mezclan con "Sin violencia"
-    porque metodológicamente no son clasificables. ``VIOLENCIA_COMUN``
-    sigue contando como "Sin violencia" (su flag
-    ``tiene_violencia == "false"``). El resto (``"unknown"``) cae en
-    "Sin clasificar".
+    separan en una tajada propia — no se mezclan con "Sin violencia"
+    porque metodológicamente no son clasificables. Filas con
+    ``exclusion_label == "VIOLENCIA_COMUN"`` (violencia sin sesgo de
+    género) se muestran como cuarta tajada: hay agresión, pero no es
+    violencia de género. El total central refleja la suma de las cuatro
+    categorías.
     """
     violent = 0
     non_violent = 0
     basura = 0
+    comun = 0
     unknown = 0
     for a in results:
         if a.get("exclusion_label") == EXCLUSION_BASURA_DIGITAL:
             basura += 1
+            continue
+        if a.get("exclusion_label") == "VIOLENCIA_COMUN":
+            comun += 1
             continue
         flag = a.get("tiene_violencia")
         if flag == "true":
@@ -151,13 +157,15 @@ def build_pie_violent_vs_nonviolent(
             unknown += 1
 
     slices: list[tuple[str, int, str]] = [
-        ("Con violencia", violent, theme.RELIABILITY_CRITICA),
+        ("Con violencia de género", violent, theme.RELIABILITY_CRITICA),
         ("Sin violencia", non_violent, theme.RELIABILITY_OK),
     ]
     if basura:
         slices.append(("Basura digital (CÓDIGO 99)", basura, theme.BRASS))
     if unknown:
         slices.append(("Sin clasificar", unknown, theme.CHARCOAL_LIGHT))
+    if comun:
+        slices.append(("Violencia común (sin sesgo)", comun, theme.BRASS_DEEP))
 
     labels = [s[0] for s in slices]
     values = [s[1] for s in slices]
@@ -170,31 +178,47 @@ def build_pie_violent_vs_nonviolent(
                 values=values,
                 hole=0.62,
                 marker=dict(colors=colors, line=dict(color="rgba(0,0,0,0)", width=2)),
-                textinfo="percent",
+                textinfo="percent+value",
                 textposition="outside",
-                textfont=dict(family=theme.FONT_DISPLAY, size=14),
+                textfont=dict(family=theme.FONT_DISPLAY, size=11),
                 hovertemplate="<b>%{label}</b><br>%{value} (%{percent})<extra></extra>",
                 pull=[0.02, 0, 0, 0],
             )
         ]
     )
     fig.update_traces(sort=False, direction="clockwise")
+    total_slices = sum(values)
     fig.update_layout(
         annotations=[
             dict(
-                text=f"<b>{sum(values)}</b><br><span style='font-size:11px; "
+                text=f"<b>{total_slices}</b><br><span style='font-size:11px; "
                 f"color:{_palette(dark)['muted']}'>contenidos</span>",
                 x=0.5,
-                y=0.5,
+                y=0.62,
                 font=dict(family=theme.FONT_DISPLAY, size=22, color=_palette(dark)["ink"]),
                 showarrow=False,
             )
-        ]
+        ],
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=-0.35,
+            xanchor="center",
+            x=0.5,
+            font=dict(
+                family=theme.FONT_UI,
+                color=_palette(dark)["muted"],
+                size=11,
+            ),
+            bgcolor="rgba(0,0,0,0)",
+        ),
     )
     return _apply_common_layout(
         fig,
-        title="Con violencia · Sin violencia · Basura digital",
+        title="Con violencia de género · Sin violencia · Basura digital · Violencia común",
         dark=dark,
+        height=420,
+        margin=dict(l=40, r=24, t=52, b=140),
     )
 
 
@@ -331,9 +355,7 @@ def build_bar_categories(
         counts = _count_subdimensions(results, categoria=categoria_padre)
         universo = list(theme.SUBDIMENSIONES_ORDENADAS)
         if categoria_padre:
-            title = (
-                f"Subdimensiones · {theme.CATEGORIA_LABELS.get(categoria_padre, categoria_padre)}"
-            )
+            title = f"Subdimensiones · {CATEGORIA_LABELS.get(categoria_padre, categoria_padre)}"
             universo = [
                 d for d in universo if theme.categoria_de_subdimension(d) == categoria_padre
             ]
@@ -343,7 +365,7 @@ def build_bar_categories(
 
     def _label_for(code: str) -> str:
         if level == "categoria":
-            return theme.CATEGORIA_LABELS.get(code, code)
+            return CATEGORIA_LABELS.get(code, code)
         return theme.SUBDIMENSION_LABELS.get(code, code)
 
     def _color_for(code: str) -> str:

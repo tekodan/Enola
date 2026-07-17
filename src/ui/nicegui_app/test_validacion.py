@@ -186,7 +186,7 @@ def test_persist_feedback_records_reviewer_user_id(_isolated_db):
     )
 
     # Create the user that will be recorded as the reviewer.
-    db.create_user("kim", "pw", role="reviewer", full_name="Kim")
+    db.create_user("kim", "pw", role="reviewer")
 
     row = {
         "id": rid,

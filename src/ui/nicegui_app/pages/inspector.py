@@ -430,12 +430,15 @@ def _render_body() -> None:
 
     total = len(analysis)
     basura_count = sum(1 for r in analysis if str(r.get("exclusion_label") or "") == "CODIGO_99")
-    net_total = max(total - basura_count, 0)
+    comun_count = sum(
+        1 for r in analysis if str(r.get("exclusion_label") or "") == "VIOLENCIA_COMUN"
+    )
+    net_total = max(total - basura_count - comun_count, 0)
     violent = sum(
         1
         for r in analysis
         if str(r.get("tiene_violencia") or "") == "true"
-        and str(r.get("exclusion_label") or "") != "CODIGO_99"
+        and str(r.get("exclusion_label") or "") not in {"CODIGO_99", "VIOLENCIA_COMUN"}
     )
     excluded = sum(
         1 for r in analysis if (r.get("exclusion_label") or "") in {"CODIGO_99", "VIOLENCIA_COMUN"}
@@ -450,8 +453,8 @@ def _render_body() -> None:
                 "value": str(net_total),
                 "icon": "inventory_2",
                 "sub": (
-                    f"De {total} filas · {basura_count} basura digital"
-                    if basura_count
+                    f"De {total} filas · {basura_count} basura digital + {comun_count} viol. común"
+                    if basura_count or comun_count
                     else "Filas en analysis_results"
                 ),
             },

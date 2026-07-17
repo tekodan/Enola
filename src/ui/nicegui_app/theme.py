@@ -69,14 +69,17 @@ CATEGORIA_COLORS: Final[dict[str, str]] = {
     "VDG_DESACREDITACION_ACTIVISTAS": PLUM,
 }
 
-CATEGORIA_LABELS: Final[dict[str, str]] = {
-    "VDG_VIOLENCIA_SIMBOLICA": "Violencia Simbólica",
-    "VDG_COSIFICACION_SLUTSHAMING": "Mercantilización Corporal",
-    "VDG_HOSTILIDAD_FEMINICIDIO": "Hostilidad / Feminicidio",
-    "VDG_MANOSFERA_ANTIFEMINISMO": "Manosfera / Antifeminismo",
-    "VDG_SALVAGUARDA_FALSO_POSITIVO": "Salvaguarda (Falso Positivo)",
-    "VDG_DESACREDITACION_ACTIVISTAS": "Castigo Del Empoderamiento Femenino",
-}
+
+# Category labels — centralised in src.ui.labels (reads from taxonomy YAML
+# + optional SQLite overrides). The final dict is built at import time so
+# theme consumers get a stable snapshot for the session lifetime.
+def _build_categoria_labels() -> dict[str, str]:  # pragma: no cover - trivial
+    from src.ui.labels import CATEGORIA_LABELS as _central_labels  # noqa: N811
+
+    return dict(_central_labels)
+
+
+CATEGORIA_LABELS: Final[dict[str, str]] = _build_categoria_labels()
 
 
 # Subdimension palette — 3 tonalidades derivadas de cada categoría padre.
@@ -100,6 +103,7 @@ SUBDIMENSION_COLORS: Final[dict[str, str]] = {
     "4.1": "#B5C2C2",
     "4.2": "#7B8E8E",
     "4.3": "#506464",
+    "4.4": "#6A7A7A",
     # cat 5 — plum (desacreditación de activistas)
     "5.1": "#A488B0",
     "5.2": "#6B4E71",
@@ -347,7 +351,7 @@ body.body--dark {{
         var(--enola-brass) 80%,
         transparent 100%
     );
-    opacity: 0.6;
+    opacity: 0.85;
 }}
 
 /* ============================================================
@@ -454,6 +458,233 @@ body.body--dark .enola-kpi-sub {{
 /* ============================================================
  * Section header — eyebrow + title + brass divider
  * ============================================================ */
+
+/* ============================================================
+ * Premium-dark KPI cards — used by /inicio Resumen row
+ * Four inner visualisations: sparkline, gauge, list, progress+avatars.
+ * All visuals (SVG, list, bar, avatars) are sized inside this card's
+ * baseline grid. Styles are independent from .enola-kpi (the light
+ * card variant) so both can coexist.
+ * ============================================================ */
+.enola-kpi-dark {{
+    position: relative;
+    background:
+        linear-gradient(
+            155deg,
+            rgba(91, 59, 92, 0.95) 0%,
+            rgba(35, 30, 46, 0.95) 100%
+        );
+    border: 1px solid rgba(191, 161, 129, 0.20);
+    border-radius: var(--enola-radius-lg);
+    padding: 1.25rem 1.4rem 1.1rem 1.4rem;
+    box-shadow: 0 12px 32px -16px rgba(35, 30, 46, 0.55);
+    color: rgba(250, 246, 240, 0.92);
+    min-height: 180px;
+    overflow: hidden;
+    isolation: isolate;
+}}
+.enola-kpi-dark::after {{
+    /* brass accent stripe at top, matches light .enola-kpi */
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(
+        90deg,
+        var(--enola-brass) 0%,
+        var(--enola-rose) 50%,
+        var(--enola-plum) 100%
+    );
+    opacity: 0.55;
+    z-index: 0;
+}}
+.enola-kpi-dark > * {{
+    position: relative;
+    z-index: 1;
+}}
+.enola-kpi-dark__corner {{
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(191, 161, 129, 0.22);
+    border: 1px solid rgba(191, 161, 129, 0.35);
+    z-index: 2;
+}}
+.enola-kpi-dark__label {{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 0.45rem;
+}}
+.enola-kpi-dark__label > :first-child {{
+    font-family: var(--enola-font-ui);
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: rgba(250, 246, 240, 0.92);
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+}}
+.enola-kpi-dark__label > :nth-child(2) {{
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--enola-brass);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}}
+.enola-kpi-dark__value {{
+    font-family: var(--enola-font-display);
+    font-size: 1.85rem;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--enola-rose);
+    letter-spacing: -0.018em;
+    margin: 0.05rem 0 0.6rem 0;
+}}
+.enola-kpi-dark__chart {{
+    margin: 0.25rem 0 0.5rem 0;
+    line-height: 0;
+}}
+.enola-kpi-dark__spark {{
+    display: block;
+    width: 100%;
+    height: 40px;
+}}
+.enola-kpi-dark__gauge {{
+    position: relative;
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 0.4rem auto;
+}}
+.enola-kpi-dark__gauge-svg {{
+    width: 100%;
+    height: 100%;
+    display: block;
+    transform: rotate(-90deg);
+}}
+.enola-kpi-dark__gauge-track {{
+    fill: none;
+    stroke: rgba(191, 161, 129, 0.15);
+    stroke-width: 8;
+}}
+.enola-kpi-dark__gauge-fill {{
+    fill: none;
+    stroke: var(--enola-brass);
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset var(--enola-motion-slow) var(--enola-ease-out);
+    filter: drop-shadow(0 0 6px rgba(191, 161, 129, 0.55));
+}}
+.enola-kpi-dark__gauge-text {{
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--enola-font-display);
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--enola-rose);
+}}
+.enola-kpi-dark__list {{
+    list-style: none;
+    padding: 0;
+    margin: 0.25rem 0 0.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}}
+.enola-kpi-dark__list li {{
+    font-size: 0.74rem;
+    line-height: 1.35;
+    color: rgba(250, 246, 240, 0.78);
+    padding-left: 14px;
+    position: relative;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}}
+.enola-kpi-dark__list li::before {{
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--enola-brass);
+    box-shadow: 0 0 4px rgba(191, 161, 129, 0.55);
+}}
+.enola-kpi-dark__progress {{
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(191, 161, 129, 0.18);
+    overflow: hidden;
+    margin: 0.5rem 0 0.65rem 0;
+    border: 1px solid rgba(191, 161, 129, 0.25);
+}}
+.enola-kpi-dark__progress-fill {{
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        var(--enola-brass) 0%,
+        var(--enola-rose) 100%
+    );
+    box-shadow: 0 0 8px rgba(191, 161, 129, 0.55);
+    transition: width var(--enola-motion-slow) var(--enola-ease-out);
+}}
+.enola-kpi-dark__avatars {{
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.65rem;
+    padding: 2px 0;
+}}
+.enola-kpi-dark__avatar {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--enola-rose) 0%, var(--enola-plum) 100%);
+    color: var(--enola-cream);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border: 2px solid rgba(35, 30, 46, 0.95);
+    margin-left: -8px;
+    box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.30);
+    text-transform: uppercase;
+}}
+.enola-kpi-dark__avatar:first-child {{
+    margin-left: 0;
+}}
+.enola-kpi-dark__sub {{
+    font-size: 0.72rem;
+    color: rgba(250, 246, 240, 0.55);
+    margin-top: 0.55rem;
+    line-height: 1.4;
+}}
+@media (max-width: 768px) {{
+    .enola-kpi-dark {{
+        min-height: 160px;
+        padding: 1rem 1.1rem 0.95rem 1.1rem;
+    }}
+    .enola-kpi-dark__value {{
+        font-size: 1.5rem;
+    }}
+    .enola-kpi-dark__list li {{
+        font-size: 0.7rem;
+    }}
+}}
+
 .enola-section {{
     margin: 2.75rem 0 1.25rem 0;
 }}
@@ -606,6 +837,181 @@ img.enola-hero-image-mobile {{
         height: auto;
         margin-left: auto;
         margin-right: auto;
+    }}
+}}
+
+/* ============================================================
+ * Hero overlay — banner with text overlay (referente mockup)
+ * Grid 2-column desktop with the banner as full background and
+ * text positioned above; simplified single-column mobile.
+ * ============================================================ */
+.enola-hero-overlay {{
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--enola-radius-xl);
+    box-shadow: var(--enola-shadow-xl);
+    isolation: isolate;
+    min-height: 360px;
+}}
+img.enola-hero-overlay__bg {{
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    border-radius: var(--enola-radius-xl);
+    z-index: 0;
+}}
+.enola-hero-overlay__content {{
+    position: relative;
+    z-index: 1;
+    padding: 1.5rem 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: 1.5rem;
+    align-items: center;
+    min-height: 360px;
+    width: 100%;
+    box-sizing: border-box;
+}}
+.enola-hero-overlay__right {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    color: var(--enola-plum-deep);
+    max-width: 100%;
+    overflow: hidden;
+    padding-right: 20px;
+}}
+.enola-hero-overlay__decor {{
+    position: relative;
+    height: 360px;
+    width: 100%;
+    display: grid;
+    place-items: center;
+}}
+.enola-hero-overlay__decor .decor-bubble {{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(2px);
+}}
+.enola-hero-overlay__decor .decor-bubble i {{
+    font-style: normal;
+}}
+.enola-hero-overlay__decor .decor-bubble--lupa   {{ position: absolute; top: 18%; left: 70%;  width: 56px; height: 56px; font-size: 22px; }}
+.enola-hero-overlay__decor .decor-bubble--gato   {{ position: absolute; top: 8%;  left: 8%;   width: 44px; height: 44px; font-size: 18px; }}
+.enola-hero-overlay__decor .decor-bubble--gato2  {{ position: absolute; top: 50%; left: 4%;   width: 44px; height: 44px; font-size: 18px; }}
+.enola-hero-overlay__decor .decor-bubble--check  {{ position: absolute; bottom: 12%; left: 14%; width: 40px; height: 40px; font-size: 16px; }}
+.enola-hero-overlay__decor .decor-bubble--hex    {{ position: absolute; bottom: 28%; right: 4%; width: 40px; height: 40px; font-size: 16px; }}
+.enola-hero-overlay__decor .decor-bubble--pin    {{ position: absolute; bottom: 6%;  left: 10%; width: 32px; height: 32px; font-size: 14px; }}
+.enola-hero-badge {{
+    display: inline-block;
+    align-self: flex-start;
+    margin-right: auto;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    color: #4A3520;
+    background: linear-gradient(135deg, #E8D4A8 0%, #C9A875 100%);
+    padding: 0.45rem 1.1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(101, 67, 33, 0.30);
+    box-shadow: 0 2px 6px -2px rgba(101, 67, 33, 0.35);
+}}
+.enola-hero-headline {{
+    font-family: var(--enola-font-display);
+    font-size: clamp(1.05rem, 2.4vw, 1.55rem);
+    font-weight: 700;
+    line-height: 1.12;
+    letter-spacing: -0.018em;
+    color: var(--enola-plum-deep);
+    margin: 0;
+    text-shadow: 0 1px 0 rgba(255, 245, 235, 0.45);
+    text-wrap: balance;
+    max-width: 28ch;
+}}
+.enola-hero-bullets {{
+    font-size: 0.88rem;
+    line-height: 1.50;
+    color: var(--enola-charcoal);
+    margin: 0;
+    padding-left: 1.1rem;
+}}
+.enola-hero-bullets li {{
+    margin-bottom: 0.30rem;
+}}
+.enola-hero-bullets strong {{
+    color: var(--enola-plum-deep);
+    font-weight: 700;
+}}
+.enola-hero-powered {{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--enola-charcoal-light);
+    letter-spacing: 0.04em;
+    margin-top: 0.4rem;
+    flex-wrap: wrap;
+}}
+.enola-hero-avatars {{
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.4rem;
+}}
+.enola-hero-avatars > span {{
+    display: inline-block;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid #f4e0d0;
+    margin-left: -8px;
+    background-size: cover;
+    background-position: center;
+    box-shadow: 0 2px 4px -1px rgba(35, 30, 46, 0.20);
+}}
+.enola-hero-avatars > span:first-child {{
+    margin-left: 0;
+}}
+.enola-hero-avatars > span:nth-child(1) {{ background: linear-gradient(135deg, #C08497 0%, #6B4E71 100%); }}
+.enola-hero-avatars > span:nth-child(2) {{ background: linear-gradient(135deg, #BFA181 0%, #5B3B5C 100%); }}
+.enola-hero-avatars > span:nth-child(3) {{ background: linear-gradient(135deg, #D4A5A5 0%, #6B4E71 100%); }}
+.enola-hero-avatars > span:nth-child(4) {{ background: linear-gradient(135deg, #E1B6C2 0%, #BFA181 100%); }}
+
+@media (max-width: 768px) {{
+    .enola-hero-overlay,
+    .enola-hero-overlay__content,
+    .enola-hero-overlay__decor {{
+        min-height: 220px;
+    }}
+    .enola-hero-overlay__content {{
+        grid-template-columns: 1fr;
+        padding: 1.25rem 1.25rem;
+        align-items: flex-start;
+    }}
+    .enola-hero-overlay__decor {{
+        display: none;
+    }}
+    .enola-hero-overlay__right {{
+        gap: 0.5rem;
+    }}
+    .enola-hero-headline {{
+        font-size: 1.0rem;
+        max-width: 22ch;
+    }}
+    .enola-hero-bullets {{
+        display: none;
+    }}
+    .enola-hero-powered {{
+        font-size: 0.68rem;
     }}
 }}
 
@@ -834,13 +1240,31 @@ body.body--dark .q-table tbody tr:hover {{
  * Sidebar / drawer
  * ============================================================ */
 .q-drawer {{
-    background: var(--enola-cream) !important;
-    border-right: 1px solid rgba(191, 161, 129, 0.22) !important;
-    box-shadow: 4px 0 24px -8px rgba(35, 30, 46, 0.08) !important;
+    border-right: 1px solid rgba(101, 67, 33, 0.35) !important;
+    box-shadow:
+        inset -4px 0 10px -4px rgba(58, 36, 18, 0.40),
+        6px 0 28px -10px rgba(35, 30, 46, 0.18) !important;
+    background: transparent !important;
+}}
+.q-drawer__inner {{
+    background:
+        url('/static/wood_sidebar.png') center top / 100% auto repeat-y,
+        #D4B896 !important;
+    background-color: #D4B896 !important;
+    background-attachment: local !important;
+    border-left: 1px solid rgba(255, 255, 255, 0.30) !important;
 }}
 body.body--dark .q-drawer {{
-    background: var(--enola-ink-soft) !important;
-    border-right-color: rgba(191, 161, 151, 0.15) !important;
+    background: transparent !important;
+}}
+body.body--dark .q-drawer__inner {{
+    background:
+        linear-gradient(180deg, rgba(45, 38, 64, 0.60) 0%, rgba(35, 30, 46, 0.70) 100%),
+        url('/static/wood_sidebar.png') center top / 100% auto repeat-y,
+        #2D2640 !important;
+    background-color: #2D2640 !important;
+    background-attachment: local !important;
+    border-left-color: rgba(255, 255, 255, 0.10) !important;
 }}
 
 .enola-nav-item {{
@@ -853,11 +1277,17 @@ body.body--dark .q-drawer {{
         transform var(--enola-motion-fast) var(--enola-ease-out);
     min-height: 42px;
 }}
+.enola-nav-item .q-item__label,
+.enola-nav-item .q-item__section {{
+    color: var(--enola-charcoal) !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}}
 .enola-nav-item:hover {{
-    background: rgba(192, 132, 151, 0.10) !important;
+    background: rgba(250, 246, 240, 0.75) !important;
     transform: translateX(2px);
 }}
 .enola-nav-item .q-icon {{
+    color: var(--enola-charcoal) !important;
     transition:
         color var(--enola-motion-fast) var(--enola-ease-out),
         transform var(--enola-motion-fast) var(--enola-ease-out);
@@ -867,20 +1297,30 @@ body.body--dark .q-drawer {{
 }}
 .q-item.q-router-link--active,
 .q-item.active-link {{
-    background: rgba(192, 132, 151, 0.16) !important;
-    color: var(--enola-plum) !important;
+    background: rgba(107, 78, 113, 0.92) !important;
+    color: var(--enola-cream) !important;
     border-radius: var(--enola-radius-sm);
-    border-left: 3px solid var(--enola-plum);
+    border-left: 3px solid var(--enola-brass);
     padding-left: 9px !important;
-    box-shadow: var(--enola-shadow-sm);
+    box-shadow: var(--enola-shadow-md);
+}}
+.q-item.q-router-link--active .q-item__label,
+.q-item.q-router-link--active .q-item__section,
+.q-item.active-link .q-item__label,
+.q-item.active-link .q-item__section {{
+    color: var(--enola-cream) !important;
+    text-shadow: none;
+}}
+.q-item.active-link .q-icon {{
+    color: var(--enola-cream) !important;
 }}
 body.body--dark .q-item.active-link {{
-    background: rgba(192, 132, 151, 0.20) !important;
-    color: var(--enola-rose) !important;
-    border-left-color: var(--enola-rose);
+    background: rgba(192, 132, 151, 0.85) !important;
+    color: var(--enola-cream) !important;
+    border-left-color: var(--enola-brass);
 }}
 body.body--dark .enola-nav-item:hover {{
-    background: rgba(192, 132, 151, 0.14) !important;
+    background: rgba(250, 246, 240, 0.18) !important;
 }}
 
 /* Sidebar brand logos — keep their natural aspect ratio, cap on width & height. */
@@ -912,25 +1352,23 @@ body.body--dark .enola-nav-item:hover {{
         border-color var(--enola-motion-base) var(--enola-ease-out) !important;
 }}
 .enola-header {{
-    background: rgba(250, 246, 240, 0.78) !important;
-    backdrop-filter: blur(14px) saturate(180%);
-    -webkit-backdrop-filter: blur(14px) saturate(180%);
-    border-bottom: 1px solid rgba(191, 161, 129, 0.18);
-    box-shadow: none;
+    background: var(--enola-plum) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border-bottom: 1px solid rgba(191, 161, 129, 0.28);
+    box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.20);
+    color: var(--enola-cream);
 }}
 .enola-header--scrolled {{
-    background: rgba(250, 246, 240, 0.92) !important;
-    border-bottom-color: rgba(191, 161, 129, 0.32);
-    box-shadow: 0 2px 12px -4px rgba(35, 30, 46, 0.08);
+    background: var(--enola-plum-deep) !important;
+    border-bottom-color: rgba(191, 161, 129, 0.40);
+    box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.30);
 }}
 body.body--dark .enola-header {{
-    background: rgba(35, 30, 46, 0.78) !important;
-    border-bottom-color: rgba(191, 161, 129, 0.10);
+    background: var(--enola-ink-soft) !important;
 }}
 body.body--dark .enola-header--scrolled {{
-    background: rgba(35, 30, 46, 0.92) !important;
-    border-bottom-color: rgba(191, 161, 129, 0.22);
-    box-shadow: 0 2px 12px -4px rgba(0, 0, 0, 0.30);
+    background: var(--enola-ink) !important;
 }}
 
 /* ============================================================

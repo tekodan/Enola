@@ -6,7 +6,7 @@ app:
 
 ollama:
   base_url: "http://localhost:11434"
-  llm_model: "gemma4:e4b-it-qat-asst-think-64k-raw-nothink-64k"
+  llm_model: "enola:latest"
   embedding_model: "snowflake-arctic-embed:m"
   timeout: 600
 

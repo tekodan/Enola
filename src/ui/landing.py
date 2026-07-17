@@ -22,8 +22,8 @@ from src.ui.adjusted_report import (  # noqa: E402
     compute_adjustment_breakdown,
     compute_validation_breakdown,
 )
+from src.ui.labels import CATEGORIA_LABELS  # noqa: E402
 from src.ui.utils import (  # noqa: E402
-    CATEGORIA_LABELS,
     CONTACT_EMAIL,
     GITHUB_FORK_URL,
     GITHUB_REPO_URL,
@@ -356,7 +356,6 @@ def render_descriptive_statistics(
         compute_frequency_distribution,
         compute_mode,
     )
-    from src.ui.utils import CATEGORIA_LABELS
 
     st.divider()
     st.header("📊 Estadística descriptiva (Reglas 2, 3 y 4)")

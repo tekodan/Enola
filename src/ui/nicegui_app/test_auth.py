@@ -184,7 +184,7 @@ class TestPersistentSessions:
         uid = fresh.create_user("ana", "pw", role="reviewer")
         storage = self._fake_storage_with_sid(monkeypatch, sid=None)
 
-        auth.login_user({"id": uid, "username": "ana", "role": "reviewer", "full_name": "Ana"})
+        auth.login_user({"id": uid, "username": "ana", "role": "reviewer"})
 
         assert "_sid" in storage
         assert storage["current"]["username"] == "ana"
@@ -205,7 +205,6 @@ class TestPersistentSessions:
             "id": uid,
             "username": "iker",
             "role": "reviewer",
-            "full_name": "Iker",
         }
         auth.login_user(original)
         saved_sid = storage["_sid"]
@@ -234,7 +233,7 @@ class TestPersistentSessions:
         uid = fresh.create_user("lara", "pw", role="reviewer")
 
         storage = self._fake_storage_with_sid(monkeypatch, sid=None)
-        auth.login_user({"id": uid, "username": "lara", "role": "reviewer", "full_name": "Lara"})
+        auth.login_user({"id": uid, "username": "lara", "role": "reviewer"})
         saved_sid = storage["_sid"]
 
         # User gets deactivated server-side.
@@ -249,7 +248,7 @@ class TestPersistentSessions:
         fresh = _patch_db(monkeypatch, tmp_path, "logout.db")
         uid = fresh.create_user("meli", "pw", role="reviewer")
         storage = self._fake_storage_with_sid(monkeypatch, sid=None)
-        auth.login_user({"id": uid, "username": "meli", "role": "reviewer", "full_name": "Meli"})
+        auth.login_user({"id": uid, "username": "meli", "role": "reviewer"})
         sid = storage["_sid"]
         assert fresh.find_session(sid) is not None
 
@@ -264,11 +263,11 @@ class TestPersistentSessions:
         fresh = _patch_db(monkeypatch, tmp_path, "idem.db")
         uid = fresh.create_user("nico", "pw", role="reviewer")
         storage = self._fake_storage_with_sid(monkeypatch, sid=None)
-        auth.login_user({"id": uid, "username": "nico", "role": "reviewer", "full_name": "Nico"})
+        auth.login_user({"id": uid, "username": "nico", "role": "reviewer"})
         first_sid = storage["_sid"]
 
         # Reload: same sid already in storage.
-        auth.login_user({"id": uid, "username": "nico", "role": "reviewer", "full_name": "Nico"})
+        auth.login_user({"id": uid, "username": "nico", "role": "reviewer"})
         assert storage["_sid"] == first_sid
 
         # Only one session row exists.

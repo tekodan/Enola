@@ -63,7 +63,7 @@ class TestBuildPieViolentVsNonviolent:
         assert _slice_for(fig, "Sin violencia") == 1.0
         assert _slice_for(fig, "Basura digital (CÓDIGO 99)") == 2.0
 
-    def test_violencia_comun_stays_in_sin_violencia(self):
+    def test_violencia_comun_se_excluye_del_pie(self):
         rows = [
             _row(tiene_violencia="true"),
             _row(tiene_violencia="false", exclusion_label=EXCLUSION_VIOLENCIA_COMUN),
@@ -71,7 +71,7 @@ class TestBuildPieViolentVsNonviolent:
         ]
         fig = build_pie_violent_vs_nonviolent(rows)
         assert _slice_for(fig, "Con violencia") == 1.0
-        assert _slice_for(fig, "Sin violencia") == 2.0
+        assert _slice_for(fig, "Sin violencia") == 1.0  # VIOLENCIA_COMUN excluida
         labels = list(fig.data[0].labels)
         assert "Basura digital (CÓDIGO 99)" not in labels
 

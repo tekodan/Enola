@@ -33,7 +33,7 @@ class AuthService:
         self._db = db if db is not None else get_database()
 
     def authenticate(self, username: str, password: str) -> dict | None:
-        """Return ``{"id", "username", "role", "full_name", ...}`` on success.
+        """Return ``{"id", "username", "role", ...}`` on success.
 
         ``None`` for unknown user **or** wrong password **or** inactive
         account — the same generic message is rendered by the login UI
@@ -268,12 +268,9 @@ def create_user(
     username: str,
     password: str,
     role: str = "reviewer",
-    full_name: str | None = None,
 ) -> int:
     """Create a user; returns the (new or existing) PK."""
-    return _service()._db.create_user(
-        username=username, password=password, role=role, full_name=full_name
-    )
+    return _service()._db.create_user(username=username, password=password, role=role)
 
 
 def set_user_password(user_id: int, password: str) -> bool:
@@ -314,7 +311,7 @@ def bootstrap_admin_from_env() -> dict | None:
             username,
         )
         return None
-    db.create_user(username=username, password=password, role="admin", full_name=username)
+    db.create_user(username=username, password=password, role="admin")
     return db.find_user_by_username(username)
 
 

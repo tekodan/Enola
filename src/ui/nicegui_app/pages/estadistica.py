@@ -20,6 +20,7 @@ from src.report.reliability import ReliabilityReport, calcular_valores_perdidos
 from src.report.stats import compute_crosstabs, compute_frequency_distribution, compute_mode
 from src.storage import get_database
 from src.ui.adjusted_report import build_adjusted_analysis
+from src.ui.labels import CATEGORIA_LABELS
 from src.ui.nicegui_app import theme
 from src.ui.nicegui_app.components.charts import (
     build_bar_categories,
@@ -32,7 +33,7 @@ from src.ui.nicegui_app.components.kpi_card import kpi_grid
 from src.ui.nicegui_app.components.section import section_header
 from src.ui.nicegui_app.layout import page_scaffold
 from src.ui.nicegui_app.pages.inicio import render_regla1
-from src.ui.utils import CATEGORIA_LABELS, filter_by_content_type
+from src.ui.utils import filter_by_content_type
 
 logger = logging.getLogger(__name__)
 
@@ -69,11 +70,17 @@ def _page_lookup(pages, posts) -> dict[str, str]:
 
 def _build_stats_csv(
     analysis: list[dict],
+    subset: list[dict],
     posts: list[dict],
     pages: list[dict],
     feedback: list[dict],
 ) -> bytes:
-    """Genera un CSV con todas las reglas estatísticas."""
+    """Genera un CSV con todas las reglas estatísticas.
+
+    ``analysis`` se usa para Regla 1 (fiabilidad completa, incluye basura
+    digital). ``subset`` es el filtrado por tipo de contenido (Todos /
+    Posts / Comments) que alimenta Reglas 2-5.
+    """
     output = io.StringIO()
     writer = csv.writer(output)
 
@@ -105,10 +112,10 @@ def _build_stats_csv(
 
     for level, level_label in [("categoria", "Categoría"), ("subdimension", "Subdimensión")]:
         if level == "categoria":
-            ft = compute_frequency_distribution(analysis, categoria_labels=CATEGORIA_LABELS)
+            ft = compute_frequency_distribution(subset, categoria_labels=CATEGORIA_LABELS)
         else:
             ft = compute_frequency_distribution(
-                analysis,
+                subset,
                 level="subdimension",
                 subdimension_labels=theme.SUBDIMENSION_LABELS,
             )
@@ -136,11 +143,11 @@ def _build_stats_csv(
 
     for level, level_label in [("categoria", "Categoría"), ("subdimension", "Subdimensión")]:
         if level == "categoria":
-            mode = compute_mode(analysis, categoria_labels=CATEGORIA_LABELS)
+            mode = compute_mode(subset, categoria_labels=CATEGORIA_LABELS)
             label_map = CATEGORIA_LABELS
         else:
             mode = compute_mode(
-                analysis, level="subdimension", subdimension_labels=theme.SUBDIMENSION_LABELS
+                subset, level="subdimension", subdimension_labels=theme.SUBDIMENSION_LABELS
             )
             label_map = theme.SUBDIMENSION_LABELS
 
@@ -162,57 +169,6 @@ def _build_stats_csv(
             writer.writerow(["Texto descriptivo:"])
             writer.writerow([mode.texto_descriptivo])
         writer.writerow([])
-
-    # --- Regla 5: Drill-down por categoría (todas las subdimensiones) --
-    writer.writerow(["--- REGLA 5: DRILL-DOWN POR CATEGORÍA ---"])
-    writer.writerow([])
-    writer.writerow(
-        [
-            "Categoría",
-            "Código Categoría",
-            "Subdimensión",
-            "Código Subdimensión",
-            "Frecuencia",
-        ]
-    )
-
-    from collections import Counter
-
-    from src.analyzer.category_mapping import SUBDIMENSIONES_POR_CATEGORIA as SUFDIMS_POR_CAT
-
-    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
-    dim_counts: Counter[str] = Counter()
-    for a in analysis:
-        if a.get("tiene_violencia") != "true":
-            continue
-        if a.get("exclusion_label") in _exclusion:
-            continue
-        labels = a.get("labels") or []
-        if labels:
-            for lbl in labels:
-                cat = lbl.get("categoria") or "ninguna"
-                dim = lbl.get("dimension")
-                if not cat or cat == "ninguna" or not dim:
-                    continue
-                dim_counts[dim] += 1
-        else:
-            cat = a.get("categoria", "ninguna")
-            dim = a.get("dimension")
-            if not cat or cat == "ninguna" or not dim:
-                continue
-            dim_counts[dim] += 1
-
-    for cat_code in theme.CATEGORIA_LABELS.keys():
-        cat_label = theme.CATEGORIA_LABELS[cat_code]
-        cat_dims = SUFDIMS_POR_CAT.get(cat_code, [])
-        for dim_code in cat_dims:
-            dim_label = theme.SUBDIMENSION_LABELS.get(dim_code, dim_code)
-            freq = dim_counts.get(dim_code, 0)
-            writer.writerow([cat_label, cat_code, dim_label, dim_code, freq])
-        if not cat_dims:
-            writer.writerow([cat_label, cat_code, "(sin subdimensiones)", "", 0])
-
-    writer.writerow([])
 
     # --- Regla 4: Análisis Bivariado --------------------------------------
     writer.writerow(["--- REGLA 4: ANÁLISIS BIVARIADO ---"])
@@ -261,6 +217,57 @@ def _build_stats_csv(
             writer.writerow([f"Patrón detectado: {ct.alerta_patron}"])
 
         writer.writerow([])
+
+    # --- Regla 5: Drill-down por categoría (todas las subdimensiones) --
+    writer.writerow(["--- REGLA 5: DRILL-DOWN POR CATEGORÍA ---"])
+    writer.writerow([])
+    writer.writerow(
+        [
+            "Categoría",
+            "Código Categoría",
+            "Subdimensión",
+            "Código Subdimensión",
+            "Frecuencia",
+        ]
+    )
+
+    from collections import Counter
+
+    from src.analyzer.category_mapping import SUBDIMENSIONES_POR_CATEGORIA as SUFDIMS_POR_CAT
+
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+    dim_counts: Counter[str] = Counter()
+    for a in subset:
+        if a.get("tiene_violencia") != "true":
+            continue
+        if a.get("exclusion_label") in _exclusion:
+            continue
+        labels = a.get("labels") or []
+        if labels:
+            for lbl in labels:
+                cat = lbl.get("categoria") or "ninguna"
+                dim = lbl.get("dimension")
+                if not cat or cat == "ninguna" or not dim:
+                    continue
+                dim_counts[dim] += 1
+        else:
+            cat = a.get("categoria", "ninguna")
+            dim = a.get("dimension")
+            if not cat or cat == "ninguna" or not dim:
+                continue
+            dim_counts[dim] += 1
+
+    for cat_code in CATEGORIA_LABELS.keys():
+        cat_label = CATEGORIA_LABELS[cat_code]
+        cat_dims = SUFDIMS_POR_CAT.get(cat_code, [])
+        for dim_code in cat_dims:
+            dim_label = theme.SUBDIMENSION_LABELS.get(dim_code, dim_code)
+            freq = dim_counts.get(dim_code, 0)
+            writer.writerow([cat_label, cat_code, dim_label, dim_code, freq])
+        if not cat_dims:
+            writer.writerow([cat_label, cat_code, "(sin subdimensiones)", "", 0])
+
+    writer.writerow([])
 
     # --- Regla 6: Métricas IA --------------------------------------------
     writer.writerow(["--- REGLA 6: MÉTRICAS DE LA IA ---"])
@@ -706,33 +713,34 @@ def _render_charts_overview(subset: list[dict]) -> None:
         subtitle=(
             "Gráfica circular tricotómica (violentos · no violentos · "
             "basura digital CÓDIGO 99) y barras jerarquizadas en orden "
-            "descendente. Hacé click en una categoría para ver el "
-            "drill-down de sus subdimensiones."
+            "descendente. Debajo se muestra la distribución por subdimensión; "
+            "hacé click en una categoría para ver su drill-down específico."
         ),
     )
 
-    bar_container_row = (
-        ui.element("div").classes("w-full grid gap-4").style("grid-template-columns: 1fr 1fr;")
-    )
+    bar_container_row = ui.column().classes("w-full gap-4")
     drilldown_col = ui.column().classes("w-full gap-3 mt-4")
 
     with bar_container_row:
-        with ui.element("div"):
+        with ui.element("div").classes("w-full"):
             ui.plotly(build_pie_violent_vs_nonviolent(subset)).classes("w-full")
-        with ui.element("div"):
-            with ui.column().classes("w-full gap-3"):
-                ui.label("Distribución por categoría").classes(
-                    "text-xs uppercase tracking-widest font-semibold enola-section-eyebrow"
-                ).style("display: inline-flex;")
+        with (
+            ui.element("div").classes("w-full grid gap-4").style("grid-template-columns: 1fr 1fr;")
+        ):
+            with ui.element("div"):
+                with ui.column().classes("w-full gap-3"):
+                    ui.label("Distribución por categoría").classes(
+                        "text-xs uppercase tracking-widest font-semibold enola-section-eyebrow"
+                    ).style("display: inline-flex;")
 
-                bar_plot = ui.plotly(build_bar_categories(subset, level="categoria")).classes(
-                    "w-full"
-                )
+                    bar_plot = ui.plotly(build_bar_categories(subset, level="categoria")).classes(
+                        "w-full"
+                    )
 
     def _render_drilldown(codigo_cat: str) -> None:
         drilldown_col.clear()
         with drilldown_col:
-            cat_label = theme.CATEGORIA_LABELS.get(codigo_cat, codigo_cat)
+            cat_label = CATEGORIA_LABELS.get(codigo_cat, codigo_cat)
             cat_color = theme.CATEGORIA_COLORS.get(codigo_cat, theme.CHARCOAL_LIGHT)
             dims = SUBDIMENSIONES_POR_CATEGORIA.get(codigo_cat, [])
             n_categoria = sum(_count_for_categoria(subset, codigo_cat) for _ in [None])
@@ -778,8 +786,26 @@ def _render_charts_overview(subset: list[dict]) -> None:
                     )
                 ).classes("w-full mt-4")
 
-    def _render_drilldown_unset() -> None:
+    def _render_all_subdimensions() -> None:
         drilldown_col.clear()
+        with drilldown_col:
+            with ui.element("div").classes("w-full enola-panel").style("padding: 1.25rem 1.5rem;"):
+                ui.label("Distribución por subdimensión").classes(
+                    "text-xs uppercase tracking-widest font-semibold enola-section-eyebrow mb-2"
+                ).style("display: inline-flex;")
+                ui.label(
+                    "Todas las subdimensiones canónicas ordenadas de mayor a menor frecuencia."
+                ).classes("text-xs mb-3").style(
+                    "color: var(--enola-charcoal-light); letter-spacing: 0.02em;"
+                )
+                fig = build_bar_categories(subset, level="subdimension")
+                fig.update_layout(height=500)
+                ui.plotly(fig).classes("w-full")
+
+    def _render_drilldown_unset() -> None:
+        _render_all_subdimensions()
+
+    _render_all_subdimensions()
 
     def _count_for_categoria(rows: list[dict], codigo_cat: str) -> int:
         from collections import Counter
@@ -815,7 +841,7 @@ def _render_charts_overview(subset: list[dict]) -> None:
         if not customdata or len(customdata) < 2:
             return
         codigo_cat = str(customdata[1])
-        if not codigo_cat or codigo_cat not in theme.CATEGORIA_LABELS:
+        if not codigo_cat or codigo_cat not in CATEGORIA_LABELS:
             return
         _render_drilldown(codigo_cat)
 
@@ -1048,7 +1074,13 @@ def _render_body() -> None:
             ui.button(
                 "📥 Descargar CSV",
                 icon="download",
-                on_click=lambda: _download_csv(analysis, posts, pages, feedback),
+                on_click=lambda: _download_csv(
+                    analysis,
+                    filter_by_content_type(analysis, content_type_value["v"]),
+                    posts,
+                    pages,
+                    feedback,
+                ),
             ).props("outline color=primary").style("font-weight: 500;")
 
         # Regla 1 needs the full (unfiltered) dataset because basura
@@ -1140,12 +1172,13 @@ def _render_rules_tabs(
 
 def _download_csv(
     analysis: list[dict],
+    subset: list[dict],
     posts: list[dict],
     pages: list[dict],
     feedback: list[dict],
 ) -> None:
     try:
-        csv_bytes = _build_stats_csv(analysis, posts, pages, feedback)
+        csv_bytes = _build_stats_csv(analysis, subset, posts, pages, feedback)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         ui.download(csv_bytes, f"estadisticas_enola_{timestamp}.csv")
     except Exception as exc:

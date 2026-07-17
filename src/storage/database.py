@@ -52,6 +52,11 @@ class Database:
         # on a freshly-created database.
         self._migrate_schema()
 
+        # Seed display tables from taxonomy defaults if empty.
+        from src.storage.category_display import seed_category_display
+
+        seed_category_display(self)
+
     def _migrate_schema(self) -> None:
         """Bring the on-disk schema in line with the current models.
 
@@ -544,6 +549,15 @@ class Database:
         import json
 
         with self.get_session() as session:
+            # Strip author PII from the hierarchical JSON before it is persisted.
+            # Author names are still used in-memory by the scraper to clean the
+            # raw text, but they must never be stored.
+            if preprocessed_data:
+                for post in preprocessed_data.get("posts", []):
+                    post.pop("author", None)
+                    for comment in post.get("comments", []):
+                        comment.pop("author", None)
+
             # Save or update the page
             existing_page = session.query(PageModel).filter_by(id=page_id).first()
 
@@ -588,6 +602,10 @@ class Database:
             seen_post_ids = set()  # Track IDs in this batch to avoid duplicates
 
             for post_idx, post_data in enumerate(posts_data):
+                # Never persist author names (PII). The scraper may use the
+                # author in-memory to strip author prefixes from the raw text,
+                # but the database stores only empty strings.
+                post_data["author"] = ""
                 # Extract comments from post data if present
                 comments = post_data.pop("comments", [])
 
@@ -658,6 +676,8 @@ class Database:
 
                 # Save comments for this post
                 for comment_idx, comment_data in enumerate(comments):
+                    # Never persist author names (PII).
+                    comment_data["author"] = ""
                     comment_id = comment_data.get("id")
                     if not comment_id:
                         comment_id = f"{post_id}_c{comment_idx}"
@@ -1515,7 +1535,6 @@ class Database:
         username: str,
         password: str,
         role: str = "reviewer",
-        full_name: str | None = None,
     ) -> int:
         """Create a new user. Idempotent: returns the existing id on conflict.
 
@@ -1523,7 +1542,6 @@ class Database:
             username: Unique login (case-sensitive).
             password: Plaintext password — hashed with bcrypt before storage.
             role: ``"admin"`` or ``"reviewer"``. Defaults to ``"reviewer"``.
-            full_name: Optional display name.
 
         Returns:
             PK of the (new or existing) user row.
@@ -1544,7 +1562,7 @@ class Database:
                 username=normalized,
                 password_hash=self._hash_password(password),
                 role=role,
-                full_name=full_name,
+                full_name=None,
                 is_active="true",
                 created_at=datetime.now(),
             )

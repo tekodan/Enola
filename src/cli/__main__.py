@@ -461,7 +461,6 @@ def cmd_users_add(args: argparse.Namespace) -> None:
             username=args.username,
             password=password,
             role=args.role,
-            full_name=args.full_name,
         )
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -542,6 +541,102 @@ def cmd_users_set_password(args: argparse.Namespace) -> None:
         sys.exit(1)
     db.set_user_password(u["id"], password)
     print(f"  ✅ Password de {args.username!r} actualizado.")
+
+
+# --- categories subcommand handlers ---------------------------------------
+
+
+def cmd_categories_list(args: argparse.Namespace) -> None:
+    """List category display rows (defaults + overrides)."""
+    db = _db()
+    from src.storage.category_display import list_category_display, list_subdimension_display
+
+    cat_rows = list_category_display(db)
+    sub_rows = list_subdimension_display(db)
+
+    overrides_only = getattr(args, "overrides", False)
+
+    print("=" * 60)
+    print("CATEGORÍAS")
+    print("=" * 60)
+    print(f"{'Código':<38} {'Título':<30} {'Fuente':<12}")
+    print("-" * 80)
+    for r in cat_rows:
+        if overrides_only and r["source"] == "taxonomy":
+            continue
+        print(f"{r['code']:<38} {r['title']:<30} {r['source']:<12}")
+    print(f"\nTotal: {len(cat_rows)} categoría(s).")
+
+    print()
+    print("=" * 60)
+    print("SUBDIMENSIONES")
+    print("=" * 60)
+    print(f"{'Código':<10} {'Cat. Padre':<38} {'Descripción':<50} {'Fuente':<12}")
+    print("-" * 110)
+    for r in sub_rows:
+        if overrides_only and r["source"] == "taxonomy":
+            continue
+        print(f"{r['code']:<10} {r['category_code']:<38} {r['description']:<50} {r['source']:<12}")
+    print(f"\nTotal: {len(sub_rows)} subdimensión(es).")
+
+
+def cmd_categories_edit(args: argparse.Namespace) -> None:
+    """Edit a category display title."""
+    from src.analyzer.category_mapping import Categoria
+
+    if args.code not in {c.value for c in Categoria}:
+        print(f"Error: {args.code!r} no es un código VDG_* válido.", file=sys.stderr)
+        print(f"Válidos: {', '.join(c.value for c in Categoria if c is not Categoria.NINGUNA)}")
+        sys.exit(1)
+
+    db = _db()
+    from src.storage.category_display import set_category_title
+
+    ok = set_category_title(db, args.code, args.title)
+    if not ok:
+        print(f"Error al actualizar {args.code!r}.", file=sys.stderr)
+        sys.exit(1)
+
+    from src.ui.labels import refresh_cache
+
+    refresh_cache()
+    print(f"  ✅ {args.code!r} → título actualizado a {args.title!r}")
+    print("  ℹ Caché recargada.")
+
+
+def cmd_categories_edit_subdim(args: argparse.Namespace) -> None:
+    """Edit a sub-dimension description."""
+    from src.analyzer.category_mapping import SUBDIMENSIONES_ORDENADAS
+
+    if args.code not in SUBDIMENSIONES_ORDENADAS:
+        print(
+            f"Error: {args.code!r} no es un código de subdimensión válido.",
+            file=sys.stderr,
+        )
+        print(f"Válidos: {', '.join(SUBDIMENSIONES_ORDENADAS)}")
+        sys.exit(1)
+
+    db = _db()
+    from src.storage.category_display import set_subdimension_description
+
+    ok = set_subdimension_description(db, args.code, args.description)
+    if not ok:
+        print(f"Error al actualizar subdimensión {args.code!r}.", file=sys.stderr)
+        sys.exit(1)
+
+    from src.ui.labels import refresh_cache
+
+    refresh_cache()
+    print(f"  ✅ Subdimensión {args.code!r} → descripción actualizada.")
+    print("  ℹ Caché recargada.")
+
+
+def cmd_categories_refresh(args: argparse.Namespace) -> None:
+    """Recargar la caché de display."""
+    from src.ui.labels import refresh_cache
+
+    refresh_cache()
+    print("  ✅ Caché de display recargada desde SQLite + taxonomía.")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -644,7 +739,6 @@ def _build_parser() -> argparse.ArgumentParser:
         default="reviewer",
         help="Rol del usuario (default: reviewer)",
     )
-    u_add.add_argument("--full-name", help="Nombre a mostrar")
     u_add.set_defaults(func=cmd_users_add)
 
     u_list = users_sub.add_parser("list", help="Lista todos los usuarios")
@@ -669,6 +763,35 @@ def _build_parser() -> argparse.ArgumentParser:
     u_pw.add_argument("username")
     u_pw.add_argument("--password", help="Si se omite, lo pide por stdin")
     u_pw.set_defaults(func=cmd_users_set_password)
+
+    # --- categories subcommand (display overrides) --------------------
+    categories = sub.add_parser(
+        "categories", help="Gestión de títulos/descripciones de categorías y subdimensiones"
+    )
+    categories_sub = categories.add_subparsers(dest="categories_command", metavar="ACTION")
+
+    cat_list = categories_sub.add_parser("list", help="Lista categorías con títulos y fuentes")
+    cat_list.add_argument(
+        "--overrides", action="store_true", help="Solo filas con override (source != taxonomy)"
+    )
+    cat_list.set_defaults(func=cmd_categories_list)
+
+    cat_edit = categories_sub.add_parser("edit", help="Edita el título de una categoría")
+    cat_edit.add_argument("code", help="Código VDG_* (ej: VDG_COSIFICACION_SLUTSHAMING)")
+    cat_edit.add_argument("--title", required=True, help="Nuevo título visible")
+    cat_edit.set_defaults(func=cmd_categories_edit)
+
+    cat_edit_sub = categories_sub.add_parser(
+        "edit-subdim", help="Edita la descripción de una subdimensión"
+    )
+    cat_edit_sub.add_argument("code", help="Código de subdimensión (ej: 2.1)")
+    cat_edit_sub.add_argument("--description", required=True, help="Nueva descripción")
+    cat_edit_sub.set_defaults(func=cmd_categories_edit_subdim)
+
+    cat_refresh = categories_sub.add_parser(
+        "refresh-cache", help="Recarga la caché de display sin reiniciar servidor"
+    )
+    cat_refresh.set_defaults(func=cmd_categories_refresh)
 
     return parser
 

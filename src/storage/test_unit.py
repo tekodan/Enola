@@ -886,12 +886,12 @@ class TestUsers:
         assert "users" in tables
 
     def test_create_user_stores_hash_not_plain(self, db):
-        uid = db.create_user("alice", "secret-pw", role="admin", full_name="Alice")
+        uid = db.create_user("alice", "secret-pw", role="admin")
         u = db.find_user_by_username("alice")
         assert u is not None
         assert u["id"] == uid
         assert u["role"] == "admin"
-        assert u["full_name"] == "Alice"
+        assert u["full_name"] is None
         assert u["is_active"] == "true"
         assert "password_hash" not in u
 

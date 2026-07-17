@@ -345,7 +345,7 @@ el LLM y se verifica que el validador produce el resultado esperado.
 qué no hacer.
 
 **Por qué funciona (como restricción).** La taxonomía cerrada
-(6 categorías × 3 sub-dimensiones = 18 códigos) está validada por
+(6 categorías × hasta 4 sub-dimensiones = 19 códigos) está validada por
 invariantes duros en
 `src/analyzer/taxonomy_loader.py:130-151`:
 
