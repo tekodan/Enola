@@ -9,70 +9,39 @@ gravedad: baja-media
 
 # Categoría 1: Violencia simbólica y estereotipos de dominación
 
-## 1. Definición Conceptual
+## Definición
 
-La violencia simbólica y los estereotipos de dominación en el ecosistema digital constituyen una forma de coerción imperceptible y disciplinaria que utiliza el lenguaje social para legitimar y naturalizar los sistemas de opresión patriarcal (Bourdieu, 1991; Crosas-Remón y Medina-Bravo, 2019). En las redes sociales, esta violencia se materializa a través de discursos que encasillan y devalúan a la mujer, reproduciendo normas que sugieren falsamente que ellas son únicamente idóneas para roles tradicionales de sumisión y cuidado, al tiempo que afirman la superioridad moral o intelectual de los varones (Recuero, 2015; Úbeda Cuspinera, 2025).
+Comprende mensajes que exigen, asumen o imponen que las mujeres deben cumplir normas hegemónicas de género vinculadas al espacio privado. Incluye expresiones que presentan a las mujeres como más adecuadas para ser madres, esposas o cuidadoras y que les exigen docilidad, fidelidad, disponibilidad, agrado, silencio o sumisión obligatoria.
 
-De este modo, el patriarcado se inmiscuye en la sociedad de la información, sirviéndose de las tecnologías para imponer estereotipos que actúan como un mecanismo de control social cuyo propósito final es silenciar a las mujeres, invalidar sus capacidades y mantenerlas al margen de la participación democrática en el espacio público virtual (Flores y Browne Sartori, 2017).
+También incluye mensajes de agresores que asumen por defecto la falta de lealtad o la traición de una mujer porque incumple las reglas del rol de género. La violencia se ejerce al recluirlas en el espacio doméstico o al condicionar su valor social a su destreza en tareas de limpieza, cocina, cuidado y servicio.
 
-## 2. Subdimensiones Analíticas
+## 1.1. Roles tradicionales y de sumisión
 
-### 2.1. Roles tradicionales y de sumisión
+Identifica la imposición de roles domésticos, familiares o de docilidad. El sistema debe buscar verbos imperativos o exhortativos que ordenen a la mujer retroceder al espacio privado o realizar labores de cuidado y limpieza: `a lavar`, `a limpiar`, `cocinar`, `criar`, `a la cocina`, `agarrar la escoba`, `váyanse a dormir`. También debe detectar adjetivos que exigen silencio y obediencia: `calladitas`, `obedientes`, `acomedidas`, `adaptables`, `agradables`, `cariñosas`.
 
-Agrupa los mensajes que exigen o asumen que las mujeres deben cumplir normas hegemónicas de género vinculadas al espacio privado. Como señala Úbeda Cuspinera (2025), se incluyen aquí las expresiones que sugieren que las mujeres son "más adecuadas para ciertos roles (madre, esposa, cuidadora de la familia, fiel, tierna, cariñosa, sumisa, y muchos otros)" (p. 199). Lo anterior evidencia cómo el entorno social fomenta directrices que legitiman la dominación al encasillar a la mujer exclusivamente "como una figura sumisa" (Ceballos, 2021, citado en Córdova Ramírez, 2025, p. 323).
+Esta subdimensión aplica a mujeres en general. Cuando la orden doméstica se usa para castigar una protesta, marcha, denuncia o participación política de una mujer con perfil público, debe multicategorizarse también en 5.2.
 
-### 2.2. Incompetencia e inferioridad intelectual o física
+**Ejemplos:** `váyanse a lavar, a la cocina`; `calladitas y obedientes`; `una mujer debe ser fiel y quedarse en casa`.
 
-Comprende afirmaciones que invalidan las capacidades femeninas en el espacio público. El algoritmo debe detectar mensajes que pretenden comunicar que las mujeres son "menos adecuadas para ciertas tareas (conducción y trabajos duros, entre otros) o bien hay afirmaciones sobre que los hombres son, en cierto modo, superiores a las mujeres" (Úbeda Cuspinera, 2025, p. 199).
+## 1.2. Incompetencia e inferioridad
 
-### 2.3. Doble estándar sexual y dominio
+Identifica afirmaciones que invalidan las capacidades femeninas en el espacio público y sostienen que las mujeres carecen de cualidades intelectuales, racionales o físicas para opinar, conducir, trabajar, decidir o participar. El ataque recae en que es una mujer quien habla o actúa, no en sus argumentos.
 
-Identifica el trato asimétrico y la validación de la supremacía masculina en las dinámicas de poder. En el ecosistema digital, esto se refleja mediante discursos que legitiman el control masculino a través de la "aceptación del doble estándar sexual" y el "dominio en la toma de decisiones", factores que la literatura vincula directamente con la humillación, la coerción y la ciberviolencia hacia la mujer (Lizarazo-Ojeda y Yanez-Peñúñuri, 2021, p. 320).
+El sistema debe detectar descalificativos directos, frases hechas y afirmaciones explícitas o implícitas de superioridad masculina: `mujer al volante`, `sexo débil`, `sin cerebro`, `niñatas`, `estúpidas`, `inútiles`, `no saben razonar`.
 
-## 3. Reglas de Inclusión Algorítmica
+**Ejemplos:** `Mujer al volante, peligro constante`; `Animal nefasto la mujer al volante`; `El hombre es más fuerte que la mujer`.
 
-### Regla 1: Roles de sumisión y ámbito privado
+## 1.3. Castigo moral y patologización
 
-**Descripción algorítmica:** La máquina debe detectar verbos imperativos o exhortativos que ordenan a la mujer retornar al espacio doméstico, asumir labores de cuidado o que asumen su sumisión frente al hombre (Úbeda Cuspinera, 2025).
+Identifica discursos que legitiman el control y el dominio masculino en las relaciones mediante un castigo moral a la conducta femenina. El agresor atribuye locura, irracionalidad o falta de decoro a las mujeres, invalida sus testimonios, las estigmatiza como inestables o les exige `darse a respetar` bajo un estándar que no aplica a los varones.
 
-**Marcadores para el algoritmo:** *a lavar, a limpiar, cuidar de sus hijos, pónganse a barrer, tener recogido*.
+El sistema debe localizar adjetivos y frases de patologización o desvalorización moral: `locas`, `histéricas`, `ridículas`, `tóxicas`, `viejas webonas`, `mojigatas`, `no se dan a respetar`, `son todas iguales`, `no se puede confiar en una mujer`.
 
-**Unidades de análisis (ejemplos reales):**
+**Ejemplos:** `A ver cuántos daños hacen las viejas locas esas`; `No sea mojigata, ubíquese al tiempo que vivimos`.
 
-- "Que vayan a limpiar sus casas y cuidar de sus hijos en vez de armar este borlote" (Domínguez Arteaga, 2023, p. 15).
-- "Si fueran para lavar su ropa o los trastes de la casa o ya mínimo tener recogido su cuarto a no pero para eso no son buenas" (Domínguez Arteaga, 2023, p. 17).
+## Reglas de exclusión y fronteras
 
----
-
-### Regla 2: Incompetencia en el espacio público e invalidación
-
-**Descripción algorítmica:** El algoritmo debe buscar frases hechas o sustantivos que impongan el silencio o invaliden las capacidades intelectuales y físicas de las mujeres, tratándolas como objetos decorativos o inútiles para la esfera pública (Rodríguez-Sánchez et al., citado en Úbeda Cuspinera, 2025).
-
-**Marcadores para el algoritmo:** *mujer al volante, mujer florero, calladita, niñata, estupidez*.
-
-**Unidades de análisis (ejemplos reales):**
-
-- "Animal nefasto la mujer al volante." (Úbeda Cuspinera, 2025, p. 201).
-- "La visión de mujer florero del vídeo es más bien arcaica." (Úbeda Cuspinera, 2025, p. 200).
-
----
-
-### Regla 3: Doble estándar moral y desvalorización
-
-**Descripción algorítmica:** El sistema debe localizar adjetivos que castigan moralmente a la mujer por salir del rol esperado, etiquetándola bajo el sesgo de la irracionalidad o la falta de decoro social.
-
-**Marcadores para el algoritmo:** *locas, ridículas, viejas webonas, no se dan a respetar*.
-
-**Unidades de análisis (ejemplos reales):**
-
-- "Aver cuántos daños asen las viejas locas esas" (Domínguez Arteaga, 2023, p. 16).
-
-## 4. Reglas Generales de Inclusión Algorítmica
-
-Además de las reglas específicas de esta categoría, se aplican los siguientes criterios transversales:
-
-- **Criterio de coocurrencia semántica** (ver [Protocolo algorítmico general](./00-protocolo-algoritmico.md), sección 1): el mensaje debe presentar proximidad sintáctica entre sustantivos o pronombres femeninos y los adjetivos de inferioridad o servidumbre de las reglas 1 a 3.
-
-- **Criterio de enunciados imperativos hacia el ámbito privado** (ver [Protocolo algorítmico general](./00-protocolo-algoritmico.md), sección 4): siguiendo los trece criterios de Schmeisser-Nieto et al. (2022), la máquina debe marcar textos que utilicen "enunciados imperativos, exhortativos o llamadas a la acción" (citado en Úbeda Cuspinera, 2025, p. 200) que ordenen a la mujer retroceder al espacio doméstico.
-
-> **Nota de falsos positivos:** la expresión *"mujer florero"* o *"mujer al volante"* puede aparecer en mensajes de denuncia feminista con intención crítica (marcada por vocablos como *arcaica, retrógrada*). Ver [Categoría 5](./05-categoria-5-sarcasmo-falsos-positivos.md) y la sección 3 del Protocolo algorítmico general.
+- No usar 1.1 para una descalificación genérica sin imperativo doméstico; evaluar 1.3.
+- No usar 1.2 si el mensaje solo castiga la moral, la sexualidad o la estabilidad emocional; evaluar 1.3 o 2.3 según el núcleo.
+- No usar 1.3 para una crítica feminista que cite o refute el estereotipo. La salvaguarda 6.3 puede anular la alerta.
+- Si el blanco es una activista o mujer con perfil público y el mandato doméstico busca expulsarla del debate, aplicar 5.2 además de 1.1 cuando ambos núcleos estén presentes.

@@ -69,16 +69,68 @@ def _latest_feedback_per_analysis(
 
 
 def _primary_override(labels: list[dict]) -> dict[str, object]:
-    """Pick the primary override label (highest severity, ties → first)."""
-    sev_order = {"alta": 3, "media": 2, "baja": 1, "ninguna": 0}
-
-    def _rank(lbl: dict) -> int:
-        sev = str(lbl.get("severidad") or "ninguna")
-        return sev_order.get(sev, 0)
+    """Pick the primary override label (highest severity, ties broken by ``orden``)."""
+    from src.analyzer.category_mapping import primary_label
 
     if not labels:
         return {}
-    return max(labels, key=lambda lbl: (_rank(lbl), 1))
+    return primary_label(labels)
+
+
+def _coerce_bool(value: object) -> bool:
+    """Strict bool coercion — :func:`bool` treats the string ``"false"`` as truthy.
+
+    Accepts booleans, ints/floats (0 → False) and string literals
+    (``"true"`` / ``"false"`` / ``"yes"`` / ``"si"`` / ``"sí"`` /
+    ``"1"``).
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes", "si", "sí"}
+    return False
+
+
+def _is_violent_label(label: dict | None) -> bool:
+    """Decide whether a single override label carries violence.
+
+    The category alone is **not** enough: ``VDG_SALVAGUARDA_FALSO_POSITIVO``
+    (cat 6) contains micromachismos (6.1) and humor hostil (6.2) which
+    ARE violence. Only the **salvaguarda sub-dimension** (6.3) flagged
+    as ``es_falso_positivo_probable=true`` cancels the alert — i.e. the
+    reviewer is signalling that the candidate detection is a denouncement,
+    quote, or endogrupal re-appropriation, not actual violence.
+    """
+    if not label:
+        return False
+    cat = str(label.get("categoria") or "")
+    if not cat or cat.upper() == "NINGUNA":
+        return False
+    if cat.upper() == "VDG_SALVAGUARDA_FALSO_POSITIVO":
+        dim = str(label.get("dimension") or "")
+        if dim == "6.3" and _coerce_bool(label.get("es_falso_positivo_probable")):
+            return False
+    return True
+
+
+def _is_violent_category(cat: str) -> bool:
+    """Backward-compatible wrapper: True iff ``cat`` represents violence.
+
+    Used by callers that only have a category string (no dimension /
+    false-positive flag). Returns ``True`` for all 6 canonical VDG
+    categories — including cat 6 (control de resistencia / salvaguarda),
+    since cat 6.1 / 6.2 *are* violence. Use :func:`_is_violent_label`
+    when the full label is available, because cat 6.3 with
+    ``es_falso_positivo_probable=true`` is the one case that should
+    NOT count as violence.
+    """
+    if not cat:
+        return True
+    if cat.upper() == "NINGUNA":
+        return False
+    return True
 
 
 def build_adjusted_analysis(
@@ -128,6 +180,13 @@ def build_adjusted_analysis(
             adjusted.append(out)
             continue
 
+        # CODIGO_99 / VIOLENCIA_COMUN rows are immutable — the reviewer
+        # cannot "correct" trash digital or violence without gender bias.
+        if row.get("exclusion_label"):
+            out["adjusted_by_human"] = False
+            adjusted.append(out)
+            continue
+
         # Reviewer disagreed — apply overrides.
         override_labels = list(fb.get("labels") or [])
         changed = False
@@ -141,17 +200,25 @@ def build_adjusted_analysis(
             if primary.get("justificacion"):
                 out["justificacion"] = primary["justificacion"]
             changed = True
+
+            out["tiene_violencia"] = "true" if _is_violent_label(primary) else "false"
         else:
             # Legacy single-label fallback.
-            if fb.get("corrected_categoria"):
-                out["categoria"] = fb["corrected_categoria"]
+            corrected_cat = fb.get("corrected_categoria")
+            corrected_dim = fb.get("corrected_dimension")
+            if corrected_cat:
+                out["categoria"] = corrected_cat
                 changed = True
-            if fb.get("corrected_dimension"):
-                out["dimension"] = fb["corrected_dimension"]
+            if corrected_dim:
+                out["dimension"] = corrected_dim
                 changed = True
             if fb.get("corrected_justificacion"):
                 out["justificacion"] = fb["corrected_justificacion"]
                 changed = True
+
+            out["tiene_violencia"] = (
+                "true" if _is_violent_category(str(corrected_cat or "")) else "false"
+            )
 
         out["adjusted_by_human"] = changed
         adjusted.append(out)
@@ -170,6 +237,11 @@ def compute_adjustment_breakdown(
     Returns:
         Dictionary with keys ``adjusted_pct``, ``autonomous_pct`` and
         ``total``. Sums to 100 (rounded to 1 decimal).
+
+        ``adjusted_count`` counts only rows where the reviewer
+        **disagreed** (``adjusted_by_human=True``). For the broader
+        question "how many rows have been validated by a human at all"
+        (agreement OR disagreement), use :func:`compute_validation_breakdown`.
     """
     rows = list(adjusted_rows or [])
     total = len(rows)
@@ -183,6 +255,66 @@ def compute_adjustment_breakdown(
         "autonomous_pct": round(100.0 - adjusted_pct, 1),
         "total": total,
         "adjusted_count": adjusted,
+    }
+
+
+def compute_validation_breakdown(
+    adjusted_rows: list[dict[str, object]] | None,
+) -> dict[str, object]:
+    """Return the share of rows that have any human feedback (agree/disagree).
+
+    Args:
+        adjusted_rows: Output of :func:`build_adjusted_analysis`.
+
+    Returns:
+        Dictionary with keys ``validated_pct`` (rows with feedback,
+        agreed OR disagreed, relative to the net analysisable total),
+        ``pending_pct`` (rows awaiting human review), ``validated_count``,
+        ``agreed_count``, ``disagreed_count``, ``pending_count`` and
+        ``total`` (original count) + ``net_total`` (excluding basura
+        digital and violencia común per Reglas 2-5).
+
+    This is the right breakdown for KPIs that ask "¿qué porcentaje del
+    dataset fue revisado por humanos?", as opposed to the narrower
+    :func:`compute_adjustment_breakdown` which only counts rows where
+    the reviewer *disagreed* with the AI (i.e. applied a correction).
+    """
+    rows = list(adjusted_rows or [])
+    total = len(rows)
+    if total == 0:
+        return {
+            "validated_pct": 0.0,
+            "pending_pct": 0.0,
+            "validated_count": 0,
+            "agreed_count": 0,
+            "disagreed_count": 0,
+            "pending_count": 0,
+            "total": 0,
+            "net_total": 0,
+        }
+
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+
+    def _is_excluded(r: dict) -> bool:
+        return (r.get("exclusion_label") or "") in _exclusion
+
+    analysable = [r for r in rows if not _is_excluded(r)]
+    net_total = len(analysable)
+
+    agreed = sum(1 for r in analysable if r.get("has_feedback") and not r.get("adjusted_by_human"))
+    disagreed = sum(1 for r in analysable if r.get("adjusted_by_human"))
+    validated = agreed + disagreed
+    pending = net_total - validated
+    validated_pct = round(validated / net_total * 100.0, 1) if net_total else 0.0
+    return {
+        "validated_pct": validated_pct,
+        "pending_pct": round(100.0 - validated_pct, 1),
+        "validated_count": validated,
+        "agreed_count": agreed,
+        "disagreed_count": disagreed,
+        "pending_count": pending,
+        "total": total,
+        "net_total": net_total,
     }
 
 

@@ -1,0 +1,20 @@
+- main [ref=f3e5]:
+  - generic [ref=f3e9]:
+    - generic [ref=f3e11]:
+      - generic [ref=f3e12]: auto_stories
+      - generic [ref=f3e14]: Enola
+      - generic [ref=f3e15]: Investigadora Digital
+    - generic [ref=f3e20]:
+      - generic: Usuario
+      - textbox "Usuario" [active] [ref=f3e21]
+    - generic [ref=f3e24]:
+      - generic [ref=f3e25]:
+        - generic: Contraseña
+        - textbox "Contraseña" [ref=f3e26]
+      - generic [ref=f3e27]: visibility_off
+    - button "Iniciar sesión" [ref=f3e30] [cursor=pointer]:
+      - generic [ref=f3e31]:
+        - img [ref=f3e32]: login
+        - generic [ref=f3e33]: Iniciar sesión
+    - generic [ref=f3e34]: Soporte
+    - generic [ref=f3e38]: ¿No tenés cuenta? Hablá con el administrador.

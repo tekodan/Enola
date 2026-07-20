@@ -48,12 +48,21 @@ class AnalysisFeedbackModel(Base):
     corrected_dimension = Column(String, nullable=True)
     corrected_justificacion = Column(Text, nullable=True)
 
+    # Snapshot of the system's regla_disparada at the time of review.
+    # Lets the validation UI show "what rule did the AI fire?" without
+    # an extra JOIN on analysis_results. The human's verdict (agree /
+    # disagree) is captured by ``agrees``; corrected_labels.regla_disparada
+    # carries the override when disagrees.
+    regla_disparada_sistema = Column(String, nullable=True)
+
     # ChromaDB sync tracking
     indexed_in_chromadb = Column(String, default="false")
     chromadb_id = Column(String, nullable=True)
     chromadb_indexed_at = Column(DateTime, nullable=True)
 
     reviewer = Column(String, nullable=True)
+    reviewer_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    reviewer_username = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -78,6 +87,8 @@ class AnalysisFeedbackModel(Base):
             if self.chromadb_indexed_at
             else None,
             "reviewer": self.reviewer,
+            "reviewer_user_id": self.reviewer_user_id,
+            "reviewer_username": self.reviewer_username,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

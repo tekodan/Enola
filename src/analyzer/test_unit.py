@@ -2,10 +2,114 @@
 
 from unittest.mock import MagicMock
 
-from src.analyzer.category_mapping import Categoria
+from src.analyzer.category_mapping import Categoria, primary_label
 from src.analyzer.embeddings import PostEmbeddings
 from src.analyzer.rag_classifier import ClassificationResult, LabelAssignment, RAGClassifier
 from src.analyzer.violence_types import Severity
+
+
+class TestPrimaryLabel:
+    """Pins the multi-label ``primary_label`` behaviour used to mirror
+    the highest-severity label into the flat ``analysis_results``
+    columns.
+
+    Regression: ``bool('false') == True`` in Python — the old code
+    returned ``'true'`` whenever the input string was non-empty,
+    silently flipping every false-positive flag across the pipeline.
+    """
+
+    def test_empty_returns_neutral_defaults(self):
+        out = primary_label([])
+        assert out["categoria"] == "ninguna"
+        assert out["dimension"] is None
+        assert out["severidad"] == "ninguna"
+        assert out["es_falso_positivo_probable"] == "false"
+
+    def test_picks_highest_severity(self):
+        out = primary_label(
+            [
+                {"categoria": "VDG_VIOLENCIA_SIMBOLICA", "dimension": "1.1", "severidad": "baja"},
+                {
+                    "categoria": "VDG_HOSTILIDAD_FEMINICIDIO",
+                    "dimension": "3.1",
+                    "severidad": "alta",
+                },
+                {
+                    "categoria": "VDG_COSIFICACION_SLUTSHAMING",
+                    "dimension": "2.3",
+                    "severidad": "media",
+                },
+            ]
+        )
+        assert out["categoria"] == "VDG_HOSTILIDAD_FEMINICIDIO"
+        assert out["dimension"] == "3.1"
+        assert out["severidad"] == "alta"
+
+    def test_fpp_string_false_coerces_to_false(self):
+        """The string 'false' must NOT be treated as truthy."""
+        out = primary_label(
+            [
+                {
+                    "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                    "dimension": "1.1",
+                    "severidad": "media",
+                    "es_falso_positivo_probable": "false",
+                }
+            ]
+        )
+        assert out["es_falso_positivo_probable"] == "false"
+
+    def test_fpp_string_true_coerces_to_true(self):
+        out = primary_label(
+            [
+                {
+                    "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                    "dimension": "1.1",
+                    "severidad": "media",
+                    "es_falso_positivo_probable": "true",
+                }
+            ]
+        )
+        assert out["es_falso_positivo_probable"] == "true"
+
+    def test_fpp_bool_true(self):
+        out = primary_label(
+            [
+                {
+                    "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                    "dimension": "1.1",
+                    "severidad": "media",
+                    "es_falso_positivo_probable": True,
+                }
+            ]
+        )
+        assert out["es_falso_positivo_probable"] == "true"
+
+    def test_fpp_bool_false(self):
+        out = primary_label(
+            [
+                {
+                    "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                    "dimension": "1.1",
+                    "severidad": "media",
+                    "es_falso_positivo_probable": False,
+                }
+            ]
+        )
+        assert out["es_falso_positivo_probable"] == "false"
+
+    def test_fpp_int_one(self):
+        out = primary_label(
+            [
+                {
+                    "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+                    "dimension": "1.1",
+                    "severidad": "media",
+                    "es_falso_positivo_probable": 1,
+                }
+            ]
+        )
+        assert out["es_falso_positivo_probable"] == "true"
 
 
 class TestSeverity:
@@ -174,11 +278,18 @@ class TestClassificationResult:
         assert result.marcadores_detectados == ["zorra", "puta", "feminazi"]
 
     def test_from_llm_response_invalid(self):
-        """Test parsing from invalid response."""
+        """Test parsing from invalid response.
+
+        With the new ``error_parsing`` flag the result distinguishes
+        "LLM returned no JSON" from "LLM genuinely said no violence".
+        ``categoria`` falls back to ``"ninguna"`` (back-compat) but
+        ``error_parsing`` is populated for the caller to flag the row.
+        """
         result = ClassificationResult.from_llm_response("invalid json")
         assert result.tiene_violencia is False
         assert result.categoria == "ninguna"
-        assert "Error parsing" in result.justificacion
+        assert result.error_parsing is not None
+        assert "JSONDecodeError" in result.error_parsing
 
     def test_from_llm_response_multi_label(self):
         """New schema: ``clasificaciones`` array of labels."""
@@ -210,13 +321,14 @@ class TestClassificationResult:
         assert r.tiene_violencia is True
         assert r.severidad_global == Severity.ALTA
         assert len(r.clasificaciones) == 2
-        # Backwards-compat properties delegate to the primary label.
-        assert r.categoria == "VDG_VIOLENCIA_SIMBOLICA"
-        assert r.dimension == "1.1"
-        assert r.severidad == Severity.BAJA
-        # The "primary" property points to the first entry.
+        # The primary label is the highest-severity one (Phase 3.1:
+        # ``validate_clasificaciones`` sorts by severity desc). For
+        # this fixture the ALTA ``3.1`` wins over BAJA ``1.1``.
+        assert r.categoria == "VDG_HOSTILIDAD_FEMINICIDIO"
+        assert r.dimension == "3.1"
+        assert r.severidad == Severity.ALTA
         assert r.primary is not None
-        assert r.primary.categoria == "VDG_VIOLENCIA_SIMBOLICA"
+        assert r.primary.categoria == "VDG_HOSTILIDAD_FEMINICIDIO"
 
     def test_from_llm_response_legacy_single_label(self):
         """Legacy single-label schema is wrapped into a 1-element list."""
@@ -264,7 +376,9 @@ class TestClassificationResult:
         d = r.to_dict()
         assert d["tiene_violencia"] is True
         assert d["categoria"] == "VDG_VIOLENCIA_SIMBOLICA"
-        assert len(d["clasificaciones"]) == 1
+        cls = d["clasificaciones"]
+        assert isinstance(cls, list)
+        assert len(cls) == 1
 
 
 class TestRAGClassifier:
@@ -360,7 +474,7 @@ class TestRAGClassifier:
         assert "(Sin ejemplos few-shot)" in prompt
 
     def test_build_prompt_includes_canonical_table(self):
-        """The prompt must include the 18-row canonical table."""
+        """The prompt must include the 19-row canonical table."""
         classifier = RAGClassifier(context_chunks=5)
         chunks = [
             {
@@ -380,12 +494,12 @@ class TestRAGClassifier:
         assert "VDG_SALVAGUARDA_FALSO_POSITIVO" in prompt
         assert "VDG_DESACREDITACION_ACTIVISTAS" in prompt
 
-        # All 18 dimensions
+        # All 19 dimensions
         for cat, dims in [
             ("1", ["1.1", "1.2", "1.3"]),
             ("2", ["2.1", "2.2", "2.3"]),
             ("3", ["3.1", "3.2", "3.3"]),
-            ("4", ["4.1", "4.2", "4.3"]),
+            ("4", ["4.1", "4.2", "4.3", "4.4"]),
             ("5", ["5.1", "5.2", "5.3"]),
             ("6", ["6.1", "6.2", "6.3"]),
         ]:

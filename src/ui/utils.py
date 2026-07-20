@@ -2,7 +2,7 @@
 
 Centralizes:
 - DB data loading with caching
-- Human-readable category labels
+- Human-readable category labels (delegated to ``src.ui.labels``)
 - Altair chart builders (pie + bar)
 - Knowledge base ZIP packaging for download
 - KPI computation from analysis results
@@ -23,6 +23,7 @@ import pandas as pd
 from src.analyzer.category_mapping import CATEGORIAS_ORDENADAS
 from src.storage import get_database
 from src.storage.database import Database
+from src.ui.labels import get_category_label
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 LOGO_PATH = PROJECT_ROOT / "src" / "logo.png"
@@ -34,15 +35,6 @@ SPEC_PATH = PROJECT_ROOT / "SPEC.md"
 GITHUB_REPO_URL = "https://github.com/investigador/tfm-violencia-genero"
 GITHUB_FORK_URL = "https://github.com/investigador/tfm-violencia-genero/fork"
 CONTACT_EMAIL = "investigador@example.com"
-
-CATEGORIA_LABELS: dict[str, str] = {
-    "VDG_VIOLENCIA_SIMBOLICA": "Violencia Simbólica",
-    "VDG_COSIFICACION_SLUTSHAMING": "Cosificación / Slut-shaming",
-    "VDG_HOSTILIDAD_FEMINICIDIO": "Hostilidad / Feminicidio",
-    "VDG_MANOSFERA_ANTIFEMINISMO": "Manosfera / Antifeminismo",
-    "VDG_SALVAGUARDA_FALSO_POSITIVO": "Salvaguarda (Falso Positivo)",
-    "VDG_DESACREDITACION_ACTIVISTAS": "Desacreditación de Activistas",
-}
 
 CATEGORIA_COLORS: dict[str, str] = {
     "VDG_VIOLENCIA_SIMBOLICA": "#e67e22",
@@ -59,7 +51,7 @@ NON_VIOLENT_COLOR = "#27ae60"
 
 def label_for(code: str) -> str:
     """Return the human-readable label for a VDG_* code, or the code itself."""
-    return CATEGORIA_LABELS.get(code, code)
+    return get_category_label(code)
 
 
 def color_for(code: str) -> str:
@@ -87,16 +79,15 @@ def filter_by_content_type(analysis: Sequence[dict], content_type: str) -> list[
 
 def compute_pie_data(results: Sequence[dict]) -> pd.DataFrame:
     """Build a DataFrame for the violent vs non-violent pie chart."""
-    counts = Counter(a.get("tiene_violencia") for a in results)
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+    valid = [a for a in results if a.get("exclusion_label") not in _exclusion]
+    counts = Counter(a.get("tiene_violencia") for a in valid)
     violent = counts.get("true", 0)
     non_violent = counts.get("false", 0)
-    other = len(results) - violent - non_violent
     rows: list[dict[str, object]] = [
         {"Estado": "Con violencia", "Cantidad": violent},
         {"Estado": "Sin violencia", "Cantidad": non_violent},
     ]
-    if other:
-        rows.append({"Estado": "Sin clasificar", "Cantidad": other})
     return pd.DataFrame(rows)
 
 
@@ -166,7 +157,12 @@ def compute_label_distribution(
         drill-down views that want to see which sub-dimensions are
         firing, not just the umbrella categories.
     """
-    violent = [a for a in results if a.get("tiene_violencia") == "true"]
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+    violent = [
+        a
+        for a in results
+        if a.get("tiene_violencia") == "true" and a.get("exclusion_label") not in _exclusion
+    ]
     counts: Counter[tuple[str, str | None]] = Counter()
     for a in violent:
         labels = a.get("labels") or []
@@ -290,13 +286,15 @@ def compute_kpis(
     frequent individual ``categoria`` across all labels (so a single
     multi-label content can boost several tops).
     """
-    total = stats.get("analysis_results_count", 0) or 0
-    violent = sum(1 for a in analysis if a.get("tiene_violencia") == "true")
-    violent_pct = (violent / total * 100.0) if total else 0.0
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+    valid = [a for a in analysis if a.get("exclusion_label") not in _exclusion]
+    net_total = len(valid)
+    violent = sum(1 for a in valid if a.get("tiene_violencia") == "true")
+    violent_pct = (violent / net_total * 100.0) if net_total else 0.0
     top_cat: str | None = None
     if violent:
         counter: Counter[str] = Counter()
-        for a in analysis:
+        for a in valid:
             if a.get("tiene_violencia") != "true":
                 continue
             labels = a.get("labels") or []
@@ -310,7 +308,7 @@ def compute_kpis(
         if counter:
             top_cat = label_for(str(counter.most_common(1)[0][0]))
     return {
-        "total": total,
+        "total": net_total,
         "violent": violent,
         "violent_pct": round(violent_pct, 1),
         "categories": len(CATEGORIAS_ORDENADAS),

@@ -36,34 +36,48 @@ def _feedback(ar_id: int, *, agrees: str = "false") -> dict[str, object]:
 
 class TestCategoriaChoices:
     def test_choices_include_all_canonical_categories(self):
+        """``categoria_choices`` returns a ``{value: label}`` dict.
+
+        The dict format is required because NiceGUI 3.x ``ui.select``
+        only accepts ``dict`` (or a flat ``list[str]``) as ``options``;
+        the older ``[(label, value), ...]`` tuple form raises
+        ``ValueError: Invalid value`` and silently breaks the widget tree.
+        """
         pairs = categoria_choices()
-        codes = [v for _, v in pairs if v]
+        assert isinstance(pairs, dict)
+        codes = [v for v in pairs if v]
         assert Categoria.VDG_VIOLENCIA_SIMBOLICA.value in codes
         assert Categoria.VDG_COSIFICACION_SLUTSHAMING.value in codes
         assert Categoria.VDG_HOSTILIDAD_FEMINICIDIO.value in codes
         assert Categoria.VDG_MANOSFERA_ANTIFEMINISMO.value in codes
         assert Categoria.VDG_DESACREDITACION_ACTIVISTAS.value in codes
 
+    def test_choices_include_sin_categoria_sentinel(self):
+        pairs = categoria_choices()
+        assert "" in pairs
+        assert "Sin categor" in pairs[""]
+
 
 class TestDimensionOptions:
     def test_dimension_for_violencia_simbolica(self):
         options = dimension_options_for(Categoria.VDG_VIOLENCIA_SIMBOLICA.value)
-        codes = [v for _, v in options if v]
+        assert isinstance(options, dict)
+        codes = [v for v in options if v]
         assert codes == ["1.1", "1.2", "1.3"]
 
     def test_dimension_for_ninguna_returns_empty_pair_only(self):
         options = dimension_options_for(Categoria.NINGUNA.value)
-        assert options == [("(Sin dimensión)", "")]
+        assert options == {"": "(Sin dimensión)"}
 
     def test_dimension_for_empty_returns_empty_pair_only(self):
         options = dimension_options_for("")
-        assert options == [("(Sin dimensión)", "")]
+        assert options == {"": "(Sin dimensión)"}
 
     def test_dimension_labels_include_descriptions(self):
         options = dimension_options_for(Categoria.VDG_COSIFICACION_SLUTSHAMING.value)
         # Each non-empty code label has the form "<code> — <desc>"
-        first = options[0][0]
-        assert " — " in first
+        first_label = next(iter(options.values()))
+        assert " — " in first_label
 
 
 class TestValidation:
@@ -169,6 +183,15 @@ class TestFilterAnalysis:
             {**_analysis(2), "tiene_violencia": "false"},
         ]
         out = filter_analysis_for_validation(rows, [], only_violent=True)
+        assert [r["id"] for r in out] == [1]
+
+    def test_excludes_preclassified_rows(self):
+        rows = [
+            _analysis(1),
+            {**_analysis(2), "exclusion_label": "CODIGO_99"},
+            {**_analysis(3), "exclusion_label": "VIOLENCIA_COMUN"},
+        ]
+        out = filter_analysis_for_validation(rows, [])
         assert [r["id"] for r in out] == [1]
 
 

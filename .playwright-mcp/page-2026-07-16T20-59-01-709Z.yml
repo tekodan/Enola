@@ -1,0 +1,111 @@
+- generic [active] [ref=f3e1]:
+  - generic [ref=f3e3]:
+    - banner [ref=f3e4]:
+      - generic [ref=f3e5]:
+        - img "Enola Investigadora Digital" [ref=f3e8]
+        - generic [ref=f3e9]:
+          - generic [ref=f3e10]: Estadística descriptiva
+          - generic [ref=f3e11]: Reglas 1 a 6 del marco metodológico
+      - generic [ref=f3e12]:
+        - link "GitHub" [ref=f3e13] [cursor=pointer]:
+          - /url: https://github.com/investigador/tfm-violencia-genero
+        - generic [ref=f3e14]:
+          - switch [ref=f3e15] [cursor=pointer]
+          - generic [ref=f3e19]: Modo oscuro
+        - link "Iniciar sesión" [ref=f3e20] [cursor=pointer]:
+          - /url: /login
+    - complementary [ref=f3e21]:
+      - generic [ref=f3e22]:
+        - img "Enola Investigadora Digital" [ref=f3e25]
+        - generic [ref=f3e26]: NAVEGACIÓN
+        - generic [ref=f3e28]:
+          - listitem [ref=f3e29] [cursor=pointer]:
+            - generic [ref=f3e30]: home
+            - generic [ref=f3e32]: Inicio
+          - listitem [ref=f3e34] [cursor=pointer]:
+            - generic [ref=f3e35]: insights
+            - generic [ref=f3e37]: Estadística
+          - listitem [ref=f3e39] [cursor=pointer]:
+            - generic [ref=f3e40]: psychology
+            - generic [ref=f3e42]: IA & Confiabilidad
+          - listitem [ref=f3e44] [cursor=pointer]:
+            - generic [ref=f3e45]: search
+            - generic [ref=f3e47]: Inspector
+          - listitem [ref=f3e49] [cursor=pointer]:
+            - generic [ref=f3e50]: menu_book
+            - generic [ref=f3e52]: Conocimiento
+          - listitem [ref=f3e54] [cursor=pointer]:
+            - generic [ref=f3e55]: cloud_upload
+            - generic [ref=f3e57]: Cargar (admin)
+          - listitem [ref=f3e59] [cursor=pointer]:
+            - generic [ref=f3e60]: travel_explore
+            - generic [ref=f3e62]: Explorar (admin)
+          - listitem [ref=f3e64] [cursor=pointer]:
+            - generic [ref=f3e65]: edit_note
+            - generic [ref=f3e67]: Editor MD (admin)
+          - listitem [ref=f3e69] [cursor=pointer]:
+            - generic [ref=f3e70]: task_alt
+            - generic [ref=f3e72]: Validación
+        - separator [ref=f3e74]
+        - generic [ref=f3e75]:
+          - generic [ref=f3e76]: Universidad de Granada
+          - img "Universidad de Granada" [ref=f3e79]
+          - generic [ref=f3e80]: TFM 2026
+          - generic [ref=f3e81]: Detección de violencia de género digital
+          - separator
+          - generic [ref=f3e82]:
+            - generic [ref=f3e83]: auto_stories
+            - generic [ref=f3e84]: Investigadora
+          - generic [ref=f3e85]: Kimberly Michell Luna Eraso
+          - generic [ref=f3e86]:
+            - generic [ref=f3e87]: workspace_premium
+            - generic [ref=f3e88]: Tutora
+          - generic [ref=f3e89]: María del Mar García Vita
+          - separator
+          - generic [ref=f3e90]: Máster en Cultura de Paz · DDHH
+    - main [ref=f3e92]:
+      - generic [ref=f3e93]:
+        - main [ref=f3e94]:
+          - generic [ref=f3e95]:
+            - generic [ref=f3e96]:
+              - generic [ref=f3e97]:
+                - generic [ref=f3e98]: Estadísticas descriptivas
+                - generic [ref=f3e99]: Una pestaña por regla del marco metodológico (Regla 1 a 6).
+              - button "📥 Descargar CSV" [ref=f3e100] [cursor=pointer]:
+                - generic [ref=f3e101]:
+                  - img [ref=f3e102]: download
+                  - generic [ref=f3e103]: 📥 Descargar CSV
+            - generic [ref=f3e105]:
+              - generic [ref=f3e106]: Tipo de contenido
+              - generic [ref=f3e107]:
+                - button "Todos" [pressed] [ref=f3e108] [cursor=pointer]
+                - button "Posts" [ref=f3e111] [cursor=pointer]
+                - button "Comments" [ref=f3e114] [cursor=pointer]
+            - generic [ref=f3e117]:
+              - tablist [ref=f3e118]:
+                - generic [ref=f3e119]:
+                  - tab "Regla 1 — Valores perdidos" [ref=f3e120] [cursor=pointer]
+                  - tab "Regla 2 — Frecuencias" [ref=f3e124] [cursor=pointer]
+                  - tab "Regla 3 — Moda" [ref=f3e128] [cursor=pointer]
+                  - tab "Regla 4 — Bivariado" [ref=f3e132] [cursor=pointer]
+                  - tab "Regla 5 — Visualización" [selected] [ref=f3e136] [cursor=pointer]
+                  - tab "Regla 6 — Métricas IA" [ref=f3e140] [cursor=pointer]
+                - generic [ref=f3e144] [cursor=pointer]: chevron_left
+                - generic [ref=f3e145] [cursor=pointer]: chevron_right
+              - tabpanel [ref=f3e147]:
+                - tabpanel [ref=f3e148]:
+                  - generic [ref=f3e149]:
+                    - generic [ref=f3e150]: Regla 5
+                    - generic [ref=f3e151]: Visualización de resultados
+                    - generic [ref=f3e152]: Gráfica circular tricotómica (violentos · no violentos · basura digital CÓDIGO 99) y barras jerarquizadas en orden descendente. Hacé click en una categoría para ver el drill-down de sus subdimensiones.
+                  - generic [ref=f3e153]: Distribución por categoría
+        - generic [ref=f3e158]:
+          - generic [ref=f3e159]:
+            - generic [ref=f3e160]: auto_stories
+            - generic [ref=f3e161]: Inspirado en Enola Holmes, la detective en pro de la justicia.
+          - generic [ref=f3e162]: Stack · Python 3.12 · NiceGUI · Ollama · ChromaDB · LangChain · SQLite
+          - generic [ref=f3e163]:
+            - generic [ref=f3e164]: Powered by
+            - link "danialva.com" [ref=f3e165] [cursor=pointer]:
+              - /url: https://danialva.com
+  - progressbar [ref=f3e166]

@@ -1,0 +1,802 @@
+{
+  "n_items": 64,
+  "exact": 47,
+  "partial": 0,
+  "fp": 4,
+  "fn": 24,
+  "avg_jaccard": 0.734,
+  "precision": 0.333,
+  "recall": 0.081,
+  "f1": 0.13,
+  "parse_errors": 0,
+  "distrib_pred": {
+    "0": 58,
+    "1": 4,
+    "2": 1,
+    "3": 1
+  },
+  "distrib_gt": {
+    "0": 48,
+    "1": 4,
+    "2": 5,
+    "3": 5,
+    "4": 2
+  },
+  "per_item": [
+    {
+      "cid": "0f3e884a8a124fd1_p0",
+      "match": "EXACT",
+      "gt": [
+        [
+          "VDG_COSIFICACION_SLUTSHAMING",
+          "2.3"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "pred": [
+        [
+          "VDG_COSIFICACION_SLUTSHAMING",
+          "2.3"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "jaccard": 1.0,
+      "elapsed_s": 82.6
+    },
+    {
+      "cid": "0f3e884a8a124fd1_p1",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 78.9
+    },
+    {
+      "cid": "0f3e884a8a124fd1_p2",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.1"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.3"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 8.7
+    },
+    {
+      "cid": "dc8ae80a3ae35f92",
+      "match": "neg-neg",
+      "gt": [
+        [
+          "VDG_COSIFICACION_SLUTSHAMING",
+          "2.3"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.1"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "pred": [
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.1"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.2"
+        ]
+      ],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "d782af3f81de2512",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "b0bcbbb5eb375a41",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_COSIFICACION_SLUTSHAMING",
+          "2.3"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.1"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "3741fe9979b310c6",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "f787d814b5a47750",
+      "match": "FP",
+      "gt": [],
+      "pred": [
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.1"
+        ]
+      ],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "b27587532d3bdeca",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "2bcbbf01c02661d1",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "449e8848a2128407",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "d145c2f9deb89f18",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "cbd632532f03b1fe",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "d6352dd38d58eb51",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "2effd62b3d4cbac5",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "cc5db2110f4ab014",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "7bbc336cbd9531f4",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "a1478d1dd8727dd4",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "ff3b966d76f7f46c",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "6983ada882e8a729",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "f0d0660ea97b4f6f",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "e2cd4ab277182465",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "fcd0b54ed754a540",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "956858f99fe0f7fe",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "2020cf0150b86856",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "ed489d3558a69eef",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.3"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "d00e75474ff087a6",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "a4305690f1e373f9",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "8b70afaf7ae522f0",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "7816e512b504b818",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "06a914582038bc43",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "d09fd0fa741fd562",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "e355f12847ca56e7",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.1"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "7e6c8887fea366de",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_DESACREDITACION_ACTIVISTAS",
+          "6.1"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.3"
+        ],
+        [
+          "VDG_SALVAGUARDA_FALSO_POSITIVO",
+          "5.2"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "b7aff28bc7d3c1de",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "d160eac77321b71d",
+      "match": "neg-neg",
+      "gt": [
+        [
+          "VDG_DESACREDITACION_ACTIVISTAS",
+          "6.1"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.2"
+        ]
+      ],
+      "pred": [
+        [
+          "VDG_HOSTILIDAD_FEMINICIDIO",
+          "3.1"
+        ]
+      ],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "5fbccd33967c9c0b",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "9a56c48901821349",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "e94db76c3e610017",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "247eade36a76b5ad",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.1"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "c559ec3ef418584a",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "52dda3c28962f918",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "6caefde6d4c0bc54",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "b177ef1b0bf960bf",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_DESACREDITACION_ACTIVISTAS",
+          "6.3"
+        ],
+        [
+          "VDG_HOSTILIDAD_FEMINICIDIO",
+          "3.3"
+        ],
+        [
+          "VDG_SALVAGUARDA_FALSO_POSITIVO",
+          "5.2"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "3dfe60c1fbf2e1a8",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "94a5252cf77e41e6",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "780240cbc59d00c2",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "a4782c5cfd1d08c5",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "9e768e369f38ae29",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "8cd4924a57e945dc",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "6ac63c8dd7b3dbcd",
+      "match": "neg-neg",
+      "gt": [
+        [
+          "VDG_COSIFICACION_SLUTSHAMING",
+          "2.3"
+        ],
+        [
+          "VDG_MANOSFERA_ANTIFEMINISMO",
+          "4.2"
+        ],
+        [
+          "VDG_SALVAGUARDA_FALSO_POSITIVO",
+          "5.2"
+        ],
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.3"
+        ]
+      ],
+      "pred": [
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.1"
+        ]
+      ],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "b7d6c7e6ce7a0402",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "ad4a9baac6f43142",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "a2b4f447a9e0d275",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "b9a25039be6c7770",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "72acc7815981bf8e",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "c5be7323a435b26c",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "4d828911cabce8cd",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "74da4732a892ce97",
+      "match": "FN",
+      "gt": [
+        [
+          "VDG_DESACREDITACION_ACTIVISTAS",
+          "6.1"
+        ]
+      ],
+      "pred": [],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "d33f19d5eac7c764",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "804fbd6335aab52c",
+      "match": "FP",
+      "gt": [],
+      "pred": [
+        [
+          "VDG_VIOLENCIA_SIMBOLICA",
+          "1.1"
+        ]
+      ],
+      "jaccard": 0.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "32cffa6031670f8e",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "df44aa3a18434718",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    },
+    {
+      "cid": "f9703d6d41e170d1",
+      "match": "EXACT",
+      "gt": [],
+      "pred": [],
+      "jaccard": 1.0,
+      "elapsed_s": 0.0
+    }
+  ],
+  "per_subdim": {
+    "VDG_COSIFICACION_SLUTSHAMING::2.3": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 3
+    },
+    "VDG_DESACREDITACION_ACTIVISTAS::6.1": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 3
+    },
+    "VDG_DESACREDITACION_ACTIVISTAS::6.3": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1
+    },
+    "VDG_HOSTILIDAD_FEMINICIDIO::3.3": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1
+    },
+    "VDG_MANOSFERA_ANTIFEMINISMO::4.1": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 4
+    },
+    "VDG_MANOSFERA_ANTIFEMINISMO::4.2": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 7
+    },
+    "VDG_MANOSFERA_ANTIFEMINISMO::4.3": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 3
+    },
+    "VDG_SALVAGUARDA_FALSO_POSITIVO::5.2": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 3
+    },
+    "VDG_VIOLENCIA_SIMBOLICA::1.1": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 1
+    },
+    "VDG_VIOLENCIA_SIMBOLICA::1.2": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 1
+    },
+    "VDG_VIOLENCIA_SIMBOLICA::1.3": {
+      "tp": 1,
+      "fp": 4,
+      "fn": 7
+    }
+  }
+}

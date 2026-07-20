@@ -105,10 +105,10 @@ def _to_binary_pred(row: dict) -> str:
 def _to_binary_truth(row: dict, prediction: str) -> str:
     """Return the ground truth label from a human feedback row.
 
-    * ``agrees="true"`` → the AI's prediction was correct → the truth
-      equals ``prediction``.
-    * ``agrees="false"`` → the reviewer overrode; use
-      ``corrected_categoria`` if present (else "no_violencia").
+    * ``agrees="true"`` → the reviewer confirmed the AI prediction, so the
+      row is counted as a true positive or true negative.
+    * ``agrees="false"`` → the reviewer supplied the ground-truth category;
+      use ``corrected_categoria`` if present (else "no_violencia").
     """
     if row.get("agrees") == "true":
         return prediction

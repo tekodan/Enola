@@ -14,6 +14,9 @@ class AppConfig(BaseModel):
     version: str = "1.0.0"
     debug: bool = False
     log_level: str = "INFO"
+    # URL exposed to the public Streamlit app when redirecting reviewers
+    # to the migrated NiceGUI dashboard. Honor env vars first.
+    nicegui_url: str = "http://127.0.0.1:8080"
 
 
 class OllamaConfig(BaseModel):
@@ -43,7 +46,10 @@ class AnalyzerConfig(BaseModel):
     similarity_threshold: float = Field(default=0.7, ge=0.0, le=1.0)
     context_chunks: int = Field(default=5, ge=1, le=20)
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=2048, ge=100, le=8192)
+    # Non-thinking model (gemma4:26b-a4b-it-qat-asst-nothink-64k): no
+    # tokens wasted on internal reasoning, so 4096 is comfortable for
+    # the multi-label JSON (5 labels × ~150 tokens each).
+    max_tokens: int = Field(default=4096, ge=100, le=8192)
     few_shot_examples: int = Field(default=5, ge=1, le=20)
 
 
@@ -132,7 +138,17 @@ class Settings(BaseModel):
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance."""
+    import os
+
     config_path = Path(__file__).parent.parent.parent / "config.yaml"
     if config_path.exists():
-        return Settings.from_yaml(str(config_path))
-    return Settings()
+        settings = Settings.from_yaml(str(config_path))
+    else:
+        settings = Settings()
+    # Env vars override the YAML defaults for the dual-app deployment.
+    host = os.environ.get("ENOLA_HOST")
+    port = os.environ.get("ENOLA_PORT")
+    if host or port:
+        port_str = port or "8080"
+        settings.app.nicegui_url = f"http://{host or '127.0.0.1'}:{port_str}"
+    return settings

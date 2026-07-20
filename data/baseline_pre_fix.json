@@ -1,0 +1,146 @@
+{
+  "n_items_in_ground_truth": 77,
+  "n_items_in_db": 69,
+  "n_items_evaluated": 77,
+  "distrib_n_labels_db": {
+    "0": 56,
+    "1": 11,
+    "2": 7,
+    "3": 2,
+    "4": 1
+  },
+  "distrib_n_labels_ground_truth": {
+    "0": 59,
+    "1": 5,
+    "2": 6,
+    "3": 5,
+    "4": 2
+  },
+  "match_distribution": {
+    "none": 34,
+    "partial": 6,
+    "exact": 37
+  },
+  "exact_match": 37,
+  "partial_match": 6,
+  "no_match": 34,
+  "false_positive_items": 6,
+  "false_negative_items": 3,
+  "avg_jaccard": 0.843,
+  "avg_n_labels_db": 0.45,
+  "avg_n_labels_ground_truth": 0.52,
+  "aggregate": {
+    "tp": 26,
+    "fp": 9,
+    "fn": 14,
+    "precision": 0.743,
+    "recall": 0.65,
+    "f1": 0.693
+  },
+  "per_subdim": {
+    "VDG_COSIFICACION_SLUTSHAMING::2.1": {
+      "tp": 0,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "VDG_COSIFICACION_SLUTSHAMING::2.3": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 3,
+      "precision": 1.0,
+      "recall": 0.25,
+      "f1": 0.4
+    },
+    "VDG_DESACREDITACION_ACTIVISTAS::6.1": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "VDG_DESACREDITACION_ACTIVISTAS::6.3": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "VDG_HOSTILIDAD_FEMINICIDIO::3.3": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "VDG_MANOSFERA_ANTIFEMINISMO::4.1": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "VDG_MANOSFERA_ANTIFEMINISMO::4.2": {
+      "tp": 5,
+      "fp": 3,
+      "fn": 4,
+      "precision": 0.625,
+      "recall": 0.556,
+      "f1": 0.588
+    },
+    "VDG_MANOSFERA_ANTIFEMINISMO::4.3": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 1,
+      "precision": 1.0,
+      "recall": 0.667,
+      "f1": 0.8
+    },
+    "VDG_SALVAGUARDA_FALSO_POSITIVO::5.2": {
+      "tp": 1,
+      "fp": 1,
+      "fn": 2,
+      "precision": 0.5,
+      "recall": 0.333,
+      "f1": 0.4
+    },
+    "VDG_SALVAGUARDA_FALSO_POSITIVO::5.3": {
+      "tp": 0,
+      "fp": 3,
+      "fn": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0
+    },
+    "VDG_VIOLENCIA_SIMBOLICA::1.1": {
+      "tp": 1,
+      "fp": 1,
+      "fn": 0,
+      "precision": 0.5,
+      "recall": 1.0,
+      "f1": 0.667
+    },
+    "VDG_VIOLENCIA_SIMBOLICA::1.2": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "VDG_VIOLENCIA_SIMBOLICA::1.3": {
+      "tp": 6,
+      "fp": 0,
+      "fn": 4,
+      "precision": 1.0,
+      "recall": 0.6,
+      "f1": 0.75
+    }
+  }
+}

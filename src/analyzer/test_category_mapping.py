@@ -5,8 +5,10 @@ import logging
 from src.analyzer.category_mapping import (
     CATEGORIAS_ORDENADAS,
     DESCRIPCION_SUBDIMENSION,
+    KNOWLEDGE_ROOT,
     SUBDIMENSIONES_POR_CATEGORIA,
     Categoria,
+    load_prompt_block,
     map_gravedad,
     normalize_categoria,
     normalize_dimension,
@@ -41,17 +43,18 @@ class TestCategoriaEnum:
 
 
 class TestSubdimensionCoverage:
-    """Tests for the 18 valid sub-dimension codes."""
+    """Tests for the 19 valid sub-dimension codes."""
 
     def test_three_dims_per_category(self):
-        """Every category (except NINGUNA) has exactly 3 sub-dimensions."""
+        """Categories 1, 2, 3, 5 and 6 have 3 sub-dimensions; Cat. 4 has 4."""
         for cat in CATEGORIAS_ORDENADAS:
-            assert len(SUBDIMENSIONES_POR_CATEGORIA[cat]) == 3
+            expected = 4 if cat == "VDG_MANOSFERA_ANTIFEMINISMO" else 3
+            assert len(SUBDIMENSIONES_POR_CATEGORIA[cat]) == expected
 
-    def test_eighteen_total_combinations(self):
-        """6 cats × 3 dims = 18 valid combinations."""
+    def test_nineteen_total_combinations(self):
+        """The taxonomy exposes 19 valid combinations."""
         total = sum(len(dims) for dims in SUBDIMENSIONES_POR_CATEGORIA.values())
-        assert total == 18
+        assert total == 19
 
     def test_dims_match_category_number(self):
         """Sub-dimension N.M must match category N (1.1, 1.2, 1.3 for cat 1).
@@ -65,7 +68,8 @@ class TestSubdimensionCoverage:
             for dim in SUBDIMENSIONES_POR_CATEGORIA[cat]:
                 n_str, m_str = dim.split(".")
                 assert 1 <= int(n_str) <= 6
-                assert 1 <= int(m_str) <= 3
+                max_subdimension = 4 if int(n_str) == 4 else 3
+                assert 1 <= int(m_str) <= max_subdimension
             # The category index in CATEGORIAS_ORDENADAS should match N
             idx = CATEGORIAS_ORDENADAS.index(cat) + 1
             for dim in SUBDIMENSIONES_POR_CATEGORIA[cat]:
@@ -171,7 +175,7 @@ class TestMapGravedad:
 class TestRenderTabla:
     """Tests for the prompt-table renderer."""
 
-    def test_renders_18_rows(self):
+    def test_renders_19_rows(self):
         table = render_tabla_canonica_prompt()
         # Count the data rows (lines starting with "| " that have a category or dimension)
         rows = [
@@ -179,7 +183,7 @@ class TestRenderTabla:
             for line in table.split("\n")
             if line.startswith("|") and "categoria" not in line and "---" not in line
         ]
-        assert len(rows) == 18
+        assert len(rows) == 19
 
     def test_includes_all_canonical_codes(self):
         table = render_tabla_canonica_prompt()
@@ -204,3 +208,54 @@ class TestRenderSeveridad:
         assert '"media"' in text
         assert '"alta"' in text
         assert '"ninguna"' in text
+
+
+class TestLoadPromptBlock:
+    """Loads rule blocks from markdown glosarios."""
+
+    def test_loads_marcadores_block(self):
+        block = load_prompt_block("glosario/marcadores-por-subdimension.md")
+        assert "MARCADORES_CANONICOS" in block
+        assert "a lavar" in block
+        assert "1.1 (VDG_VIOLENCIA_SIMBOLICA)" in block
+        assert "aliade" in block
+
+    def test_loads_leetspeak_block(self):
+        block = load_prompt_block("glosario/leetspeak-decoder.md")
+        assert "DESCODIFICACIÓN" in block
+        assert "f3m1 nizta → feminazi" in block
+        assert "aliade → aliado" in block
+
+    def test_loads_mitigadores_block(self):
+        block = load_prompt_block("glosario/marcadores-mitigadores.md")
+        assert "MARCADORES_MITIGADORES" in block
+        assert "patriarcal" in block
+        assert "#NiUnaMenos" in block
+
+    def test_loads_referentes_block(self):
+        block = load_prompt_block("glosario/referentes-femeninos.md")
+        assert "REGLA DE COOCURRENCIA" in block
+        assert "mujer" in block
+        assert "stacy" in block
+
+    def test_loads_cat5_block_from_categoria_5_md(self):
+        block = load_prompt_block("05-categoria-5-desacreditacion-activistas.md")
+        assert "USO DE Cat. 5" in block
+        assert "5.3 acusación de hipocresía política" in block
+
+    def test_returns_empty_for_missing_file(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            result = load_prompt_block("glosario/no-existe.md")
+        assert result == ""
+
+    def test_returns_empty_for_missing_anchor(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            result = load_prompt_block(
+                "glosario/leetspeak-decoder.md",
+                anchor="No Existe",
+            )
+        assert result == ""
+
+    def test_knowledge_root_points_to_markdowns(self):
+        assert (KNOWLEDGE_ROOT / "glosario" / "leetspeak-decoder.md").is_file()
+        assert (KNOWLEDGE_ROOT / "00-protocolo-algoritmico.md").is_file()

@@ -1,0 +1,140 @@
+- generic [ref=f5e3]:
+  - banner [ref=f5e4]:
+    - generic [ref=f5e5]:
+      - img "Enola Investigadora Digital" [ref=f5e8]
+      - generic [ref=f5e9]:
+        - generic [ref=f5e10]: Validación humana
+        - generic [ref=f5e11]: Revisá los análisis y empujá correcciones a ChromaDB para que la IA aprenda de los errores confirmados.
+    - generic [ref=f5e12]:
+      - link "GitHub" [ref=f5e13] [cursor=pointer]:
+        - /url: https://github.com/investigador/tfm-violencia-genero
+      - generic [ref=f5e14]:
+        - switch [ref=f5e15] [cursor=pointer]
+        - generic [ref=f5e19]: Modo oscuro
+      - generic [ref=f5e20]:
+        - generic [ref=f5e21]: person
+        - generic [ref=f5e23]:
+          - generic [ref=f5e24]: "@admin"
+          - generic [ref=f5e25]: admin
+        - button "Salir" [ref=f5e26] [cursor=pointer]:
+          - generic [ref=f5e27]:
+            - img [ref=f5e28]: logout
+            - generic [ref=f5e29]: Salir
+  - complementary [ref=f5e30]:
+    - generic [ref=f5e31]:
+      - img "Enola Investigadora Digital" [ref=f5e34]
+      - generic [ref=f5e35]: NAVEGACIÓN
+      - generic [ref=f5e37]:
+        - listitem [ref=f5e38] [cursor=pointer]:
+          - generic [ref=f5e39]: home
+          - generic [ref=f5e41]: Inicio
+        - listitem [ref=f5e43] [cursor=pointer]:
+          - generic [ref=f5e44]: insights
+          - generic [ref=f5e46]: Estadística
+        - listitem [ref=f5e48] [cursor=pointer]:
+          - generic [ref=f5e49]: psychology
+          - generic [ref=f5e51]: IA & Confiabilidad
+        - listitem [ref=f5e53] [cursor=pointer]:
+          - generic [ref=f5e54]: search
+          - generic [ref=f5e56]: Inspector
+        - listitem [ref=f5e58] [cursor=pointer]:
+          - generic [ref=f5e59]: menu_book
+          - generic [ref=f5e61]: Conocimiento
+        - listitem [ref=f5e63] [cursor=pointer]:
+          - generic [ref=f5e64]: cloud_upload
+          - generic [ref=f5e66]: Cargar (admin)
+        - listitem [ref=f5e68] [cursor=pointer]:
+          - generic [ref=f5e69]: travel_explore
+          - generic [ref=f5e71]: Explorar (admin)
+        - listitem [ref=f5e73] [cursor=pointer]:
+          - generic [ref=f5e74]: edit_note
+          - generic [ref=f5e76]: Editor MD (admin)
+        - listitem [ref=f5e78] [cursor=pointer]:
+          - generic [ref=f5e79]: task_alt
+          - generic [ref=f5e81]: Validación
+      - separator [ref=f5e83]
+      - generic [ref=f5e84]:
+        - generic [ref=f5e85]: Universidad de Granada
+        - img "Universidad de Granada" [ref=f5e88]
+        - generic [ref=f5e89]: TFM 2026
+        - generic [ref=f5e90]: Detección de violencia de género digital
+        - separator
+        - generic [ref=f5e91]:
+          - generic [ref=f5e92]: auto_stories
+          - generic [ref=f5e93]: Investigadora
+        - generic [ref=f5e94]: Kimberly Michell Luna Eraso
+        - generic [ref=f5e95]:
+          - generic [ref=f5e96]: workspace_premium
+          - generic [ref=f5e97]: Tutora
+        - generic [ref=f5e98]: María del Mar García Vita
+        - separator
+        - generic [ref=f5e99]: Máster en Cultura de Paz · DDHH
+  - main [ref=f5e101]:
+    - generic [ref=f5e102]:
+      - main [ref=f5e103]:
+        - generic [ref=f5e104]:
+          - generic [ref=f5e105]:
+            - generic [ref=f5e106]:
+              - generic [ref=f5e107]: Análisis pendientes
+              - generic [ref=f5e108]: pending_actions
+            - generic [ref=f5e110]: "0"
+            - generic [ref=f5e111]: Sin feedback aún
+          - generic [ref=f5e112]:
+            - generic [ref=f5e113]:
+              - generic [ref=f5e114]: Total revisiones
+              - generic [ref=f5e115]: task_alt
+            - generic [ref=f5e117]: "58"
+            - generic [ref=f5e118]: 35 acuerdo · 23 corregidas
+          - generic [ref=f5e119]:
+            - generic [ref=f5e120]:
+              - generic [ref=f5e121]: Acuerdo
+              - generic [ref=f5e122]: thumb_up
+            - generic [ref=f5e124]: "35"
+          - generic [ref=f5e125]:
+            - generic [ref=f5e126]:
+              - generic [ref=f5e127]: Corregidas
+              - generic [ref=f5e128]: edit_note
+            - generic [ref=f5e130]: "23"
+          - generic [ref=f5e131]:
+            - generic [ref=f5e132]:
+              - generic [ref=f5e133]: Indexadas en ChromaDB
+              - generic [ref=f5e134]: search
+            - generic [ref=f5e136]: "0"
+            - generic [ref=f5e137]: 23 pendientes
+        - 'button "Expand \"🔧 Colección `feedback_corrections` (ChromaDB)\"" [ref=f5e141] [cursor=pointer]':
+          - generic [ref=f5e142]: "🔧 Colección `feedback_corrections` (ChromaDB)"
+          - generic [ref=f5e144]: keyboard_arrow_down
+        - generic [ref=f5e146]:
+          - generic [ref=f5e147]: Análisis pendientes
+          - generic [ref=f5e148]: Revisá y corregí las salidas de la IA
+          - generic [ref=f5e149]: Filtros por tipo / estado / sólo violentos. Cada fila del listado incluye la corrección multi-etiqueta — la indexación en ChromaDB es opcional pero te permite entrenar implícitamente el RAGClassifier.
+        - generic [ref=f5e152]:
+          - generic [ref=f5e155] [cursor=pointer]:
+            - generic [ref=f5e156]:
+              - generic: Tipo
+              - generic [ref=f5e157]:
+                - generic [ref=f5e158]: Todos
+                - combobox "Tipo" [ref=f5e159]: Todos
+            - generic [ref=f5e160]: arrow_drop_down
+          - generic [ref=f5e164] [cursor=pointer]:
+            - generic [ref=f5e165]:
+              - generic: Estado
+              - generic [ref=f5e166]:
+                - generic [ref=f5e167]: Pendientes
+                - combobox "Estado" [ref=f5e168]: Pendientes
+            - generic [ref=f5e169]: arrow_drop_down
+          - switch "Solo violentos" [ref=f5e171] [cursor=pointer]
+          - button "Refrescar" [ref=f5e176] [cursor=pointer]:
+            - generic [ref=f5e177]:
+              - img [ref=f5e178]: refresh
+              - generic [ref=f5e179]: Refrescar
+        - generic [ref=f5e180]: No hay análisis con los filtros seleccionados.
+      - generic [ref=f5e181]:
+        - generic [ref=f5e182]:
+          - generic [ref=f5e183]: auto_stories
+          - generic [ref=f5e184]: Inspirado en Enola Holmes, la detective en pro de la justicia.
+        - generic [ref=f5e185]: Stack · Python 3.12 · NiceGUI · Ollama · ChromaDB · LangChain · SQLite
+        - generic [ref=f5e186]:
+          - generic [ref=f5e187]: Powered by
+          - link "danialva.com" [ref=f5e188] [cursor=pointer]:
+            - /url: https://danialva.com

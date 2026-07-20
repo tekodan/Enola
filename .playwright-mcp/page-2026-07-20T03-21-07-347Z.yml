@@ -1,0 +1,211 @@
+- generic [ref=f7e3]:
+  - banner [ref=f7e4]:
+    - generic [ref=f7e5]:
+      - img "Enola Investigadora Digital" [ref=f7e8]
+      - generic [ref=f7e9]:
+        - generic [ref=f7e10]: IA & Confiabilidad
+        - generic [ref=f7e11]: Regla 6 — matriz de confusión y métricas de la IA
+    - generic [ref=f7e12]:
+      - link "GitHub" [ref=f7e13] [cursor=pointer]:
+        - /url: https://github.com/investigador/tfm-violencia-genero
+      - generic [ref=f7e14]:
+        - switch [ref=f7e15] [cursor=pointer]
+        - generic [ref=f7e19]: Modo oscuro
+      - generic [ref=f7e20]:
+        - generic [ref=f7e21]: person
+        - generic [ref=f7e23]:
+          - generic [ref=f7e24]: "@admin"
+          - generic [ref=f7e25]: admin
+        - button "Salir" [ref=f7e26] [cursor=pointer]:
+          - generic [ref=f7e27]:
+            - img [ref=f7e28]: logout
+            - generic [ref=f7e29]: Salir
+  - complementary [ref=f7e30]:
+    - generic [ref=f7e31]:
+      - img "Enola Investigadora Digital" [ref=f7e34]
+      - generic [ref=f7e35]: NAVEGACIÓN
+      - generic [ref=f7e37]:
+        - listitem [ref=f7e38] [cursor=pointer]:
+          - generic [ref=f7e39]: home
+          - generic [ref=f7e41]: Inicio
+        - listitem [ref=f7e43] [cursor=pointer]:
+          - generic [ref=f7e44]: insights
+          - generic [ref=f7e46]: Estadística
+        - listitem [ref=f7e48] [cursor=pointer]:
+          - generic [ref=f7e49]: psychology
+          - generic [ref=f7e51]: IA & Confiabilidad
+        - listitem [ref=f7e53] [cursor=pointer]:
+          - generic [ref=f7e54]: search
+          - generic [ref=f7e56]: Inspector
+        - listitem [ref=f7e58] [cursor=pointer]:
+          - generic [ref=f7e59]: menu_book
+          - generic [ref=f7e61]: Conocimiento
+        - listitem [ref=f7e63] [cursor=pointer]:
+          - generic [ref=f7e64]: cloud_upload
+          - generic [ref=f7e66]: Cargar (admin)
+        - listitem [ref=f7e68] [cursor=pointer]:
+          - generic [ref=f7e69]: travel_explore
+          - generic [ref=f7e71]: Explorar (admin)
+        - listitem [ref=f7e73] [cursor=pointer]:
+          - generic [ref=f7e74]: edit_note
+          - generic [ref=f7e76]: Editor MD (admin)
+        - listitem [ref=f7e78] [cursor=pointer]:
+          - generic [ref=f7e79]: task_alt
+          - generic [ref=f7e81]: Validación
+      - separator [ref=f7e83]
+      - generic [ref=f7e84]:
+        - generic [ref=f7e85]: Universidad de Granada
+        - img "Universidad de Granada" [ref=f7e88]
+        - generic [ref=f7e89]: TFM 2026
+        - generic [ref=f7e90]: Detección de violencia de género digital
+        - separator
+        - generic [ref=f7e91]:
+          - generic [ref=f7e92]: auto_stories
+          - generic [ref=f7e93]: Investigadora
+        - generic [ref=f7e94]: Kimberly Michell Luna Eraso
+        - generic [ref=f7e95]:
+          - generic [ref=f7e96]: workspace_premium
+          - generic [ref=f7e97]: Tutora
+        - generic [ref=f7e98]: María del Mar García Vita
+        - separator
+        - generic [ref=f7e99]: Máster en Cultura de Paz · DDHH
+  - main [ref=f7e101]:
+    - generic [ref=f7e102]:
+      - main [ref=f7e103]:
+        - generic [ref=f7e104]:
+          - generic [ref=f7e105]: Regla 6
+          - generic [ref=f7e106]: Confiabilidad y validez del instrumento (IA)
+          - generic [ref=f7e107]: Matriz de confusión y métricas de rendimiento (Precisión, Sensibilidad, F1-Score) calculadas con sklearn sobre la predicción original de la IA y las correcciones del revisor humano.
+        - generic [ref=f7e109]:
+          - generic [ref=f7e110]:
+            - generic [ref=f7e111]:
+              - generic [ref=f7e112]: Soporte (n)
+              - generic [ref=f7e113]: inventory_2
+            - generic [ref=f7e115]: "58"
+            - generic [ref=f7e116]: Análisis con feedback humano
+          - generic [ref=f7e117]:
+            - generic [ref=f7e118]:
+              - generic [ref=f7e119]: Precisión
+              - generic [ref=f7e120]: target
+            - generic [ref=f7e122]: 69.2%
+            - generic [ref=f7e123]: VP / (VP + FP)
+          - generic [ref=f7e124]:
+            - generic [ref=f7e125]:
+              - generic [ref=f7e126]: Sensibilidad (Recall)
+              - generic [ref=f7e127]: radar
+            - generic [ref=f7e129]: 47.4%
+            - generic [ref=f7e130]: VP / (VP + FN)
+          - generic [ref=f7e131]:
+            - generic [ref=f7e132]:
+              - generic [ref=f7e133]: F1-Score
+              - generic [ref=f7e134]: balance
+            - generic [ref=f7e136]: 56.2%
+            - generic [ref=f7e137]: Media armónica P / S
+        - generic [ref=f7e138]:
+          - generic [ref=f7e139]: Paso 6.1
+          - generic [ref=f7e140]: Matriz de confusión
+          - generic [ref=f7e141]: Verdaderos/Falsos Positivos/Negativos a nivel binario (con vs sin violencia).
+        - generic [ref=f7e143]:
+          - generic [ref=f7e214]:
+            - img:
+              - generic:
+                - generic:
+                  - generic:
+                    - generic:
+                      - generic:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - generic: VP
+                              - text: n = 9
+                          - generic:
+                            - generic:
+                              - generic: FN
+                              - text: n = 10
+                          - generic:
+                            - generic:
+                              - generic: FP
+                              - text: n = 4
+                          - generic:
+                            - generic:
+                              - generic: VN
+                              - text: n = 35
+                  - generic:
+                    - generic: "Pred: Sí (violencia)"
+                    - generic: "Pred: No"
+                  - generic:
+                    - generic: "Real: No"
+                    - generic: "Real: Sí (violencia)"
+            - img:
+              - generic: Matriz de confusión
+            - toolbar [ref=f7e228]:
+              - button "Download plot as a PNG" [ref=f7e230] [cursor=pointer]
+              - generic [ref=f7e233]:
+                - button "Zoom" [ref=f7e234] [cursor=pointer]
+                - button "Pan" [ref=f7e237] [cursor=pointer]
+              - generic [ref=f7e240]:
+                - button "Zoom in" [ref=f7e241] [cursor=pointer]
+                - button "Zoom out" [ref=f7e244] [cursor=pointer]
+                - button "Autoscale" [ref=f7e247] [cursor=pointer]
+                - button "Reset axes" [ref=f7e250] [cursor=pointer]
+              - link "plotly-logomark" [ref=f7e254] [cursor=pointer]:
+                - /url: https://plotly.com/
+                - img "plotly-logomark" [ref=f7e255]
+          - generic [ref=f7e146]:
+            - generic [ref=f7e147]:
+              - generic [ref=f7e148]:
+                - generic [ref=f7e149]: Verdaderos Positivos
+                - generic [ref=f7e150]: check_circle
+              - generic [ref=f7e152]: "9"
+              - generic [ref=f7e153]: "IA y humano coinciden: violencia"
+            - generic [ref=f7e154]:
+              - generic [ref=f7e155]:
+                - generic [ref=f7e156]: Verdaderos Negativos
+                - generic [ref=f7e157]: check_circle_outline
+              - generic [ref=f7e159]: "35"
+              - generic [ref=f7e160]: "IA y humano coinciden: no violencia"
+            - generic [ref=f7e161]:
+              - generic [ref=f7e162]:
+                - generic [ref=f7e163]: Falsos Positivos
+                - generic [ref=f7e164]: error
+              - generic [ref=f7e166]: "4"
+              - generic [ref=f7e167]: IA marcó violencia, humano dijo que no
+            - generic [ref=f7e168]:
+              - generic [ref=f7e169]:
+                - generic [ref=f7e170]: Falsos Negativos
+                - generic [ref=f7e171]: warning
+              - generic [ref=f7e173]: "10"
+              - generic [ref=f7e174]: IA no marcó, humano dijo violencia
+        - generic [ref=f7e175]:
+          - generic [ref=f7e176]: Paso 6.3
+          - generic [ref=f7e177]: Reporte de validación del instrumento
+          - generic [ref=f7e178]: Estas métricas certifican que los resultados descriptivos provienen de un instrumento válido y confiable.
+        - generic [ref=f7e180]:
+          - generic [ref=f7e181]: Lectura interpretativa
+          - generic [ref=f7e182]: "**Rendimiento bajo.** F1-Score de 56.2% sobre 58 casos. Precisión 69.2%, Sensibilidad 47.4%. Se recomienda ampliar la muestra de feedback y revisar los falsos positivos/negativos para entender los sesgos del clasificador."
+        - generic [ref=f7e183]:
+          - generic [ref=f7e184]: Resumen
+          - generic [ref=f7e185]: Acuerdos y desacuerdos del feedback humano
+          - generic [ref=f7e186]: Distribución de acuerdos y desacuerdos con el clasificador.
+        - generic [ref=f7e188]:
+          - generic [ref=f7e189]:
+            - generic [ref=f7e190]:
+              - generic [ref=f7e191]: Acuerdos (agrees=true)
+              - generic [ref=f7e192]: thumb_up
+            - generic [ref=f7e194]: "35"
+            - generic [ref=f7e195]: 60.3% del total
+          - generic [ref=f7e196]:
+            - generic [ref=f7e197]:
+              - generic [ref=f7e198]: Desacuerdos (agrees=false)
+              - generic [ref=f7e199]: thumb_down
+            - generic [ref=f7e201]: "23"
+            - generic [ref=f7e202]: 39.7% del total
+      - generic [ref=f7e203]:
+        - generic [ref=f7e204]:
+          - generic [ref=f7e205]: auto_stories
+          - generic [ref=f7e206]: Inspirado en Enola Holmes, la detective en pro de la justicia.
+        - generic [ref=f7e207]: Stack · Python 3.12 · NiceGUI · Ollama · ChromaDB · LangChain · SQLite
+        - generic [ref=f7e208]:
+          - generic [ref=f7e209]: Powered by
+          - link "danialva.com" [ref=f7e210] [cursor=pointer]:
+            - /url: https://danialva.com

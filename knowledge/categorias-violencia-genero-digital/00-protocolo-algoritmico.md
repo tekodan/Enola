@@ -3,102 +3,58 @@ tipo: Protocolo técnico transversal
 aplica_a: Todas las categorías
 ---
 
-# Protocolo Algorítmico General
+# Protocolo algorítmico general
 
-Este documento recopila los criterios técnicos de procesamiento de lenguaje natural (PLN) que aplican transversalmente a las seis categorías de violencia de género digital. Su objetivo es homogeneizar el comportamiento del modelo de IA ante fenómenos recurrentes (evasión de filtros, ambigüedad contextual, etc.) independientemente de la categoría que se esté clasificando.
+Este protocolo define las reglas transversales para las seis categorías y sus diecinueve subdimensiones.
 
----
+## 1. Coocurrencia semántica
 
-## 1. Criterio de coocurrencia semántica
+Salvo la categoría 4 y las señales de la categoría 6, las categorías sustantivas requieren un referente femenino explícito o un nombre propio reconocible. Referentes válidos incluyen `ella`, `mujer`, `chica`, `pibas`, `vieja`, `fémina`, `esposa`, `novia`, `madre`, `hija`, `hermana`, `feminista`, `activista`, `colectivo feminista`, `Eva` y `María`.
 
-**Aplica a:** todas las categorías.
+La ausencia de referente femenino debe producir `clasificaciones: []`, salvo cuando la jerga de la manosfera o el contexto transversal de 6.1/6.2 justifique otra evaluación.
 
-**Descripción:** El mensaje debe presentar la coocurrencia (proximidad sintáctica en el texto) entre:
+## 2. Leetspeak y evasión algorítmica
 
-- **Sustantivos o pronombres femeninos**: *ellas, las mujeres, la vieja, la niña, la tipa, la piba, féminas, fémina*.
-- **Adjetivos, verbos o sintagmas de inferioridad, minorización o servidumbre**, propios de la categoría que se esté evaluando (ver reglas de cada categoría).
+Antes de buscar marcadores, normalizar sustituciones alfanuméricas y ortográficas: `mu3rte` → `muerte`, `m4tar` → `matar`, `asesin0s` → `asesinos`, `f3m1 nizta` → `feminazi`, `fe-mi-nis-ta` → `feminista`, `aliade` → `aliado`, `pvt@` → `puta`.
 
-**Justificación teórica:** Basado en los estudios de procesamiento de lenguaje natural enfocados en la detección de discursos de odio de García-Díaz et al. (2021).
+Las mutaciones de muerte y asesinato pertenecen a 3.2 cuando expresan un deseo letal directo. `feminazi` con victimismo masculino pertenece a 4.2; `aliade` dirigido a un varón pertenece a 4.3.
 
----
+## 3. Contexto pragmático y salvaguarda
 
-## 2. Criterio de evasión algorítmica (Leetspeak y mutaciones ortográficas)
+Antes de confirmar un ataque, distinguir:
 
-**Aplica a:** Categoría 3 (Hostilidad explícita y apología al feminicidio) — y, preventivamente, a cualquier categoría donde el agresor pueda intentar evadir filtros.
+- Ataque misógino: el marcador se usa para agredir.
+- Denuncia feminista: el marcador se cita, critica o refuta y no es VDG.
+- Reapropiación o camaradería: el marcador no busca dañar y no es VDG.
 
-**Descripción:** El software debe estar entrenado para identificar no solo las palabras clave tal como aparecen en el diccionario, sino también sus **mutaciones alfanuméricas y ortográficas** diseñadas para eludir la moderación automática.
+Marcadores mitigadores: `arcaica`, `retrógrada`, `patriarcal`, `machista`, `denunciar`, `criticar`, `rechazar`, `repudiar`, `desmontar`, `visibilizar`, `no es verdad que`, `en realidad`, `sin embargo`, `#NiUnaMenos`, `#8M`, `#VivasNosQueremos`, comillas y preguntas retóricas de defensa.
 
-**Patrones de evasión documentados:**
+Cuando esos marcadores cumplen una función de denuncia o refutación, 6.3 sobreescribe y anula alertas de las categorías 1 a 5. El resultado es una lista vacía con `tiene_violencia: false` y `es_falso_positivo_probable: true`.
 
-| Patrón | Ejemplo original | Mutación |
-|--------|------------------|----------|
-| Sustitución numérica de vocales | muerte | `mu3rte`, `m4tar`, `asesin0s` |
-| Inserción de caracteres especiales | hija de puta | `hij@ de pút@` |
-| Separación silábica | feminista | `fe-mi-nis-ta` |
-| Variantes tipográficas | feminazi | `feminaz1`, `feminachy` |
-| Uso de sinónimos eufemísticos | asesinato | `sacrificio`, `eliminación` |
+## 4. Imperativos domésticos
 
-**Acción algorítmica:** ante la detección de un patrón que matchea parcialmente con un marcador de la categoría 3 (especialmente verbos de daño letal o sustantivos de víctima femenina), el clasificador debe activar la regla sin requerir coincidencia léxica exacta.
+Los imperativos `a lavar`, `a limpiar`, `cocinar`, `criar`, `a la cocina`, `agarrar la escoba`, `váyanse a dormir` y `calladitas` activan 1.1 cuando se dirigen a mujeres en general.
 
-**Justificación teórica:** Las plataformas aplican estrictos "niveles de moderación de contenido" orientados a la remoción inmediata de amenazas letales (Corte Constitucional, 2025, citado en Boletín temático de jurisprudencia 5, p. 49). Como respuesta, los agresores mutan tecnológicamente el discurso.
+Si esos mismos imperativos se dirigen a activistas, manifestantes, periodistas o políticas para castigar su presencia pública, activan 5.2 y pueden multicategorizarse con 1.1.
 
----
+## 5. Fronteras obligatorias
 
-## 3. Criterio de contexto pragmático (antídoto contra falsos positivos)
+| Frontera | Regla |
+|---|---|
+| 1.1 / 1.2 / 1.3 | Doméstico y sumisión / incapacidad intelectual o física / castigo moral y patologización |
+| 2.1 / 2.2 / 2.3 | Consumo sexual / físico, edad, peso o anatomía / sexualidad, intimidad o vestimenta sancionada |
+| 3.1 / 3.2 / 3.3 | Castigo físico no letal / deseo directo de matar / apología o justificación sin amenaza directa |
+| 4.1 / 4.2 / 4.3 / 4.4 | Jerarquía manosférica / oposición antifeminista / castigo a varón aliado / arquetipo femenino deshumanizante |
+| 5.1 / 5.2 / 5.3 | Patologización pública / orden doméstica contra activismo / hipocresía política |
+| 6.1 / 6.2 / 6.3 | Sutileza sin insulto / humor que encubre ataque / denuncia o reapropiación no agresiva |
 
-**Aplica a:** Categoría 5 (Control de resistencia, sarcasmos y falsos positivos) — y como salvaguarda general.
+## 6. Flujo de clasificación
 
-**Descripción:** El algoritmo debe entrenarse bajo perspectivas pragmáticas y de contexto para distinguir entre:
+1. Normalizar texto y leetspeak.
+2. Identificar referentes y blanco del ataque.
+3. Evaluar mitigadores y aplicar 6.3 si corresponde.
+4. Evaluar las seis categorías y todas las subdimensiones aplicables.
+5. Resolver fronteras con la tabla y las reglas de desempate.
+6. Devolver hasta cinco etiquetas con justificación, evidencia y marcadores propios.
 
-- **Ataque misógino** (uso despectivo del marcador).
-- **Denuncia feminista** (uso irónico o crítico del marcador, generalmente con marcadores atenuantes).
-- **Reapropiación coloquial** (uso humorístico o de camaradería, sin intención agresiva).
-
-**Marcadores de contexto mitigador (revisar antes de clasificar como ataque):**
-
-- Vocabulario valorativo negativo sobre el marcador: *arcaica, ridícula, falsa, absurda, retrógrada, patriarcal, machista*.
-- Verbos de denuncia o crítica explícita: *denunciar, criticar, evidenciar, rechazar, repudiar, desmontar, deconstruir*.
-- Conectores de negación o contraposición: *no es verdad que, en realidad, sin embargo, no, jamás, nunca, no debería*.
-- Formato de cita o referencia: comillas, paréntesis, hashtags de campaña (`#NiUnaMenos`, `#8M`, `#VivasNosQueremos`).
-- Tono coloquial-afectivo: *eres un crack, te amo, hermana, mi vida* (en insultos reapropiados).
-
-**Justificación teórica:** Syafi-Muhammad y Ruldeviyani (2020, citados en Suárez-Álvarez et al., 2025) advierten que la codificación automática presenta graves limitaciones para decodificar expresiones irónicas y frases con doble sentido. Úbeda Cuspinera (2025) documenta empíricamente que los mensajes de denuncia feminista suelen reutilizar los mismos marcadores misóginos con intención opuesta.
-
----
-
-## 4. Criterio de enunciados imperativos hacia el ámbito privado
-
-**Aplica a:** Categorías 1 y 6 (roles de sumisión y ridiculización).
-
-**Descripción:** Siguiendo los trece criterios propuestos por Schmeisser-Nieto et al. (2022) para identificar contenido sexista, la máquina debe marcar textos que utilicen "enunciados imperativos, exhortativos o llamadas a la acción" (citado en Úbeda Cuspinera, 2025, p. 200) que ordenen a la mujer retroceder al espacio doméstico para invalidar sus opiniones o participación pública.
-
-**Patrones verbales a detectar:**
-
-- Modo imperativo en segunda persona: *vete a lavar, ponte a barrer, deja de opinar*.
-- Modo imperativo en tercera persona (prescripción colectiva): *que vayan a cuidar, pónganse a trabajar, déjenlo para los hombres*.
-- Exhortaciones disfrazadas de consejo: *deberías estar en tu casa, mejor dedicate a los tuyos*.
-
----
-
-## 5. Pipeline general de clasificación
-
-Para cada mensaje recibido por el modelo, se sugiere el siguiente flujo:
-
-1. **Preprocesamiento:** normalización, lematización, detección de leetspeak (aplicar Criterio 2).
-2. **Detección de entidades:** identificar pronombres, sustantivos y referentes femeninos (Criterio 1).
-3. **Análisis pragmático:** buscar marcadores mitigadores antes de clasificar como ataque (Criterio 3).
-4. **Match contra reglas:** evaluar las 3 reglas de cada categoría y devolver la categoría con mayor score.
-5. **Validación de subdimensionar:** dentro de la categoría ganadora, identificar la subdimensión activada.
-6. **Salida estructurada:**
-
-```json
-{
-  "categoria": 1,
-  "subdimension": "1.1",
-  "regla_disparada": "Regla 1",
-  "score": 0.87,
-  "marcadores_detectados": ["a lavar", "cuidar de sus hijos"],
-  "es_falso_positivo_probable": false,
-  "evidencia": "Que vayan a limpiar sus casas..."
-}
-```
+La risa o el sarcasmo no neutralizan un ataque. Cuando el mensaje contiene humor hostil, agregar 6.2 junto con las categorías sustantivas independientes.

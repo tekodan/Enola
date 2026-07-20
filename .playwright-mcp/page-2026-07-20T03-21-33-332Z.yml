@@ -1,0 +1,187 @@
+- generic [ref=f9e3]:
+  - banner [ref=f9e4]:
+    - generic [ref=f9e5]:
+      - img "Enola Investigadora Digital" [ref=f9e8]
+      - generic [ref=f9e9]:
+        - generic [ref=f9e10]: Conocimiento
+        - generic [ref=f9e11]: Taxonomía canónica y comunidad
+    - generic [ref=f9e12]:
+      - link "GitHub" [ref=f9e13] [cursor=pointer]:
+        - /url: https://github.com/investigador/tfm-violencia-genero
+      - generic [ref=f9e14]:
+        - switch [ref=f9e15] [cursor=pointer]
+        - generic [ref=f9e19]: Modo oscuro
+      - generic [ref=f9e20]:
+        - generic [ref=f9e21]: person
+        - generic [ref=f9e23]:
+          - generic [ref=f9e24]: "@admin"
+          - generic [ref=f9e25]: admin
+        - button "Salir" [ref=f9e26] [cursor=pointer]:
+          - generic [ref=f9e27]:
+            - img [ref=f9e28]: logout
+            - generic [ref=f9e29]: Salir
+  - complementary [ref=f9e30]:
+    - generic [ref=f9e31]:
+      - img "Enola Investigadora Digital" [ref=f9e34]
+      - generic [ref=f9e35]: NAVEGACIÓN
+      - generic [ref=f9e37]:
+        - listitem [ref=f9e38] [cursor=pointer]:
+          - generic [ref=f9e39]: home
+          - generic [ref=f9e41]: Inicio
+        - listitem [ref=f9e43] [cursor=pointer]:
+          - generic [ref=f9e44]: insights
+          - generic [ref=f9e46]: Estadística
+        - listitem [ref=f9e48] [cursor=pointer]:
+          - generic [ref=f9e49]: psychology
+          - generic [ref=f9e51]: IA & Confiabilidad
+        - listitem [ref=f9e53] [cursor=pointer]:
+          - generic [ref=f9e54]: search
+          - generic [ref=f9e56]: Inspector
+        - listitem [ref=f9e58] [cursor=pointer]:
+          - generic [ref=f9e59]: menu_book
+          - generic [ref=f9e61]: Conocimiento
+        - listitem [ref=f9e63] [cursor=pointer]:
+          - generic [ref=f9e64]: cloud_upload
+          - generic [ref=f9e66]: Cargar (admin)
+        - listitem [ref=f9e68] [cursor=pointer]:
+          - generic [ref=f9e69]: travel_explore
+          - generic [ref=f9e71]: Explorar (admin)
+        - listitem [ref=f9e73] [cursor=pointer]:
+          - generic [ref=f9e74]: edit_note
+          - generic [ref=f9e76]: Editor MD (admin)
+        - listitem [ref=f9e78] [cursor=pointer]:
+          - generic [ref=f9e79]: task_alt
+          - generic [ref=f9e81]: Validación
+      - separator [ref=f9e83]
+      - generic [ref=f9e84]:
+        - generic [ref=f9e85]: Universidad de Granada
+        - img "Universidad de Granada" [ref=f9e88]
+        - generic [ref=f9e89]: TFM 2026
+        - generic [ref=f9e90]: Detección de violencia de género digital
+        - separator
+        - generic [ref=f9e91]:
+          - generic [ref=f9e92]: auto_stories
+          - generic [ref=f9e93]: Investigadora
+        - generic [ref=f9e94]: Kimberly Michell Luna Eraso
+        - generic [ref=f9e95]:
+          - generic [ref=f9e96]: workspace_premium
+          - generic [ref=f9e97]: Tutora
+        - generic [ref=f9e98]: María del Mar García Vita
+        - separator
+        - generic [ref=f9e99]: Máster en Cultura de Paz · DDHH
+  - main [ref=f9e101]:
+    - generic [ref=f9e102]:
+      - main [ref=f9e103]:
+        - generic [ref=f9e104]:
+          - generic [ref=f9e105]: TFM 2026 · Universidad de Granada
+          - generic [ref=f9e106]: Conocimiento & Comunidad
+          - generic [ref=f9e107]: Taxonomía canónica de violencia de género digital y código abierto para reproducir y extender el análisis.
+        - generic [ref=f9e108]:
+          - generic [ref=f9e109]: Base de conocimiento
+          - generic [ref=f9e110]: Taxonomía canónica (6 categorías, 19 subdimensiones)
+          - generic [ref=f9e111]: El sistema RAG indexa esta base en ChromaDB para fundamentar cada clasificación. La descarga incluye glosario, definiciones operativas y patrones de la manosfera.
+        - generic [ref=f9e113]:
+          - generic [ref=f9e114]:
+            - generic [ref=f9e115]:
+              - generic [ref=f9e116]: Documentos
+              - generic [ref=f9e117]: description
+            - generic [ref=f9e119]: "19"
+            - generic [ref=f9e120]: Archivos .md indexados
+          - generic [ref=f9e121]:
+            - generic [ref=f9e122]:
+              - generic [ref=f9e123]: Tamaño total
+              - generic [ref=f9e124]: cloud_download
+            - generic [ref=f9e126]: 84.4 KB
+            - generic [ref=f9e127]: Base de conocimiento
+          - generic [ref=f9e128]:
+            - generic [ref=f9e129]:
+              - generic [ref=f9e130]: Categorías
+              - generic [ref=f9e131]: category
+            - generic [ref=f9e133]: "6"
+            - generic [ref=f9e134]: Taxonomía cerrada VDG_*
+        - generic [ref=f9e136]:
+          - generic [ref=f9e137]:
+            - generic [ref=f9e138]: 📥 Descargar taxonomía completa
+            - generic [ref=f9e139]: ZIP con los .md de la base de conocimiento (incluye glosario de manosfera, definiciones operativas y patrones por categoría).
+          - button "Descargar .zip" [ref=f9e140] [cursor=pointer]:
+            - generic [ref=f9e141]:
+              - img [ref=f9e142]: download
+              - generic [ref=f9e143]: Descargar .zip
+        - generic [ref=f9e144]:
+          - generic [ref=f9e145]: Sobre la herramienta
+          - generic [ref=f9e146]: Pipeline del instrumento
+          - generic [ref=f9e147]: Cinco etapas desacopladas — cada componente es independiente y testeable. La metodología sigue a Hernández-Sampieri y Mendoza Torres (2018).
+        - generic [ref=f9e149]:
+          - generic [ref=f9e150]:
+            - generic [ref=f9e151]: "1"
+            - generic [ref=f9e153]:
+              - generic [ref=f9e154]:
+                - generic [ref=f9e155]: cloud_circle
+                - generic [ref=f9e156]: Scraping
+              - generic [ref=f9e157]: ScrapeGraphAI extrae posts y comentarios de páginas públicas de Facebook en formato markdown estructurado.
+          - generic [ref=f9e158]:
+            - generic [ref=f9e159]: "2"
+            - generic [ref=f9e161]:
+              - generic [ref=f9e162]:
+                - generic [ref=f9e163]: cleaning_services
+                - generic [ref=f9e164]: Preprocesamiento
+              - generic [ref=f9e165]: Limpieza, normalización y segmentación del texto. Filas vacías o ilegibles se marcan con el sentinel CÓDIGO 99 (basura digital).
+          - generic [ref=f9e166]:
+            - generic [ref=f9e167]: "3"
+            - generic [ref=f9e169]:
+              - generic [ref=f9e170]:
+                - generic [ref=f9e171]: data_object
+                - generic [ref=f9e172]: Embeddings
+              - generic [ref=f9e173]: nomic-embed-text vectoriza cada texto y ChromaDB indexa tanto la taxonomía canónica como el feedback humano.
+          - generic [ref=f9e174]:
+            - generic [ref=f9e175]: "4"
+            - generic [ref=f9e177]:
+              - generic [ref=f9e178]:
+                - generic [ref=f9e179]: psychology
+                - generic [ref=f9e180]: Clasificación
+              - generic [ref=f9e181]: RAGClassifier (Ollama + LangChain) clasifica contra 6 categorías VDG_* y 19 subdimensiones, con prompt que incluye el filtro de violencia común.
+          - generic [ref=f9e182]:
+            - generic [ref=f9e183]: "5"
+            - generic [ref=f9e185]:
+              - generic [ref=f9e186]:
+                - generic [ref=f9e187]: storage
+                - generic [ref=f9e188]: Persistencia + métricas
+              - generic [ref=f9e189]: "SQLite almacena análisis + feedback. Los módulos ``src/report/`` computan las 6 reglas metodológicas (frecuencias, moda, crosstabs, matriz de confusión)."
+        - generic [ref=f9e190]:
+          - generic [ref=f9e191]: Comunidad
+          - generic [ref=f9e192]: Código abierto
+          - generic [ref=f9e193]: El proyecto es reproducible y extensible. Si trabajás en investigación de ciberviolencia o querés adaptar la taxonomía a otro contexto, abrí un issue o fork.
+        - generic [ref=f9e195]:
+          - generic [ref=f9e196]:
+            - generic [ref=f9e197]: "Investigación reproducible: stack Python 3.12 + ScrapeGraphAI + Ollama + ChromaDB + LangChain + SQLite + Streamlit + NiceGUI + sklearn. Sin dependencias externas de pago."
+            - generic [ref=f9e198]: "Stack: · Python 3.12 · ScrapeGraphAI · Ollama · ChromaDB · LangChain · SQLite · Streamlit · NiceGUI · sklearn · Plotly"
+          - generic [ref=f9e199]:
+            - button "⭐ Ver repo en GitHub" [ref=f9e200] [cursor=pointer]:
+              - generic [ref=f9e201]:
+                - img [ref=f9e202]: star
+                - generic [ref=f9e203]: ⭐ Ver repo en GitHub
+            - button "🔀 Fork" [ref=f9e204] [cursor=pointer]:
+              - generic [ref=f9e205]:
+                - img [ref=f9e206]: fork_right
+                - generic [ref=f9e207]: 🔀 Fork
+        - generic [ref=f9e208]:
+          - generic [ref=f9e209]: Créditos
+          - generic [ref=f9e210]: Investigadora · Tutora
+        - generic [ref=f9e212]:
+          - generic [ref=f9e213]:
+            - generic [ref=f9e214]: 🔬 Investigadora
+            - generic [ref=f9e215]: Kimberly Michell Luna Eraso
+            - generic [ref=f9e216]: TFM · Máster Interuniversitario en Cultura de Paz
+          - generic [ref=f9e217]:
+            - generic [ref=f9e218]: 🎓 Tutora de proyecto
+            - generic [ref=f9e219]: María del Mar García Vita
+            - generic [ref=f9e220]: Universidad de Granada
+      - generic [ref=f9e221]:
+        - generic [ref=f9e222]:
+          - generic [ref=f9e223]: auto_stories
+          - generic [ref=f9e224]: Inspirado en Enola Holmes, la detective en pro de la justicia.
+        - generic [ref=f9e225]: Stack · Python 3.12 · NiceGUI · Ollama · ChromaDB · LangChain · SQLite
+        - generic [ref=f9e226]:
+          - generic [ref=f9e227]: Powered by
+          - link "danialva.com" [ref=f9e228] [cursor=pointer]:
+            - /url: https://danialva.com

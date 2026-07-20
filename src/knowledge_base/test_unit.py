@@ -786,3 +786,42 @@ class TestFeedbackStore:
             content_id="p",
         )
         assert fs.get_count() == 1
+
+    def test_add_correction_stores_user_metadata(self, tmp_path):
+        """``user_id``, ``added_by_username`` and ``added_at`` are persisted."""
+        fs = self._make_store(tmp_path)
+        fs.add_correction(
+            feedback_id=42,
+            text="text",
+            corrected_categoria="VDG_X",
+            corrected_dimension="1.1",
+            corrected_justificacion="",
+            content_type="post",
+            content_id="p",
+            user_id=7,
+            added_by_username="alice",
+        )
+        results = fs.search_relevant_corrections("text", n_results=1)
+        meta = results[0]["metadata"]
+        assert meta["user_id"] == "7"
+        assert meta["added_by_username"] == "alice"
+        assert meta["added_at"]
+        assert meta["feedback_id"] == "42"
+
+    def test_add_correction_user_metadata_optional(self, tmp_path):
+        """``user_id``/``added_by_username`` default to empty strings."""
+        fs = self._make_store(tmp_path)
+        fs.add_correction(
+            feedback_id=1,
+            text="text",
+            corrected_categoria="VDG_X",
+            corrected_dimension="1.1",
+            corrected_justificacion="",
+            content_type="post",
+            content_id="p",
+        )
+        results = fs.search_relevant_corrections("text", n_results=1)
+        meta = results[0]["metadata"]
+        assert meta["user_id"] == ""
+        assert meta["added_by_username"] == ""
+        assert meta["added_at"]  # timestamp defaults to now()

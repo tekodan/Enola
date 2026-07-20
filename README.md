@@ -191,7 +191,7 @@ SCRAPE COMPLETO
 
 ### `tfm analyze` — Clasificación con RAG
 
-Toma todos los posts/comments no analizados de SQLite, los clasifica con el LLM local (Ollama) usando RAG contra ChromaDB, y persiste los resultados en `analysis_results`. Los resultados son **homogéneos** (taxonomía cerrada de 6 categorías `VDG_*` y 18 subdimensiones `N.M`).
+Toma todos los posts/comments no analizados de SQLite, los clasifica con el LLM local (Ollama) usando RAG contra ChromaDB, y persiste los resultados en `analysis_results`. Los resultados son **homogéneos** (taxonomía cerrada de 6 categorías `VDG_*` y 19 subdimensiones `N.M`).
 
 ```bash
 tfm analyze                       # solo lo no analizado

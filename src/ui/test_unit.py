@@ -1,4 +1,4 @@
-"""Unit tests for the Enola UI helpers (utils.py)."""
+"""Unit tests for the Enola UI helpers (utils.py + labels.py)."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import io
 import zipfile
 
 from src.analyzer.category_mapping import CATEGORIAS_ORDENADAS
+from src.ui.labels import CATEGORIA_LABELS, get_category_choices, get_category_label
 from src.ui.utils import (
     CATEGORIA_COLORS,
-    CATEGORIA_LABELS,
     KNOWLEDGE_DIR,
     build_bar_chart,
     build_knowledge_zip,
@@ -30,6 +30,12 @@ def test_categoria_labels_complete():
         assert label and label != code, f"Missing human label for {code}"
 
 
+def test_categoria_labels_new_names():
+    """Verify the centralised labels use the updated names from taxonomy."""
+    assert CATEGORIA_LABELS["VDG_COSIFICACION_SLUTSHAMING"] == "Mercantilización Corporal"
+    assert CATEGORIA_LABELS["VDG_SALVAGUARDA_FALSO_POSITIVO"] == "Salvaguarda (Falso Positivo)"
+
+
 def test_categoria_colors_complete():
     assert set(CATEGORIA_COLORS.keys()) == set(CATEGORIAS_ORDENADAS)
     for color in CATEGORIA_COLORS.values():
@@ -41,7 +47,20 @@ def test_label_for_known_code():
 
 
 def test_label_for_unknown_code_passthrough():
-    assert label_for("VDG_FUTURA") == "VDG_FUTURA"
+    assert label_for("VDG_FUTURA") == "Vdg Futura"
+
+
+def test_label_for_centralized():
+    """label_for() and get_category_label() return the same value."""
+    for code in CATEGORIAS_ORDENADAS:
+        assert label_for(code) == get_category_label(code)
+
+
+def test_get_category_choices_matches():
+    choices = get_category_choices()
+    assert set(choices.keys()) == set(CATEGORIAS_ORDENADAS)
+    for code in CATEGORIAS_ORDENADAS:
+        assert choices[code] == CATEGORIA_LABELS[code]
 
 
 def test_color_for_known_code():
@@ -143,9 +162,9 @@ def test_compute_kpis_basic():
         {"tiene_violencia": "false"},
     ]
     kpis = compute_kpis(stats, analysis, {"files": 10, "size_bytes": 100})
-    assert kpis["total"] == 10
+    assert kpis["total"] == 3
     assert kpis["violent"] == 2
-    assert kpis["violent_pct"] == 20.0
+    assert kpis["violent_pct"] == round(2 / 3 * 100, 1)
     assert kpis["categories"] == 6
     assert kpis["pages"] == 3
     assert kpis["top_category"] == "Violencia Simbólica"

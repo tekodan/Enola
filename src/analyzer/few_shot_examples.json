@@ -1,0 +1,156 @@
+{
+  "_comment": "Few-shot examples para RAGClassifier. Cada ejemplo es un texto con su clasificacion esperada (multi-label). Validado contra docs/auditoria-categorizaciones-2026-07-13.md y docs/informe-revalidacion-2026-07-14.md.",
+  "_format": "Cada ejemplo: { 'text': str, 'result': { 'categoria': str (primary), 'dimension': str (primary), 'severidad': str, 'clasificaciones': [ { 'categoria': str, 'dimension': str, 'severidad': str, 'justificacion': str, 'evidencia': str, 'marcadores_detectados': list[str], 'regla_disparada': str } ] } }",
+  "examples": [
+    {
+      "_id": "ex1_post_manosfera_multietiqueta",
+      "text": "Confiar en la lealtad de una muj3r moderna es como esperar que un león se vuelva vegetariano. Las mvjeres modernas crecen en un entorno que incentiva la degenerac18n, acost4rs3 con var1os y no tener vergüenza. Para ellas, engañar no es malo porque pueden justificarlo con alguna lógica feminista absurd4.",
+      "result": {
+        "tiene_violencia": true,
+        "severidad": "media",
+        "clasificaciones": [
+          {
+            "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+            "dimension": "1.3",
+            "severidad": "media",
+            "justificacion": "Desvalorización genérica del colectivo femenino + inversión de responsabilidad ('engañar no es malo porque pueden justificarlo').",
+            "evidencia": "engañar no es malo porque pueden justificarlo con alguna lógica feminista absurd4",
+            "marcadores_detectados": ["engañar no es malo", "lógica feminista absurd4"],
+            "regla_disparada": "1.3 / Regla 3 — doble estándar moral"
+          },
+          {
+            "categoria": "VDG_COSIFICACION_SLUTSHAMING",
+            "dimension": "2.3",
+            "severidad": "baja",
+            "justificacion": "Juzgamiento de la conducta sexual femenina + leetspeak decodificado (degenerac18n, acost4rs3).",
+            "evidencia": "incentiva la degenerac18n, acost4rs3 con var1os y no tener vergüenza",
+            "marcadores_detectados": ["degenerac18n", "acost4rs3", "var1os"],
+            "regla_disparada": "2.3 / Regla 2.3 — slut-shaming leetspeak"
+          },
+          {
+            "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+            "dimension": "4.2",
+            "severidad": "media",
+            "justificacion": "Esencialismo victimista: la mujer moderna como manipuladora por naturaleza.",
+            "evidencia": "muj3r moderna es como esperar que un león se vuelva vegetariano",
+            "marcadores_detectados": ["muj3r moderna", "degenerac18n"],
+            "regla_disparada": "4.2 / Regla 4.2 — desinformación victimista"
+          }
+        ]
+      }
+    },
+    {
+      "_id": "ex2_comment_doble_manosfera",
+      "text": "Para el aliade y la f3m1 nizta",
+      "result": {
+        "tiene_violencia": true,
+        "severidad": "media",
+        "clasificaciones": [
+          {
+            "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+            "dimension": "4.3",
+            "severidad": "media",
+            "justificacion": "Jerga de emasculación manosférica — 'aliade' ridiculiza al aliado de las mujeres.",
+            "evidencia": "aliade",
+            "marcadores_detectados": ["aliade"],
+            "regla_disparada": "4.3 / Regla 4.3 — troleo de género (aliade)"
+          },
+          {
+            "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+            "dimension": "4.3",
+            "severidad": "media",
+            "justificacion": "Troleo de género contra feminista — 'f3m1 nizta' es leetspeak de feminazi.",
+            "evidencia": "f3m1 nizta",
+            "marcadores_detectados": ["f3m1 nizta"],
+            "regla_disparada": "4.3 / Regla 4.3 — troleo de género (feminazi)"
+          }
+        ]
+      }
+    },
+    {
+      "_id": "ex3_comment_multi_humor",
+      "text": "como son todas las mujeres Pero está ves es vieja y fea y por eso a ningún hombre le interesa... Nada es gratis en esta vida algo tiene que costar, la más cara es una esposa que ya tuve y siempre están enculada o les duele la cabeza... Ustedes no se Pero yo que ya tengo 67 me quedo con el plan A que no falla...",
+      "result": {
+        "tiene_violencia": true,
+        "severidad": "media",
+        "clasificaciones": [
+          {
+            "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+            "dimension": "1.3",
+            "severidad": "media",
+            "justificacion": "Doble estándar moral / desvalorización genérica del colectivo femenino.",
+            "evidencia": "como son todas las mujeres",
+            "marcadores_detectados": ["como son todas las mujeres"],
+            "regla_disparada": "1.3 / Regla 3 — doble estándar"
+          },
+          {
+            "categoria": "VDG_COSIFICACION_SLUTSHAMING",
+            "dimension": "2.3",
+            "severidad": "media",
+            "justificacion": "Doble estándar sexual / juzgar la conducta sexual femenina.",
+            "evidencia": "siempre están enculada o les duele la cabeza",
+            "marcadores_detectados": ["siempre están enculada", "les duele la cabeza"],
+            "regla_disparada": "2.3 / Regla 2.3 — juzgar conducta sexual"
+          },
+          {
+            "categoria": "VDG_MANOSFERA_ANTIFEMINISMO",
+            "dimension": "4.2",
+            "severidad": "media",
+            "justificacion": "Esencialismo femenino-mercancía; caricatura del varón engañado por una esposa cara.",
+            "evidencia": "la más cara es una esposa que ya tuve",
+            "marcadores_detectados": ["la más cara es una esposa", "nada es gratis"],
+            "regla_disparada": "4.2 / Regla 4.2 — esencialismo victimista"
+          },
+          {
+              "categoria": "VDG_SALVAGUARDA_FALSO_POSITIVO",
+              "dimension": "6.2",
+              "severidad": "ninguna",
+              "justificacion": "El sarcasmo/jaja modula toda la intervención (Cat. 6.2 = humor hostil que enmascara un ataque, SÍ es VDG).",
+              "evidencia": "jajaja",
+              "marcadores_detectados": ["jajaja"],
+              "regla_disparada": "6.2 / humor hostil"
+
+          }
+        ]
+      }
+    },
+    {
+      "_id": "ex4_comment_5_3_reapropiacion",
+      "text": "Pues en los carteles veo cosas logicas, a quien le molesta eso? Quieren a una mujer controlada? Quieren que las mujeres mueran? Les importa la opinión de otros sobre su cuerpo? Yo creo que todos pensamos lo mismo que dicen los carteles, o quien no? Cual es el lio?",
+      "result": {
+        "tiene_violencia": false,
+        "severidad": "ninguna",
+        "clasificaciones": []
+      }
+    },
+    {
+      "_id": "ex5_comment_violencia_comun",
+      "text": "Por eso un cafesito",
+      "result": {
+        "tiene_violencia": false,
+        "severidad": "ninguna",
+        "clasificaciones": [],
+        "exclusion_label": "VIOLENCIA_COMUN"
+      }
+    },
+    {
+      "_id": "ex6_comment_imperativo_domestico",
+      "text": "No es q la chica sea mala es q el hombre hoy día quiere hacer el papel de mujer a la mujer es quien le toca cocinar y criar al bebe",
+      "result": {
+        "tiene_violencia": true,
+        "severidad": "media",
+        "clasificaciones": [
+          {
+            "categoria": "VDG_VIOLENCIA_SIMBOLICA",
+            "dimension": "1.1",
+            "severidad": "media",
+            "justificacion": "Imperativo doméstico explícito: 'a la mujer es quien le toca cocinar y criar al bebe'.",
+            "evidencia": "a la mujer es quien le toca cocinar y criar al bebe",
+            "marcadores_detectados": ["le toca cocinar", "criar al bebe"],
+            "regla_disparada": "1.1 / Regla 1 — imperativo doméstico"
+          }
+        ]
+      }
+    }
+  ]
+}
