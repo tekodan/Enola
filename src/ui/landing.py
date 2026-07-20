@@ -155,7 +155,7 @@ def render_kpis(
 
     Row 1: Análisis totales, % con violencia, % ajustado por humanos,
     % validado por humanos.
-    Row 2: Categorías canónicas, Páginas scrapeadas.
+    Row 2: Categorías canónicas, Páginas analizadas.
 
     ``adjustment`` (from :func:`compute_adjustment_breakdown`) only
     counts rows where the reviewer *disagreed* — it answers "¿cuánto
@@ -206,7 +206,7 @@ def render_kpis(
         kpis["categories"],
         help="Taxonomía cerrada VDG_*",
     )
-    col6.metric("🗄️ Páginas scrapeadas", kpis["pages"])
+    col6.metric("🗄️ Páginas analizadas", kpis["pages"])
 
 
 def render_reliability_banner(analysis: list[dict]) -> dict[str, object]:
@@ -673,7 +673,7 @@ def render_about_section() -> None:
         """
         **Pipeline RAG end-to-end:**
 
-        1. **Scraping** de páginas de Facebook con ScrapeGraphAI + Playwright
+        1. **Captura** de contenido de páginas de Facebook
         2. **Preprocesamiento** del HTML → jerarquía `página → posts → comentarios`
         3. **Embeddings** con Ollama (`nomic-embed-text`) → ChromaDB
         4. **Clasificación** con LLM local (Ollama) y taxonomía cerrada de 6 categorías
@@ -757,13 +757,13 @@ def main() -> None:
     adjustment = compute_adjustment_breakdown(analysis)
     validation = compute_validation_breakdown(analysis)
 
-    kpis = compute_kpis(stats, analysis, knowledge_summary())
+    kpis = compute_kpis(stats, raw_analysis, knowledge_summary())
     render_kpis(kpis, adjustment, validation)
 
-    render_reliability_banner(analysis)
+    render_reliability_banner(raw_analysis)
 
     st.divider()
-    st.header("📈 Resultados del análisis (ajustados)")
+    st.header("📈 Resultados del análisis (IA)")
     adj_pct = adjustment.get("adjusted_pct", 0.0)
     val_pct = validation.get("validated_pct", 0.0)
     aut_pct = validation.get("pending_pct", 100.0)
@@ -773,9 +773,9 @@ def main() -> None:
         f"Validado por humanos: **{val_pct}%** ({adj_pct}% corregido) · "
         f"Autónomo: **{aut_pct}%**"
     )
-    render_chart_tabs(analysis)
+    render_chart_tabs(raw_analysis)
 
-    render_descriptive_statistics(analysis, posts)
+    render_descriptive_statistics(raw_analysis, posts)
 
     render_reliability_metrics_section(analysis)
 

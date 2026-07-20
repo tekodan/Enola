@@ -157,7 +157,12 @@ def compute_label_distribution(
         drill-down views that want to see which sub-dimensions are
         firing, not just the umbrella categories.
     """
-    violent = [a for a in results if a.get("tiene_violencia") == "true"]
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+    violent = [
+        a
+        for a in results
+        if a.get("tiene_violencia") == "true" and a.get("exclusion_label") not in _exclusion
+    ]
     counts: Counter[tuple[str, str | None]] = Counter()
     for a in violent:
         labels = a.get("labels") or []
@@ -281,13 +286,15 @@ def compute_kpis(
     frequent individual ``categoria`` across all labels (so a single
     multi-label content can boost several tops).
     """
-    total = stats.get("analysis_results_count", 0) or 0
-    violent = sum(1 for a in analysis if a.get("tiene_violencia") == "true")
-    violent_pct = (violent / total * 100.0) if total else 0.0
+    _exclusion = {"CODIGO_99", "VIOLENCIA_COMUN"}
+    valid = [a for a in analysis if a.get("exclusion_label") not in _exclusion]
+    net_total = len(valid)
+    violent = sum(1 for a in valid if a.get("tiene_violencia") == "true")
+    violent_pct = (violent / net_total * 100.0) if net_total else 0.0
     top_cat: str | None = None
     if violent:
         counter: Counter[str] = Counter()
-        for a in analysis:
+        for a in valid:
             if a.get("tiene_violencia") != "true":
                 continue
             labels = a.get("labels") or []
@@ -301,7 +308,7 @@ def compute_kpis(
         if counter:
             top_cat = label_for(str(counter.most_common(1)[0][0]))
     return {
-        "total": total,
+        "total": net_total,
         "violent": violent,
         "violent_pct": round(violent_pct, 1),
         "categories": len(CATEGORIAS_ORDENADAS),

@@ -19,7 +19,6 @@ from src.report.metrics import render_metrics_report
 from src.report.reliability import ReliabilityReport, calcular_valores_perdidos
 from src.report.stats import compute_crosstabs, compute_frequency_distribution, compute_mode
 from src.storage import get_database
-from src.ui.adjusted_report import build_adjusted_analysis
 from src.ui.labels import CATEGORIA_LABELS
 from src.ui.nicegui_app import theme
 from src.ui.nicegui_app.components.charts import (
@@ -45,10 +44,9 @@ def _load_data():
     db = get_database()
     raw = db.get_analysis_results()
     feedback = db.list_feedback()
-    analysis = build_adjusted_analysis(raw, feedback)
     posts = db.get_posts(limit=2000)
     pages = db.get_pages(limit=500)
-    return analysis, posts, pages, feedback
+    return raw, posts, pages, feedback
 
 
 def _page_lookup(pages, posts) -> dict[str, str]:
@@ -69,7 +67,7 @@ def _page_lookup(pages, posts) -> dict[str, str]:
 
 
 def _build_stats_csv(
-    analysis: list[dict],
+    raw: list[dict],
     subset: list[dict],
     posts: list[dict],
     pages: list[dict],
@@ -77,9 +75,9 @@ def _build_stats_csv(
 ) -> bytes:
     """Genera un CSV con todas las reglas estatísticas.
 
-    ``analysis`` se usa para Regla 1 (fiabilidad completa, incluye basura
-    digital). ``subset`` es el filtrado por tipo de contenido (Todos /
-    Posts / Comments) que alimenta Reglas 2-5.
+    ``raw`` se usa para Regla 1 (fiabilidad completa, incluye basura
+    digital) y Regla 4 (crosstabs). ``subset`` es el filtrado por tipo
+    de contenido (Todos / Posts / Comments) que alimenta Reglas 2, 3 y 5.
     """
     output = io.StringIO()
     writer = csv.writer(output)
@@ -91,7 +89,7 @@ def _build_stats_csv(
     lookup = _page_lookup(pages, posts)
 
     # --- Regla 1: Reporte de fiabilidad --------------------------------
-    reliability = calcular_valores_perdidos(analysis)
+    reliability = calcular_valores_perdidos(raw)
     writer.writerow(["--- REGLA 1: REPORTE DE FIABILIDAD ---"])
     writer.writerow([])
     writer.writerow(["Total de análisis", reliability.total])
@@ -187,7 +185,7 @@ def _build_stats_csv(
             ct_kwargs["posts"] = posts
 
         try:
-            ct = compute_crosstabs(analysis, **ct_kwargs)
+            ct = compute_crosstabs(raw, **ct_kwargs)
         except ValueError:
             writer.writerow([f"{dim_label}: Sin datos válidos"])
             writer.writerow([])
@@ -276,7 +274,7 @@ def _build_stats_csv(
     if not feedback:
         writer.writerow(["Sin feedback humano para calcular métricas"])
     else:
-        analysis_lookup = {a.get("id"): a for a in analysis if a.get("id") is not None}
+        analysis_lookup = {a.get("id"): a for a in raw if a.get("id") is not None}
         report = render_metrics_report(feedback, analysis_lookup=analysis_lookup)
         cm = report["confusion_matrix"]
         metrics = report["metrics"]
@@ -851,7 +849,7 @@ def _render_charts_overview(subset: list[dict]) -> None:
 # --- Regla 6 — Métricas de la IA ------------------------------------------
 
 
-def _render_regla6(analysis: list[dict], feedback: list[dict]) -> None:
+def _render_regla6(raw: list[dict], feedback: list[dict]) -> None:
     """Regla 6 — Matriz de confusión + fórmulas de rendimiento.
 
     Documenta las definiciones operativas de los 4 valores de la matriz
@@ -892,7 +890,7 @@ def _render_regla6(analysis: list[dict], feedback: list[dict]) -> None:
                 ).classes("text-sm").style("line-height: 1.5;")
         return
 
-    lookup: dict = {a.get("id"): a for a in analysis if a.get("id") is not None}
+    lookup: dict = {a.get("id"): a for a in raw if a.get("id") is not None}
     report = render_metrics_report(feedback, analysis_lookup=lookup)
     cm_dict = report["confusion_matrix"]
     metrics = report["metrics"]
@@ -1056,7 +1054,7 @@ def page_estadistica() -> None:
 
 def _render_body() -> None:
     try:
-        analysis, posts, pages, feedback = _load_data()
+        raw, posts, pages, feedback = _load_data()
     except Exception as exc:
         logger.exception("Failed to load data: %s", exc)
         ui.label("No se pudo cargar la base de datos.").classes("text-base")
@@ -1075,8 +1073,8 @@ def _render_body() -> None:
                 "📥 Descargar CSV",
                 icon="download",
                 on_click=lambda: _download_csv(
-                    analysis,
-                    filter_by_content_type(analysis, content_type_value["v"]),
+                    raw,
+                    filter_by_content_type(raw, content_type_value["v"]),
                     posts,
                     pages,
                     feedback,
@@ -1086,7 +1084,7 @@ def _render_body() -> None:
         # Regla 1 needs the full (unfiltered) dataset because basura
         # digital is one of its denominators. We compute it once here
         # so the Regla 1 tab can render it without re-querying.
-        reliability: ReliabilityReport = calcular_valores_perdidos(analysis)
+        reliability: ReliabilityReport = calcular_valores_perdidos(raw)
 
         # --- Content-type selector (Todos / Posts / Comments) -----------
         # Drives the subset used by Regla 2, 3, 4 y 5. Regla 1 y 6
@@ -1113,13 +1111,13 @@ def _render_body() -> None:
 
         def _rerender_tabs() -> None:
             tabs_holder.clear()
-            subset = filter_by_content_type(analysis, content_type_value["v"])
-            if not subset:
-                subset = analysis
+            raw_subset = filter_by_content_type(raw, content_type_value["v"])
+            if not raw_subset:
+                raw_subset = raw
             with tabs_holder:
                 _render_rules_tabs(
-                    analysis=analysis,
-                    subset=subset,
+                    analysis=raw,
+                    subset=raw_subset,
                     posts=posts,
                     pages=pages,
                     feedback=feedback,

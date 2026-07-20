@@ -143,9 +143,9 @@ def _render_body() -> None:
     steps = [
         {
             "n": "1",
-            "title": "Scraping",
+            "title": "Captura de datos",
             "body": (
-                "ScrapeGraphAI extrae posts y comentarios de páginas "
+                "Se capturan posts y comentarios de páginas "
                 "públicas de Facebook en formato markdown estructurado."
             ),
             "icon": "cloud_circle",
@@ -241,15 +241,15 @@ def _render_body() -> None:
         with ui.column().classes("gap-3"):
             ui.label(
                 "Investigación reproducible: stack Python 3.12 + "
-                "ScrapeGraphAI + Ollama + ChromaDB + LangChain + SQLite + "
-                "Streamlit + NiceGUI + sklearn. Sin dependencias externas "
+                "Ollama + ChromaDB + LangChain + SQLite + "
+                "NiceGUI + sklearn. Sin dependencias externas "
                 "de pago."
             ).classes("text-sm leading-relaxed").style(
                 "color: var(--enola-charcoal); line-height: 1.6;"
             )
             ui.label(
-                "Stack: · Python 3.12 · ScrapeGraphAI · Ollama · ChromaDB · "
-                "LangChain · SQLite · Streamlit · NiceGUI · sklearn · "
+                "Stack: · Python 3.12 · Ollama · ChromaDB · "
+                "LangChain · SQLite · NiceGUI · sklearn · "
                 "Plotly"
             ).classes("text-xs").style(
                 "color: var(--enola-charcoal-light); "

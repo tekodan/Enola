@@ -162,9 +162,9 @@ def test_compute_kpis_basic():
         {"tiene_violencia": "false"},
     ]
     kpis = compute_kpis(stats, analysis, {"files": 10, "size_bytes": 100})
-    assert kpis["total"] == 10
+    assert kpis["total"] == 3
     assert kpis["violent"] == 2
-    assert kpis["violent_pct"] == 20.0
+    assert kpis["violent_pct"] == round(2 / 3 * 100, 1)
     assert kpis["categories"] == 6
     assert kpis["pages"] == 3
     assert kpis["top_category"] == "Violencia Simbólica"

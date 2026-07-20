@@ -44,6 +44,7 @@ class NavItem:
 
 NAV_ITEMS: tuple[NavItem, ...] = (
     NavItem("Inicio", "home", "/inicio"),
+    NavItem("Tutorial", "school", "/tutorial"),
     NavItem("Estadística", "insights", "/estadistica"),
     NavItem("IA & Confiabilidad", "psychology", "/ia"),
     NavItem("Inspector", "search", "/inspector"),

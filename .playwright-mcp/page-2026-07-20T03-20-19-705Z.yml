@@ -1,0 +1,244 @@
+- generic [ref=f4e3]:
+  - banner [ref=f4e4]:
+    - generic [ref=f4e5]:
+      - img "Enola Investigadora Digital" [ref=f4e8]
+      - generic [ref=f4e9]:
+        - generic [ref=f4e10]: Enola Investigadora Digital
+        - generic [ref=f4e11]: Detección de violencia de género digital con RAG
+    - generic [ref=f4e12]:
+      - link "GitHub" [ref=f4e13] [cursor=pointer]:
+        - /url: https://github.com/investigador/tfm-violencia-genero
+      - generic [ref=f4e14]:
+        - switch [ref=f4e15] [cursor=pointer]
+        - generic [ref=f4e19]: Modo oscuro
+      - generic [ref=f4e20]:
+        - generic [ref=f4e21]: person
+        - generic [ref=f4e23]:
+          - generic [ref=f4e24]: "@admin"
+          - generic [ref=f4e25]: admin
+        - button "Salir" [ref=f4e26] [cursor=pointer]:
+          - generic [ref=f4e27]:
+            - img [ref=f4e28]: logout
+            - generic [ref=f4e29]: Salir
+  - complementary [ref=f4e30]:
+    - generic [ref=f4e31]:
+      - img "Enola Investigadora Digital" [ref=f4e34]
+      - generic [ref=f4e35]: NAVEGACIÓN
+      - generic [ref=f4e37]:
+        - listitem [ref=f4e38] [cursor=pointer]:
+          - generic [ref=f4e39]: home
+          - generic [ref=f4e41]: Inicio
+        - listitem [ref=f4e43] [cursor=pointer]:
+          - generic [ref=f4e44]: insights
+          - generic [ref=f4e46]: Estadística
+        - listitem [ref=f4e48] [cursor=pointer]:
+          - generic [ref=f4e49]: psychology
+          - generic [ref=f4e51]: IA & Confiabilidad
+        - listitem [ref=f4e53] [cursor=pointer]:
+          - generic [ref=f4e54]: search
+          - generic [ref=f4e56]: Inspector
+        - listitem [ref=f4e58] [cursor=pointer]:
+          - generic [ref=f4e59]: menu_book
+          - generic [ref=f4e61]: Conocimiento
+        - listitem [ref=f4e63] [cursor=pointer]:
+          - generic [ref=f4e64]: cloud_upload
+          - generic [ref=f4e66]: Cargar (admin)
+        - listitem [ref=f4e68] [cursor=pointer]:
+          - generic [ref=f4e69]: travel_explore
+          - generic [ref=f4e71]: Explorar (admin)
+        - listitem [ref=f4e73] [cursor=pointer]:
+          - generic [ref=f4e74]: edit_note
+          - generic [ref=f4e76]: Editor MD (admin)
+        - listitem [ref=f4e78] [cursor=pointer]:
+          - generic [ref=f4e79]: task_alt
+          - generic [ref=f4e81]: Validación
+      - separator [ref=f4e83]
+      - generic [ref=f4e84]:
+        - generic [ref=f4e85]: Universidad de Granada
+        - img "Universidad de Granada" [ref=f4e88]
+        - generic [ref=f4e89]: TFM 2026
+        - generic [ref=f4e90]: Detección de violencia de género digital
+        - separator
+        - generic [ref=f4e91]:
+          - generic [ref=f4e92]: auto_stories
+          - generic [ref=f4e93]: Investigadora
+        - generic [ref=f4e94]: Kimberly Michell Luna Eraso
+        - generic [ref=f4e95]:
+          - generic [ref=f4e96]: workspace_premium
+          - generic [ref=f4e97]: Tutora
+        - generic [ref=f4e98]: María del Mar García Vita
+        - separator
+        - generic [ref=f4e99]: Máster en Cultura de Paz · DDHH
+  - main [ref=f4e101]:
+    - generic [ref=f4e102]:
+      - main [ref=f4e103]:
+        - generic [ref=f4e104]:
+          - generic [ref=f4e105]:
+            - img "Enola Investigadora Digital — banner" [ref=f4e106]
+            - generic [ref=f4e107]:
+              - generic [ref=f4e108]:
+                - generic:
+                  - generic [ref=f4e109]: search
+                  - generic [ref=f4e111]: pets
+                  - generic [ref=f4e113]: pets
+                  - generic [ref=f4e115]: check
+                  - generic [ref=f4e117]: view_in_ar
+                  - generic [ref=f4e119]: place
+              - generic [ref=f4e121]:
+                - generic [ref=f4e122]: TFM 2026 · UNIVERSIDAD DE GRANADA
+                - heading "UN ENFOQUE RAG DE DETECCIÓN DE VIOLENCIA DE GÉNERO DIGITAL EN FACEBOOK" [level=2] [ref=f4e125]
+                - list [ref=f4e127]:
+                  - listitem [ref=f4e128]:
+                    - text: Inspirado en Enola Holmes, este sistema avanzado de investigación digital analiza conversaciones de Facebook con una
+                    - strong [ref=f4e129]: taxonomía canónica
+                    - text: de
+                    - strong [ref=f4e130]: 6 categorías
+                    - text: "y"
+                    - strong [ref=f4e131]: 19 subdimensiones
+                    - text: .
+                  - listitem [ref=f4e132]:
+                    - text: Asistida por tecnologías de vanguardia como
+                    - strong [ref=f4e133]: Ollama y ChromaDB
+                    - text: ", con validación humana en el circuito para"
+                    - strong [ref=f4e134]: asegurar precisión y ética
+                    - text: .
+                - generic [ref=f4e135]:
+                  - generic [ref=f4e136]: auto_awesome
+                  - generic [ref=f4e137]: Powered by RAG + Ollama + ChromaDB
+                  - generic "Equipo" [ref=f4e139]
+          - generic [ref=f4e144]:
+            - generic [ref=f4e145]: Resumen
+            - generic [ref=f4e146]: Indicadores clave del análisis
+            - generic [ref=f4e147]: Métricas principales calculadas sobre el dataset original de la IA.
+          - generic [ref=f4e148]:
+            - generic [ref=f4e149]:
+              - generic [ref=f4e150]: trending_up
+              - generic [ref=f4e152]:
+                - generic [ref=f4e153]: Total de Casos Analizados
+                - generic [ref=f4e154]: Métricas principales
+              - generic [ref=f4e155]: (55)
+              - generic [ref=f4e161]: De 69 registros · 12 basura digital + 2 violencia común excluida
+            - generic [ref=f4e162]:
+              - generic [ref=f4e163]: auto_awesome
+              - generic [ref=f4e165]:
+                - generic [ref=f4e166]: Precisión del Modelo RAG
+                - generic [ref=f4e167]: Validación cruzada
+              - generic [ref=f4e168]: (69.2%)
+              - generic [ref=f4e169]: 69%
+              - generic [ref=f4e176]: VP / (VP + FP) · 58/69 (84.1% cobertura)
+            - generic [ref=f4e177]:
+              - generic [ref=f4e178]: category
+              - generic [ref=f4e180]:
+                - generic [ref=f4e181]: Categorías de Violencia Detectadas
+                - generic [ref=f4e182]: Top en el dataset
+              - generic [ref=f4e183]: "6"
+              - list [ref=f4e185]:
+                - listitem [ref=f4e186]: Violencia Simbólica
+                - listitem [ref=f4e187]: Mercantilización Corporal
+                - listitem [ref=f4e188]: Salvaguarda (Falso Positivo)
+                - listitem [ref=f4e189]: Manosfera / Antifeminismo
+              - generic [ref=f4e190]: 23.6% de los casos con sesgo de género
+            - generic [ref=f4e191]:
+              - generic [ref=f4e192]: task_alt
+              - generic [ref=f4e194]:
+                - generic [ref=f4e195]: Estado de Validación Humana
+                - generic [ref=f4e196]: Cobertura del equipo
+              - generic [ref=f4e197]: (100%)
+              - generic [ref=f4e199]:
+                - generic [ref=f4e200]: KL
+                - generic [ref=f4e201]: MV
+                - generic [ref=f4e202]: AB
+                - generic [ref=f4e203]: "+1"
+              - generic [ref=f4e204]: 55 revisados · 34 de acuerdo · 21 corregidos · 0 pendientes · 69 totales
+          - generic [ref=f4e205]:
+            - generic [ref=f4e206]:
+              - generic [ref=f4e207]:
+                - generic [ref=f4e208]: Categorías canónicas
+                - generic [ref=f4e209]: category
+              - generic [ref=f4e211]: "6"
+              - generic [ref=f4e212]: Taxonomía cerrada VDG_*
+            - generic [ref=f4e213]:
+              - generic [ref=f4e214]:
+                - generic [ref=f4e215]: Subdimensiones canónicas
+                - generic [ref=f4e216]: workspaces
+              - generic [ref=f4e218]: "19"
+              - generic [ref=f4e219]: 3-4 subdimensiones por categoría (19 en total)
+            - generic [ref=f4e220]:
+              - generic [ref=f4e221]:
+                - generic [ref=f4e222]: Páginas analizadas
+                - generic [ref=f4e223]: public
+              - generic [ref=f4e225]: "2"
+              - generic [ref=f4e226]: Fuentes de Facebook analizadas
+          - generic [ref=f4e227]:
+            - text: “
+            - generic [ref=f4e228]: "La violencia de género digital no se mide solo en likes y reportes: se mide en la intención pragmática del discurso, en quién ataca, por qué y con qué palabras."
+            - generic [ref=f4e229]: — Marco metodológico, Regla de exclusión
+          - generic [ref=f4e230]:
+            - generic [ref=f4e231]: Regla 1
+            - generic [ref=f4e232]: Reporte de fiabilidad
+            - generic [ref=f4e233]: Detección de valores perdidos (CÓDIGO 99) y violencia común sin sesgo de género. Hernández-Sampieri y Mendoza Torres (2018).
+          - generic [ref=f4e234]:
+            - generic [ref=f4e235]:
+              - generic [ref=f4e236]:
+                - generic [ref=f4e237]: Total de análisis
+                - generic [ref=f4e238]: database
+              - generic [ref=f4e240]: "69"
+              - generic [ref=f4e241]: Filas evaluadas
+            - generic [ref=f4e242]:
+              - generic [ref=f4e243]:
+                - generic [ref=f4e244]: "% Basura digital (CÓDIGO 99)"
+                - generic [ref=f4e245]: delete_sweep
+              - generic [ref=f4e247]: 17.39%
+              - generic [ref=f4e248]: 12 de 69 registros
+            - generic [ref=f4e249]:
+              - generic [ref=f4e250]:
+                - generic [ref=f4e251]: "% Violencia común (sin sesgo)"
+                - generic [ref=f4e252]: block
+              - generic [ref=f4e254]: 2.9%
+              - generic [ref=f4e255]: 2 de 69 registros
+          - generic [ref=f4e256]:
+            - generic [ref=f4e257]:
+              - generic [ref=f4e258]: error
+              - generic [ref=f4e260]:
+                - generic [ref=f4e261]: Nivel de alerta · CRITICA
+                - generic [ref=f4e262]: "ALERTA CRÍTICA: el 17.39% de los registros son valores perdidos (CÓDIGO 99), superando el umbral del 10%. El instrumento de extracción (scraper) tiene problemas de estabilidad y la extracción debe revisarse."
+            - generic [ref=f4e263]:
+              - generic [ref=f4e264]: Detalle de códigos de basura digital
+              - generic [ref=f4e265]: COND_1_VACIO · 12
+          - generic [ref=f4e268]:
+            - generic [ref=f4e269]: 💬 Chat con la IA
+            - generic [ref=f4e270]: Preguntá sobre la taxonomía, análisis de posts o por qué se clasificó de cierta forma
+            - generic [ref=f4e271]: "Ejemplos: '¿en qué categorías clasificarías este texto?' · 'analizá el post 0f3e884a8a124fd1_p2' · '¿por qué 4.1 y no 1.1?'"
+          - generic [ref=f4e272]:
+            - generic [ref=f4e273]:
+              - generic [ref=f4e274]: ¡Hola! Soy Enola, asistente del TFM. Tengo conocimiento basado en la taxonomía y las reglas de clasificación que podés descargar desde la base de conocimiento.
+              - generic [ref=f4e276]: ⚠️ La IA puede cometer errores. Mis respuestas se basan en las 6 categorías y 19 subdimensiones de la taxonomía.
+            - generic [ref=f4e278]:
+              - textbox [ref=f4e283]:
+                - /placeholder: Escribí tu pregunta y presioná Enter…
+              - button "Enviar" [ref=f4e284] [cursor=pointer]:
+                - generic [ref=f4e285]:
+                  - img [ref=f4e286]: send
+                  - generic [ref=f4e287]: Enviar
+          - generic [ref=f4e288]:
+            - generic [ref=f4e289]:
+              - generic [ref=f4e290]: ¿Querés profundizar?
+              - generic [ref=f4e291]: "Explorá las pestañas del menú lateral: estadística completa, métricas de la IA, inspector por contenido y la base de conocimiento."
+            - generic [ref=f4e292]:
+              - button "Estadística" [ref=f4e293] [cursor=pointer]:
+                - generic [ref=f4e294]:
+                  - img [ref=f4e295]: insights
+                  - generic [ref=f4e296]: Estadística
+              - button "IA & Confiabilidad" [ref=f4e297] [cursor=pointer]:
+                - generic [ref=f4e298]:
+                  - img [ref=f4e299]: psychology
+                  - generic [ref=f4e300]: IA & Confiabilidad
+      - generic [ref=f4e301]:
+        - generic [ref=f4e302]:
+          - generic [ref=f4e303]: auto_stories
+          - generic [ref=f4e304]: Inspirado en Enola Holmes, la detective en pro de la justicia.
+        - generic [ref=f4e305]: Stack · Python 3.12 · NiceGUI · Ollama · ChromaDB · LangChain · SQLite
+        - generic [ref=f4e306]:
+          - generic [ref=f4e307]: Powered by
+          - link "danialva.com" [ref=f4e308] [cursor=pointer]:
+            - /url: https://danialva.com

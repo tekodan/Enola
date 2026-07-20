@@ -47,6 +47,7 @@ from src.ui.nicegui_app.pages import (  # noqa: E402,F401  -- registers @ui.page
     inicio,
     inspector,
     login,
+    tutorial,
     validacion,
 )
 

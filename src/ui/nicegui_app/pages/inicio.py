@@ -169,7 +169,7 @@ def page_inicio() -> None:
 # --- Data loading ------------------------------------------------------------
 
 
-def _load_data() -> tuple[list[dict], dict, ReliabilityReport, dict, dict]:
+def _load_data() -> tuple[list[dict], list[dict], dict, ReliabilityReport, dict, dict]:
     """Pull everything the Inicio page needs in one shot."""
     db = get_database()
     raw_analysis = db.get_analysis_results()
@@ -177,7 +177,7 @@ def _load_data() -> tuple[list[dict], dict, ReliabilityReport, dict, dict]:
 
     analysis = build_adjusted_analysis(raw_analysis, feedback_rows)
     adjustment = compute_adjustment_breakdown(analysis)
-    reliability = calcular_valores_perdidos(analysis)
+    reliability = calcular_valores_perdidos(raw_analysis)
 
     # Validation breakdown — counts reviewed rows (agreement OR
     # disagreement). Used by the Estado de Validación Humana card.
@@ -203,7 +203,7 @@ def _load_data() -> tuple[list[dict], dict, ReliabilityReport, dict, dict]:
     except Exception:
         logger.exception("compute_reliability_metrics falló — card usará fallback")
 
-    return analysis, adjustment, reliability, validation, metrics_payload
+    return raw_analysis, analysis, adjustment, reliability, validation, metrics_payload
 
 
 # --- Components --------------------------------------------------------------
@@ -875,7 +875,9 @@ def render_inicio_body() -> None:
         render_hero()
 
         try:
-            analysis, adjustment, reliability, validation, metrics_payload = _load_data()
+            raw_analysis, analysis, adjustment, reliability, validation, metrics_payload = (
+                _load_data()
+            )
         except Exception as exc:  # pragma: no cover - DB may not be seeded
             logger.exception("Failed to load landing data: %s", exc)
             empty_state(
@@ -892,9 +894,11 @@ def render_inicio_body() -> None:
         section_header(
             "Resumen",
             "Indicadores clave del análisis",
-            subtitle=("Métricas principales calculadas sobre el dataset ajustado por humanos."),
+            subtitle=("Métricas principales calculadas sobre el dataset original de la IA."),
         )
-        render_kpis(analysis, adjustment, validation=validation, metrics_payload=metrics_payload)
+        render_kpis(
+            raw_analysis, adjustment, validation=validation, metrics_payload=metrics_payload
+        )
 
         # Editorial interlude
         render_intro_quote()
