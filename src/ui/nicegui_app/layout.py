@@ -160,7 +160,7 @@ def page_header(title: str, *, subtitle: str | None = None) -> None:
                 icon="menu",
                 on_click=lambda: _toggle_drawer(),
             ).props("flat dense round").classes("enola-hamburger").style(
-                "color: var(--enola-plum);"
+                "color: var(--enola-cream);"
             )
 
             with (
@@ -308,7 +308,7 @@ def side_drawer(current_path: str) -> None:
     ugr_dark_url = "/static/ugr_dark.png"
 
     drawer = (
-        ui.left_drawer(top_corner=True, bottom_corner=True, value=True)
+        ui.left_drawer(top_corner=True, bottom_corner=True, value=None)
         .props("mode=desktop breakpoint=768")
         .classes("w-64 no-wrap enola-drawer")
     )

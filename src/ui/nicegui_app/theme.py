@@ -1818,10 +1818,37 @@ body.body--dark .enola-markdown blockquote {{
         padding: 1rem !important;
     }}
 
-    /* Drawer — Quasar's mode="desktop" already collapses the drawer
-       to an overlay below 1024px. We just tighten the open width. */
-    .q-drawer {{
+    /* Hamburger — slight brass ring for prominence on dark header */
+    .enola-hamburger {{
+        border-radius: 8px;
+        box-shadow: 0 0 0 1px rgba(191, 161, 129, 0.35);
+        background: rgba(107, 78, 113, 0.50);
+    }}
+
+    /* Drawer — Quasar's mode="desktop" converts to overlay below
+       768px. On overlay the DOM uses ``.q-drawer__content`` (not
+       ``__inner``), and the ``enola-drawer`` class lands on the
+       content child rather than the outer ``.q-drawer``. Target the
+       real elements with broad yet valid selectors.
+       
+       We also kill the dark-scrim backdrop — the drawer itself is
+       opaque and a translucent backdrop only hurts legibility. */
+    .q-drawer--mobile {{
         width: 260px !important;
+        background: #D4B896 !important;
+    }}
+    .q-drawer--mobile .q-drawer__content {{
+        background: #D4B896 !important;
+    }}
+    body.body--dark .q-drawer--mobile {{
+        background: #2D2640 !important;
+    }}
+    body.body--dark .q-drawer--mobile .q-drawer__content {{
+        background: #2D2640 !important;
+    }}
+    .q-drawer--mobile + .q-drawer__backdrop {{
+        background: rgba(35, 30, 46, 0.65) !important;
+        backdrop-filter: blur(4px);
     }}
 
     /* Modal — full width with minimal padding */
