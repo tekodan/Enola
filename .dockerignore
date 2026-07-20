@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────
+# .dockerignore — exclude large / unnecessary files from build context
+# ─────────────────────────────────────────────────────────────────────
+
+# Git
+.git/
+.gitignore
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Runtime data (not needed in image)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Large binaries in repo root (save ~25 MB)
+Banner Enola.png
+Banner Enola vertical.png
+banner-background.png
+banner background.png
+logo-enola-new.png
+Logo Enola.png
+inicio-fullpage.png
+wood-pattern.png
+ugr_dark.png
+ugr-light.png
+Manual_Enola_Investigadora_Digital.docx
+mentalidad100.html
+knowledge.zip
+*.zip
+*.tar.gz
+*.tar.bz2
+
+# Misc
+.env
+.env.*
+!.env.example
+*.log
+*.log.*
+*.tmp
+*.pid
+nohup.out
+.nicegui/
+.playwright-mcp/
+Backup/
+docs/
+tests/
+scripts/
+aider*
+.windsurf/
+.cursor/
+.claude/
